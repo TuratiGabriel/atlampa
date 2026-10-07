@@ -1,0 +1,351 @@
+"""Módulos de vivienda de 'nuevos bloques.3dm' → atlampa-modulos.js
+
+    python herramientas/prepara-modulos.py      (desde diagrama/)
+
+Lee las capas de módulos (modulos44, modulos66, modulos88, 44med,
+modulosamenidades, modulosextra) con rhino3dm, sin abrir Rhino.
+Todos los módulos son cajas iguales (5.5 × 4 × 3 m) con el mismo giro, así
+que cada uno se guarda como centro + nivel + tipo.
+
+1. Shell: de cada caja sólo se guardan las caras que dan al exterior (las
+   que no tapa una caja vecina del mismo nivel o la de arriba), recortadas
+   a la parte descubierta. Las bases nunca se ven (la cámara mira desde
+   arriba) y no se guardan. Las cajas sin ninguna cara exterior se omiten.
+2. Visibilidad: para cada grado de azimut se pintan las cajas en el mismo
+   orden que el navegador (de lejos a cerca, de abajo arriba) en un búfer de
+   identificadores, y se anota cuáles quedan a la vista. Por sector de 10°
+   se guarda la unión (con 3° de margen): el navegador sólo construye y
+   pinta las cajas del sector de la cámara.
+
+3. Industria (capa 'industry_bake - Copy'): un prisma; se guarda su planta
+   (el contorno de la cara de abajo) y sus alturas.
+
+Marco: nuevos bloques.3dm está en el mismo giro que Contexto.3dm, corrido
+(497.59, 391.73) en planta; su suelo está en −6.96.
+"""
+import base64
+import json
+import math
+import os
+import sys
+from collections import Counter, defaultdict
+
+import numpy as np
+import rhino3dm
+from PIL import Image, ImageDraw
+from shapely.geometry import box as sbox
+from shapely.ops import unary_union
+
+AQUI = os.path.dirname(os.path.abspath(__file__))
+RAIZ = os.path.dirname(AQUI)
+MODELO = os.path.join(RAIZ, '..', 'Rhino', 'nuevos bloques.3dm')
+SALIDA = os.path.join(RAIZ, 'atlampa-modulos.js')
+
+CAPAS = ['modulos44', '44SOC', 'modulos66', 'modulos88', 'modulosamenidades', 'modulosextra']   # subcapas de 'Módulos'
+DU, DV, DZ = 497.59, 391.73, 6.96          # nuevos bloques → marco del diagrama
+TOL = 0.03
+SECTOR, MARGEN = 10, 3                    # grados
+PX = 0.15                                 # m por píxel en la prueba de visibilidad
+MIN_PX = 3                                # píxeles para contar una caja como visible
+PH = math.radians(30)
+
+
+def lee():
+    m = rhino3dm.File3dm.Read(MODELO)
+    cajas = []
+    for o in m.Objects:
+        capa = m.Layers[o.Attributes.LayerIndex].FullPath.split('::')[-1]
+        if capa not in CAPAS:
+            continue
+        g = o.Geometry
+        vs = [(g.Vertices[i].X, g.Vertices[i].Y, g.Vertices[i].Z) for i in range(len(g.Vertices))]
+        z0 = min(v[2] for v in vs)
+        z1 = max(v[2] for v in vs)
+        base = []
+        for v in vs:
+            if abs(v[2] - z0) < 1e-3 and all(math.dist(v[:2], b) > 1e-3 for b in base):
+                base.append(v[:2])
+        if len(base) != 4:
+            sys.exit('módulo que no es caja en ' + capa)
+        cx = sum(b[0] for b in base) / 4
+        cy = sum(b[1] for b in base) / 4
+        lados = [(base[i], base[(i + 1) % 4]) for i in range(4)]
+        largo = max(lados, key=lambda l: math.dist(*l))
+        ang = math.atan2(largo[1][1] - largo[0][1], largo[1][0] - largo[0][0])
+        ang = (ang + math.pi / 2) % math.pi - math.pi / 2           # dirección del lado largo, en (−90°, 90°]
+        cajas.append({'capa': capa, 'c': (cx, cy), 'z0': z0, 'h': z1 - z0, 'ang': ang,
+                      'a': math.dist(*largo), 'b': min(math.dist(*l) for l in lados)})
+    return cajas
+
+
+def industria():
+    m = rhino3dm.File3dm.Read(MODELO)
+    for o in m.Objects:
+        if m.Layers[o.Attributes.LayerIndex].FullPath != 'industry_bake - Copy':
+            continue
+        b = o.Geometry
+        bb = b.GetBoundingBox()
+        z0 = bb.Min.Z
+        segs = []
+        for e in b.Edges:
+            a, c = e.PointAtStart, e.PointAtEnd
+            if abs(a.Z - z0) < 1e-3 and abs(c.Z - z0) < 1e-3:
+                segs.append(((round(a.X, 3), round(a.Y, 3)), (round(c.X, 3), round(c.Y, 3))))
+        s = segs.pop()
+        lazo = [s[0], s[1]]
+        while lazo[-1] != lazo[0]:
+            for i, t in enumerate(segs):
+                if t[0] == lazo[-1] or t[1] == lazo[-1]:
+                    lazo.append(t[1] if t[0] == lazo[-1] else t[0])
+                    segs.pop(i)
+                    break
+            else:
+                sys.exit('la planta de la industria no cierra')
+        if segs:
+            sys.exit('la industria tiene más de un contorno')
+        return {'planta': [round(v, 2) for p in lazo[:-1] for v in (p[0] + DU, p[1] + DV)],
+                'z0': round(z0 + DZ, 2), 'z1': round(bb.Max.Z + DZ, 2)}
+    return None
+
+
+def chimenea():
+    """La chimenea existente (capa 'site::existing - Copy'): el prisma que se
+    afila, de 8 vértices. Base y remate como rectángulos en el marco del diagrama."""
+    m = rhino3dm.File3dm.Read(MODELO)
+    for o in m.Objects:
+        if m.Layers[o.Attributes.LayerIndex].FullPath != 'site::existing - Copy':
+            continue
+        pts = [(v.Location.X, v.Location.Y, v.Location.Z) for v in o.Geometry.Vertices]
+        if len(pts) != 8:
+            continue
+        z0 = min(p[2] for p in pts)
+        z1 = max(p[2] for p in pts)
+
+        def caja(z):
+            q = [p for p in pts if abs(p[2] - z) < 1e-3]
+            return [round(min(p[0] for p in q) + DU, 2), round(min(p[1] for p in q) + DV, 2),
+                    round(max(p[0] for p in q) + DU, 2), round(max(p[1] for p in q) + DV, 2)]
+        return {'base': caja(z0), 'remate': caja(z1), 'z0': round(z0 + DZ, 2), 'z1': round(z1 + DZ, 2)}
+    return None
+
+
+def main():
+    cajas = lee()
+    giro = sum(c['ang'] for c in cajas) / len(cajas)
+    A = round(sum(c['a'] for c in cajas) / len(cajas), 3)
+    B = round(sum(c['b'] for c in cajas) / len(cajas), 3)
+    H = round(sum(c['h'] for c in cajas) / len(cajas), 3)
+    print('cajas', len(cajas), 'giro', round(math.degrees(giro), 3), 'medidas', A, B, H)
+    assert all(abs(c['ang'] - giro) < 0.002 and abs(c['a'] - A) < 0.02 and abs(c['b'] - B) < 0.02 for c in cajas)
+    Z0 = min(c['z0'] for c in cajas)
+    eg, sg = math.cos(giro), math.sin(giro)
+    for c in cajas:
+        c['k'] = round((c['z0'] - Z0) / H)
+        assert abs(Z0 + c['k'] * H - c['z0']) < 0.01
+        # marco local girado: X a lo largo del lado largo
+        c['X'] = c['c'][0] * eg + c['c'][1] * sg
+        c['Y'] = -c['c'][0] * sg + c['c'][1] * eg
+
+    # duplicados (la misma caja en dos capas)
+    vistos, unicas = {}, []
+    for c in cajas:
+        llave = (round(c['X'], 1), round(c['Y'], 1), c['k'])
+        if llave in vistos:
+            print('  duplicada', c['capa'], 'y', vistos[llave]['capa'], llave)
+            continue
+        vistos[llave] = c
+        unicas.append(c)
+    cajas = unicas
+
+    por_nivel = defaultdict(list)
+    for c in cajas:
+        por_nivel[c['k']].append(c)
+    # traslapes dentro de un nivel
+    for k, cs in por_nivel.items():
+        for i, a in enumerate(cs):
+            for b in cs[i + 1:]:
+                if abs(a['X'] - b['X']) < A - TOL and abs(a['Y'] - b['Y']) < B - TOL:
+                    print('  traslape en nivel', k, a['capa'], b['capa'])
+
+    # 1. Shell. Lados: 0 (−Y), 1 (+X), 2 (+Y), 3 (−X); intervalos en coordenadas locales
+    def resta(a0, a1, cubre):
+        libres = [(a0, a1)]
+        for c0, c1 in cubre:
+            nuevo = []
+            for l0, l1 in libres:
+                if c1 <= l0 + TOL or c0 >= l1 - TOL:
+                    nuevo.append((l0, l1))
+                    continue
+                if c0 > l0 + TOL:
+                    nuevo.append((l0, c0))
+                if c1 < l1 - TOL:
+                    nuevo.append((c1, l1))
+            libres = nuevo
+        return libres
+
+    for c in cajas:
+        x, y = c['X'], c['Y']
+        mismos = [o for o in por_nivel[c['k']] if o is not c]
+        muros = []
+        for lado in range(4):
+            if lado in (0, 2):
+                s = -1 if lado == 0 else 1
+                cubre = [(o['X'] - A / 2 - x, o['X'] + A / 2 - x) for o in mismos if abs((o['Y'] - y) - s * B) < TOL]
+                muros.append(resta(-A / 2, A / 2, cubre))
+            else:
+                s = 1 if lado == 1 else -1
+                cubre = [(o['Y'] - B / 2 - y, o['Y'] + B / 2 - y) for o in mismos if abs((o['X'] - x) - s * A) < TOL]
+                muros.append(resta(-B / 2, B / 2, cubre))
+        arriba = [sbox(o['X'] - A / 2 - x, o['Y'] - B / 2 - y, o['X'] + A / 2 - x, o['Y'] + B / 2 - y)
+                  for o in por_nivel[c['k'] + 1] if abs(o['X'] - x) < A - TOL and abs(o['Y'] - y) < B - TOL]
+        tapa = sbox(-A / 2, -B / 2, A / 2, B / 2)
+        if arriba:
+            tapa = tapa.difference(unary_union(arriba))
+        polis = []
+        geoms = getattr(tapa, 'geoms', [tapa])
+        for gm in geoms:
+            if gm.is_empty or gm.area < 0.05:
+                continue
+            gm = gm.simplify(0.01)
+            pts = list(gm.exterior.coords)[:-1]
+            polis.append(pts)
+        c['muros'], c['tapa'] = muros, polis
+        c['u'] = c['c'][0] + DU
+        c['v'] = c['c'][1] + DV
+
+    shell = [c for c in cajas if c['tapa'] or any(c['muros'])]
+    print('con cara exterior', len(shell), 'de', len(cajas))
+    caras = sum(len(c['tapa']) + sum(len(m) for m in c['muros']) for c in shell)
+    print('caras del shell', caras, '(cajas completas:', len(cajas) * 5, ')')
+
+    # caras en coordenadas del diagrama (u, v, z), con normal
+    ex = (eg, sg)
+    ey = (-sg, eg)
+    Zb = Z0 + DZ
+
+    def uv(c, lx, ly):
+        return (c['u'] + ex[0] * lx + ey[0] * ly, c['v'] + ex[1] * lx + ey[1] * ly)
+
+    NORMALES = [(-ey[0], -ey[1]), ex, ey, (-ex[0], -ex[1])]
+    for c in shell:
+        z0 = Zb + c['k'] * H
+        z1 = z0 + H
+        c['z0d'] = z0
+        lista = []
+        for lado, ints in enumerate(c['muros']):
+            for s0, s1 in ints:
+                if lado == 0:
+                    a, b = uv(c, s0, -B / 2), uv(c, s1, -B / 2)
+                elif lado == 2:
+                    a, b = uv(c, s0, B / 2), uv(c, s1, B / 2)
+                elif lado == 1:
+                    a, b = uv(c, A / 2, s0), uv(c, A / 2, s1)
+                else:
+                    a, b = uv(c, -A / 2, s0), uv(c, -A / 2, s1)
+                lista.append((NORMALES[lado], [(a[0], a[1], z0), (b[0], b[1], z0), (b[0], b[1], z1), (a[0], a[1], z1)]))
+        for pts in c['tapa']:
+            lista.append(((0, 0, 1), [(*uv(c, p[0], p[1]), z1) for p in pts]))
+        c['caras'] = lista
+
+    # 2. Visibilidad por grado
+    sp, cp = math.sin(PH), math.cos(PH)
+    n = len(shell)
+    vis_grado = []
+    for az in range(360):
+        a = math.radians(az)
+        ct, st = math.cos(a), math.sin(a)
+
+        def xl(u, v):
+            return u * ct - v * st
+
+        def yl(u, v, z):
+            return -(u * st + v * ct) * sp - z * cp
+
+        orden = sorted(range(n), key=lambda i: (-(shell[i]['u'] * st + shell[i]['v'] * ct), shell[i]['z0d']))
+        polis = []
+        xs, ys = [], []
+        for i in orden:
+            for nrm, pts in shell[i]['caras']:
+                if len(nrm) == 2 and nrm[0] * st + nrm[1] * ct >= -1e-6:
+                    continue      # mira hacia atrás
+                pp = [(xl(p[0], p[1]), yl(p[0], p[1], p[2])) for p in pts]
+                polis.append((i, pp))
+                xs += [q[0] for q in pp]
+                ys += [q[1] for q in pp]
+        x0, y0 = min(xs) - 2, min(ys) - 2
+        w = int((max(xs) + 2 - x0) / PX) + 1
+        h = int((max(ys) + 2 - y0) / PX) + 1
+        img = Image.new('I', (w, h), 0)
+        d = ImageDraw.Draw(img)
+        for i, pp in polis:
+            d.polygon([((q[0] - x0) / PX, (q[1] - y0) / PX) for q in pp], fill=i + 1)
+        ids, cuenta = np.unique(np.asarray(img), return_counts=True)
+        vis_grado.append({int(k) - 1 for k, c in zip(ids, cuenta) if k > 0 and c >= MIN_PX})
+    print('visibles por grado: mín', min(map(len, vis_grado)), 'máx', max(map(len, vis_grado)))
+
+    sectores = []
+    for s in range(0, 360, SECTOR):
+        u = set()
+        for g in range(s - MARGEN, s + SECTOR + MARGEN):
+            u |= vis_grado[g % 360]
+        bits = bytearray((n + 7) // 8)
+        for i in u:
+            bits[i >> 3] |= 1 << (i & 7)
+        sectores.append(base64.b64encode(bytes(bits)).decode())
+        print('  sector', s, len(u))
+    nunca = n - len(set().union(*vis_grado))
+    print('cajas del shell que nunca se ven', nunca)
+
+    # 3. Salida
+    def r2(x):
+        return round(x, 2)
+
+    def caja_js(c):
+        muros = []
+        for lado, ints in enumerate(c['muros']):
+            L = A / 2 if lado in (0, 2) else B / 2
+            if not ints:
+                muros.append(0)
+            elif len(ints) == 1 and abs(ints[0][0] + L) < TOL and abs(ints[0][1] - L) < TOL:
+                muros.append(1)
+            else:
+                muros.append([r2(v) for iv in ints for v in iv])
+        if not c['tapa']:
+            tapa = 0
+        elif len(c['tapa']) == 1 and abs(sbox(-A / 2, -B / 2, A / 2, B / 2).area - abs(_area(c['tapa'][0]))) < 0.01:
+            tapa = 1
+        else:
+            tapa = [[r2(v) for p in pts for v in p] for pts in c['tapa']]
+        return [r2(c['u']), r2(c['v']), c['k'], CAPAS.index(c['capa'])] + muros + [tapa]
+
+    datos = {
+        'giro': round(math.degrees(giro), 4), 'a': A, 'b': B, 'alto': H, 'z0': round(Zb, 2),
+        'tipos': CAPAS, 'sector': SECTOR,
+        'cajas': [caja_js(c) for c in shell],
+        'sectores': sectores,
+        'industria': industria(),
+        'chimenea': chimenea(),
+    }
+    cuenta = Counter(c['capa'] for c in cajas)
+    cab = ('/* Módulos de vivienda. Generado por herramientas/prepara-modulos.py: no editar a mano.\n'
+           '   Fuente: Rhino/nuevos bloques.3dm, capas ' + ', '.join(CAPAS) + '.\n'
+           '   ' + str(len(cajas)) + ' módulos (' + ', '.join('%s %d' % (k, cuenta[k]) for k in CAPAS) + '); '
+           'aquí sólo los ' + str(len(shell)) + ' con alguna cara al exterior, y sólo esas caras.\n'
+           '   cajas: [u, v, nivel, tipo, muro −Y, muro +X, muro +Y, muro −X, tapa]; muro 1 = completo,\n'
+           '   0 = tapado, lista = tramos descubiertos (coordenadas locales). sectores: bits de las\n'
+           '   cajas visibles desde cada sector de ' + str(SECTOR) + '° de azimut. */\n')
+    with open(SALIDA, 'w', encoding='utf-8') as f:
+        f.write(cab + 'window.ATLAMPA_MODULOS = ' + json.dumps(datos, separators=(',', ':')) + ';\n')
+    print('escrito', SALIDA, os.path.getsize(SALIDA), 'bytes')
+
+
+def _area(pts):
+    s = 0
+    for i in range(len(pts)):
+        a, b = pts[i], pts[(i + 1) % len(pts)]
+        s += a[0] * b[1] - b[0] * a[1]
+    return s / 2
+
+
+if __name__ == '__main__':
+    main()
