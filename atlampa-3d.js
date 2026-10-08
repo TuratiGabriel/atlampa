@@ -533,10 +533,12 @@ function crea(svg, op) {
     const verde = pon(gPredio, m, PAI ? 'verde' : 'predio', PAI ? 'paisajismo' : null, 1);
     picables.splice(picables.indexOf(verde), 1);
     suelos.push(verde);
-    // plaza cultural: rectángulo menos el disco exterior del aro
-    const r = ANILLO.re, cu = ANILLO.u, cv = ANILLO.v, P = PLAZA_C;
-    const aN = Math.acos((P.u1 - cu) / r), aS = Math.PI - Math.asin((P.v0 - cv) / r), pl = [[P.u0, P.v1], [P.u1, P.v1]];
-    for (let i = 0; i <= 40; i++) { const t = aN + (aS - aN) * i / 40; pl.push([cu + Math.cos(t) * r, cv + Math.sin(t) * r]); }
+    // plaza cultural: rectángulo menos el aro (con su chipote): el borde de
+    // afuera del aro entre donde cruza el lado oriente (u1) y el sur (v0) de la plaza
+    const P = PLAZA_C, borde = t => G.aroPunto(t, ANILLO.re);
+    const corta = (f, a, b) => { for (let k = 0; k < 50; k++) { const m = (a + b) / 2; if ((f(a) > 0) === (f(m) > 0)) a = m; else b = m; } return (a + b) / 2; };
+    const aN = corta(t => borde(t)[0] - P.u1, 60, 135), aS = corta(t => borde(t)[1] - P.v0, 135, 200), pl = [[P.u0, P.v1], [P.u1, P.v1]];
+    for (let i = 0; i <= 60; i++) pl.push(borde(aN + (aS - aN) * i / 60));
     pl.push([P.u0, P.v0]);
     const mp = new Malla(); tapa(mp, pl, 0.22); pon(gPredio, mp, 'plaza', 'cultura', 1);
     const mh = new Malla(); tapa(mh, rect(GU.o, HE[0], GU.e, HE[1]), 0.23); pon(gPredio, mh, 'calle', null, 1);
@@ -678,7 +680,8 @@ function crea(svg, op) {
   /* ===== 6. Aro ===== */
   {
     const g = pieza('aro', 'aro', 0.6), m = new Malla(), n = 160, z1 = ANILLO.z, z0 = z1 - ANILLO.canto;
-    const ext = circ([ANILLO.u, ANILLO.v], ANILLO.re, n), int = circ([ANILLO.u, ANILLO.v], ANILLO.ri, n);
+    // con el chipote hacia la plaza cultural (G.bulto)
+    const ext = G.aroPoli(ANILLO.re, n), int = G.aroPoli(ANILLO.ri, n);
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n, A = ext[i], B = ext[j], a = int[i], b = int[j];
       m.quad(W(a[0], a[1], z1), W(b[0], b[1], z1), W(B[0], B[1], z1), W(A[0], A[1], z1));
@@ -689,10 +692,12 @@ function crea(svg, op) {
     // barandal: pasamanos y balaustres cada 2.4 m
     const ln = new Lineas(), zb = z1 + ANILLO.baranda;
     [ANILLO.ri, ANILLO.re].forEach(r => {
-      const pts = circ([ANILLO.u, ANILLO.v], r, n).map(q => W(q[0], q[1], zb));
+      const pts = G.aroPoli(r, n).map(q => W(q[0], q[1], zb));
       ln.poli(pts, true);
-      const k = Math.round(2 * Math.PI * r / 2.4);
-      circ([ANILLO.u, ANILLO.v], r, k).forEach(q => ln.seg(W(q[0], q[1], z1), W(q[0], q[1], zb)));
+      // balaustres cada 2.4 m a lo largo del borde (el chipote lo alarga)
+      const fino = G.aroPoli(r, 720);
+      let d = 0;
+      fino.forEach((q, i) => { const p = fino[(i + 1) % fino.length]; if (d <= 0) { ln.seg(W(q[0], q[1], z1), W(q[0], q[1], zb)); d += 2.4; } d -= Math.hypot(p[0] - q[0], p[1] - q[1]); });
     });
     pon(g, m, 'aro', 'aro', 30, ln);
     // columnas (las que no caen dentro de un pabellón)
@@ -1278,7 +1283,7 @@ function crea(svg, op) {
     gNolli.add(new THREE.Mesh(ed.geo(), negro));
     // lo de arriba, punteado: el aro (sus dos bordes) y la losa de arte y cultura; y el límite del predio
     const l = new Lineas();
-    [ANILLO.ri, ANILLO.re].forEach(r => l.poli(circ([ANILLO.u, ANILLO.v], r, 160).map(q => W(q[0], q[1], 0.08)), true));
+    [ANILLO.ri, ANILLO.re].forEach(r => l.poli(G.aroPoli(r, 240).map(q => W(q[0], q[1], 0.08)), true));
     if (CD) l.poli(CD.losa1.map(q => W(q[0], q[1], 0.08)), true);
     const lineas = new THREE.LineSegments(l.geo(), new THREE.LineDashedMaterial({ color: 0x555555, dashSize: 1.2, gapSize: 0.9 }));
     lineas.computeLineDistances();
@@ -1300,7 +1305,9 @@ function crea(svg, op) {
      recta pasa a ~2 m del centro): ese diámetro es el eje principal, el
      acento. Las naves (oriente) contra la industria y arte y cultura
      (poniente) dan el segundo eje; todas las masas giran alrededor del
-     círculo (el polígono que une sus centros).
+     círculo (el polígono que une sus centros). El aro lleva el chipote del
+     concepto de arte y cultura: el círculo de base, punteado, y el eje del
+     chipote (hacia la plaza cultural).
      Se dibuja en 2D sobre la imagen (el mismo grueso en pantalla, encima de
      todo), proyectando los puntos 3D: al orbitar se mueve con el modelo. Los
      ejes y los centros, en el plano del aro (+9.8): ahí las relaciones son
@@ -1371,7 +1378,9 @@ function crea(svg, op) {
       franjas: masas.filter(m => m.eje).map(m => m.eje.map(q => P3(q[0], q[1], zc))),
       ejes: ejes.map(e => ({ a: P3(e.a[0], e.a[1], zc), b: P3(e.b[0], e.b[1], zc), acento: e.acento })),
       orbita: giro.map(c => P3(c[0], c[1], zc)),
-      circulo: circ([ANILLO.u, ANILLO.v], (ANILLO.ri + ANILLO.re) / 2, 160).map(q => P3(q[0], q[1], zc)),
+      circulo: G.aroPoli((ANILLO.ri + ANILLO.re) / 2, 240).map(q => P3(q[0], q[1], zc)),
+      base: circ([ANILLO.u, ANILLO.v], (ANILLO.ri + ANILLO.re) / 2, 160).map(q => P3(q[0], q[1], zc)),
+      chipote: [P3(ANILLO.u, ANILLO.v, zc), P3(...G.aroPunto(G.BULTO.th, (ANILLO.ri + ANILLO.re) / 2 + 6), zc)],
       centro: P3(ANILLO.u, ANILLO.v, zc)
     };
   })();
@@ -1417,11 +1426,10 @@ function crea(svg, op) {
       const e = envolvente(p);
       x.beginPath(); e.forEach((q, i) => i ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1])); x.closePath(); x.stroke();
     });
-    // el círculo generador (el aro)
-    x.lineWidth = 1.4; x.beginPath();
-    let ab = false;
-    ESQ.circulo.concat([ESQ.circulo[0]]).forEach(p => { const q = S(p); if (!q) { ab = false; return; } if (ab) x.lineTo(q[0], q[1]); else { x.moveTo(q[0], q[1]); ab = true; } });
-    x.stroke();
+    // el aro: el círculo generador (punteado) y su chipote hacia la plaza cultural, con su eje
+    const curva = (pts, cierra) => { x.beginPath(); let ab = false; (cierra ? pts.concat([pts[0]]) : pts).forEach(p => { const q = S(p); if (!q) { ab = false; return; } if (ab) x.lineTo(q[0], q[1]); else { x.moveTo(q[0], q[1]); ab = true; } }); x.stroke(); };
+    x.lineWidth = 0.9; x.setLineDash([3, 4]); curva(ESQ.base, true); curva(ESQ.chipote, false); x.setLineDash([]);
+    x.lineWidth = 1.4; curva(ESQ.circulo, true);
     // la órbita: el polígono de los centros de las masas
     const o = ESQ.orbita.map(S);
     if (o.every(Boolean)) { x.lineWidth = 0.9; x.setLineDash([6, 5]); x.beginPath(); o.forEach((q, i) => i ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1])); x.closePath(); x.stroke(); x.setLineDash([]); }
@@ -1490,7 +1498,7 @@ function crea(svg, op) {
     else if (ap === 'comercio') { G.NAVES.forEach(nv => { mete([nv.L.u0, nv.L.v0]); mete([nv.L.u1, nv.L.v1]); }); z1 = 9; }
     else if (ap === 'industria' && MOD && MOD.industria) { G.pares(MOD.industria.planta).forEach(mete); z1 = MOD.industria.z1; }
     else if (ap === 'cultura') { [[PLAZA_C.u0, PLAZA_C.v0], [PLAZA_C.u1, PLAZA_C.v1]].forEach(mete); mete([ANILLO.u - ANILLO.re, ANILLO.v - ANILLO.re]); z1 = ANILLO.z; }
-    else if (ap === 'aro') { mete([ANILLO.u - ANILLO.re, ANILLO.v - ANILLO.re]); mete([ANILLO.u + ANILLO.re, ANILLO.v + ANILLO.re]); z1 = ANILLO.z + 1; }
+    else if (ap === 'aro') { G.aroPoli(ANILLO.re, 72).forEach(mete); z1 = ANILLO.z + 1; }
     else { mete([PB.u0, PB.v0]); mete([PB.u1, PB.v1]); z1 = 2; }
     return [Math.min(...us), Math.max(...us), Math.min(...vs), Math.max(...vs), z0, z1];
   }

@@ -62,6 +62,19 @@ ELEVACIONES = [(6, 2), (15, 2), (30, 1), (48, 2), (70, 3)]   # alturas de cámar
 BANDAS = {'baja': (6, 15, 30), 'alta': (30, 48, 70)}           # el navegador usa 'baja' bajo 30°
 CORTE_BANDA = 30
 ANILLO = (505.75, 409.05, 39.5, 46.55, 9.8)   # u, v, radio interior y exterior, cubierta (como en atlampa-geo.js)
+BULTO = (138, 58, 10 * (39.5 + 46.55) / 2 / 38.27)   # el chipote del concepto de arte y cultura (th °, w °, b m), como en atlampa-geo.js
+
+
+def bulto(t):
+    d = (t - BULTO[0] + 540) % 360 - 180
+    if abs(d) >= BULTO[1]:
+        return 0
+    return BULTO[2] * math.cos(math.pi / 2 * d / BULTO[1]) ** 2
+
+
+def aro_poli(r, n=720):
+    return [(ANILLO[0] + (r + bulto(i * 360 / n)) * math.cos(math.radians(i * 360 / n)),
+             ANILLO[1] + (r + bulto(i * 360 / n)) * math.sin(math.radians(i * 360 / n))) for i in range(n)]
 LIBRE = 2.5                                   # altura libre sobre la cubierta
 JUNTO = 1.5                                   # a menos de esto del paso, un módulo da al aro
 
@@ -175,7 +188,7 @@ def main():
 
     # 0. El aro: quita los que estorban el paso; abre y pasa a comercio los de junto
     AU, AV, RI, RE, AZ = ANILLO
-    banda = Point(AU, AV).buffer(RE, 256).difference(Point(AU, AV).buffer(RI, 256))
+    banda = Polygon(aro_poli(RE)).difference(Polygon(aro_poli(RI)))   # con el chipote
     ex0, ey0 = (eg, sg), (-sg, eg)
 
     def esquina(c, lx, ly):

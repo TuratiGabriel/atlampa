@@ -36,10 +36,28 @@
   // columnas de 0.80 m, con barandal a +0.90. Corta las naves por fuera de sus columnas.
   var ANILLO = { u: 505.75, v: 409.05, ri: 39.5, re: 46.55, z: 9.8, canto: 0.35, baranda: 0.9 };
   var CORTE = 47;
+  /* La deformación del aro (el «chipote» del concepto de arte y cultura,
+     ../arte_y_cultura_concepto.html: BULGE th 138°, w 58°, b 10 m sobre R0
+     38.27): el eje del aro se abre hacia afuera con un perfil cos², b metros
+     en th y nada a ±w grados; el ancho de la losa no cambia (se corre en
+     radio). Escalada a este aro: b × (radio medio / 38.27); los ángulos no
+     cambian. */
+  var BULTO = { th: 138, w: 58, b: 10 * ((ANILLO.ri + ANILLO.re) / 2) / 38.27 };
+  function bulto(t) {   // t en grados → cuánto se abre el aro (m)
+    var d = ((t - BULTO.th) % 360 + 540) % 360 - 180;
+    if (Math.abs(d) >= BULTO.w) return 0;
+    var c = Math.cos(Math.PI / 2 * d / BULTO.w);
+    return BULTO.b * c * c;
+  }
+  function aroPunto(t, r) { var R = r + bulto(t), a = t * Math.PI / 180; return [ANILLO.u + Math.cos(a) * R, ANILLO.v + Math.sin(a) * R]; }
+  function aroPoli(r, n) { var p = []; for (var i = 0; i < n; i++) p.push(aroPunto(i / n * 360, r)); return p; }
+  // el radio «sin chipote» de un punto: se compara con ri / re como si el aro fuera un círculo
+  function radioAro(u, v) { var t = Math.atan2(v - ANILLO.v, u - ANILLO.u) * 180 / Math.PI; return Math.hypot(u - ANILLO.u, v - ANILLO.v) - bulto(t); }
   var COLUMNAS = pares([532.1, 379.6, 539.9, 389.2, 541.9, 425.0, 469.6, 393.1, 476.3, 382.7, 485.9, 374.9, 497.4, 370.4, 509.7, 369.7,
     521.7, 372.9, 535.2, 435.4, 525.6, 443.2, 514.1, 447.7, 489.8, 445.2, 479.4, 438.5, 471.6, 428.9, 467.1, 417.4,
     536.8, 374.4, 545.9, 385.7, 548.3, 427.9, 463.2, 390.3, 471.1, 378.0, 482.4, 368.8, 495.9, 363.6, 510.5, 362.8,
-    524.5, 366.5, 540.4, 440.1, 529.1, 449.3, 515.5, 454.5, 501.0, 455.3, 486.9, 451.6, 474.7, 443.7, 465.5, 432.4, 460.3, 418.9]);
+    524.5, 366.5, 540.4, 440.1, 529.1, 449.3, 515.5, 454.5, 501.0, 455.3, 486.9, 451.6, 474.7, 443.7, 465.5, 432.4, 460.3, 418.9])
+    .map(function (c) { var t = Math.atan2(c[1] - ANILLO.v, c[0] - ANILLO.u) * 180 / Math.PI; return aroPunto(t, Math.hypot(c[0] - ANILLO.u, c[1] - ANILLO.v)); });   // siguen al chipote
   // Espuela (satélite): sale de las vías al sur, sube junto a Calle Cedro, da la
   // vuelta y entra al predio por Heliotropo, donde termina.
   var ESPUELA = [[524, 126], [423, 127], [398, 127], [382, 129], [372, 134], [358, 142], [348, 151], [339, 162], [333, 173], [330.5, 184],
@@ -254,7 +272,7 @@
   }
   // ¿cabe un árbol de copa r en (u, v)? (para los sueltos y los de acento)
   function cabeArbol(u, v, r) {
-    var ra = Math.hypot(u - ANILLO.u, v - ANILLO.v);
+    var ra = radioAro(u, v);
     if (ra > ANILLO.ri - 3 - r && ra < ANILLO.re + 2 + r) return false;            // bajo el aro
     if (enEdificio(u, v) || enEdificio(u + r, v) || enEdificio(u - r, v) || enEdificio(u, v + r) || enEdificio(u, v - r)) return false;
     if (bajoModulo(u, v, r)) return false;
@@ -408,7 +426,8 @@
     // el corte del anillo y su losa
     var ca = aMini(ANILLO.u, ANILLO.v);
     el('circle', { class: 'ad-mini-corte', cx: ca[0].toFixed(1), cy: ca[1].toFixed(1), r: (CORTE * ESC).toFixed(1) }, m);
-    el('circle', { class: 'ad-mini-anillo', cx: ca[0].toFixed(1), cy: ca[1].toFixed(1), r: ((ANILLO.ri + ANILLO.re) / 2 * ESC).toFixed(1), 'stroke-width': ((ANILLO.re - ANILLO.ri) * ESC).toFixed(1) }, m);
+    el('path', { class: 'ad-mini-anillo', d: 'M' + aroPoli((ANILLO.ri + ANILLO.re) / 2, 90).map(function (q) { q = aMini(q[0], q[1]); return q[0].toFixed(1) + ' ' + q[1].toFixed(1); }).join('L') + 'Z',
+      'stroke-width': ((ANILLO.re - ANILLO.ri) * ESC).toFixed(1) }, m);
     var cono = el('path', { class: 'ad-mini-cono' }, m), meta = el('circle', { class: 'ad-mini-meta', r: 4.5 }, m), punto = el('circle', { class: 'ad-mini-camara', r: 4.5 }, m);
     el('path', { class: 'ad-mini-n', d: 'M' + C + ' 4L' + (C - 3) + ' 10M' + C + ' 4L' + (C + 3) + ' 10' }, m);
     var tn = el('text', { class: 'ad-mini-texto', x: C, y: 17, 'text-anchor': 'middle' }, m); tn.textContent = 'N';
@@ -436,7 +455,7 @@
     return pon;
   }
 
-  window.AtlampaGeo = { D: D, PB: PB, GU: GU, GF: GF, S: S, HE: HE, CEN: CEN, NAVES: NAVES, PIEZAS: PIEZAS, ANILLO: ANILLO, CORTE: CORTE, COLUMNAS: COLUMNAS,
+  window.AtlampaGeo = { D: D, PB: PB, GU: GU, GF: GF, S: S, HE: HE, CEN: CEN, NAVES: NAVES, PIEZAS: PIEZAS, ANILLO: ANILLO, CORTE: CORTE, COLUMNAS: COLUMNAS, BULTO: BULTO, bulto: bulto, aroPunto: aroPunto, aroPoli: aroPoli, radioAro: radioAro,
     ESPUELA: ESPUELA, ESP_FIN: ESP_FIN, CULTURA: CULTURA, PLAZA_C: PLAZA_C, GIRO: GIRO, MOD: MOD, EST: EST, PAI: PAI, MEX: MEX, MEY: MEY, LUZ: LUZ,
     pares: pares, rect: rect, minimapa: minimapa, orilla: orilla, circulo: circulo, antihorario: antihorario, cortaU: cortaU, menosCirculo: menosCirculo,
     dentro: dentro, enEdificio: enEdificio, plantasDe: plantasDe, arbolesPai: arbolesPai, laguna: laguna, solEn: solEn, diaDelAno: diaDelAno, aleatorio: aleatorio };
