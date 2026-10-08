@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261008i'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261008s'      # versión de los archivos (para que el navegador no use los viejos)
 
 SOTANOS = '''
       <div class="hud-grupo" role="group" aria-label="Sótanos">
@@ -106,8 +106,9 @@ def pagina(k):
 CAPAS = [('modulos', 'Módulos', True, ''), ('paisaje', 'Paisaje', True, ''), ('sol', 'Sol', False, ''),
          ('contexto', 'Contexto urbano', False, 'solo-general')]
 DIAGRAMAS = [('accesos', 'Accesos', False, ''), ('personas', 'Personas', False, ''),
-             ('flujos', 'Flujos', False, ''), ('arboles', 'Árboles', False, '')]
-RESALTA = [('', 'Nada'), ('publico', 'Público'), ('privado', 'Privado'), ('modulos', 'Vivienda'),
+             ('flujos', 'Flujos', False, ''), ('arboles', 'Árboles', False, ''),
+             ('esquema', 'Esquema compositivo', False, '')]
+RESALTA = [('', 'Nada'), ('espacio', '<i class="hud-esp hud-esp--pub"></i>Público / <i class="hud-esp hud-esp--pri"></i>privado'), ('modulos', 'Vivienda'),
            ('comercio', 'Comercio'), ('cultura', 'Arte y cultura'), ('industria', 'Industria'),
            ('aro', 'Aro'), ('paisajismo', 'Paisaje')]
 # Propuesto: [clave para ocultar, nombre]. Las que tienen apartado van a él al
@@ -173,6 +174,7 @@ PLANTILLA = '''<!doctype html>
       <div class="hud-panel">
         <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">Color</button>
         <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="true">Perspectiva</button>
+        <button class="hud-op" type="button" data-capa="planta" aria-pressed="false">Planta</button>
         <button class="hud-op" type="button" data-capa="nolli" aria-pressed="false">Mapa Nolli</button>
         <p class="hud-panel__t">Estilo</p>
         <button class="hud-op hud-op--radio" type="button" data-estilo="rayado" aria-pressed="true">Rayado</button>
@@ -196,7 +198,7 @@ PLANTILLA = '''<!doctype html>
   </aside>
 
   <div class="hud-camara">
-    <svg class="ad-mini" data-minimapa role="img" aria-label="Posición de la cámara"></svg>
+    <svg class="ad-mini" data-minimapa role="button" tabindex="0" aria-label="Brújula: nortear la vista"></svg>
     <div class="ad-zoom" role="group" aria-label="Zoom">
       <button class="ad-zoom__b" type="button" data-zoom="mas" aria-label="Acercar">+</button>
       <button class="ad-zoom__b" type="button" data-zoom="0" aria-label="Regresar al encuadre">⟲</button>

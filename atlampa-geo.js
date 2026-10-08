@@ -367,7 +367,7 @@
 
   /* ---------- Minimapa ----------
      Planta del sitio con el norte arriba, la cámara como un punto y su
-     ángulo de vista. Sólo indica: la cámara se gira arrastrando el dibujo. */
+     ángulo de vista. Hace de brújula: picarlo nortea la vista (atlampa-pagina.js). */
   function minimapa(m) {
     var T = 120, C = T / 2, ESC = 0.62, R = 50;
     m.setAttribute('viewBox', '0 0 ' + T + ' ' + T);
@@ -426,7 +426,7 @@
       var ang = Math.atan2(C - py, C - px), ab = 0.32, L = R * 0.9;
       cono.setAttribute('d', 'M' + px.toFixed(1) + ' ' + py.toFixed(1) + 'L' + (px + Math.cos(ang - ab) * L).toFixed(1) + ' ' + (py + Math.sin(ang - ab) * L).toFixed(1) +
         'M' + px.toFixed(1) + ' ' + py.toFixed(1) + 'L' + (px + Math.cos(ang + ab) * L).toFixed(1) + ' ' + (py + Math.sin(ang + ab) * L).toFixed(1));
-      m.setAttribute('aria-label', 'Cámara al ' + rumbo(az) + ' del predio');
+      m.setAttribute('aria-label', 'Brújula (cámara al ' + rumbo(az) + ' del predio): nortear la vista');
     }
     function rumbo(az) {   // dónde está la cámara respecto al predio, en rumbos verdaderos
       var a = az * Math.PI / 180, cu = -Math.sin(a), cv = -Math.cos(a);

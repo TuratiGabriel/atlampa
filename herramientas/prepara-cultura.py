@@ -61,7 +61,9 @@ export function construye() {
   // árboles no caben bajo la losa)
   const enDiagrama = Q => Q.map(p => [p[0] + DX, p[1] + DY]);
   const pisa = [enDiagrama(D.BOWL)].concat(D.mods.filter(m => m.lv === 'PB' || m.lv === 'PIT').map(m => enDiagrama(m.P)));
-  return { mallas, lineas, pisa, losa1: enDiagrama(D.N1) };
+  // columnas de la retícula, para el mapa Nolli
+  const cols = D.cols.map(c => [c.x + DX, c.y + DY]);
+  return { mallas, lineas, pisa, losa1: enDiagrama(D.N1), cols };
 }
 '''
 

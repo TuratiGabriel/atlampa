@@ -39,48 +39,55 @@ const RAD = Math.PI / 180;
 const W = (u, v, z) => [u - CEN[0], z, -(v - CEN[1])];
 
 /* ---------- Estilos ---------- */
-const PAPELES = ['suelo', 'calle', 'banqueta', 'predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'proyecto', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'arbusto', 'copa', 'est'];
+const PAPELES = ['suelo', 'calle', 'banqueta', 'predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'proyecto', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'arbusto', 'copa', 'est', 'rampa'];
 const ESTILOS = {
   rayado: {
     // Croquis + rayado (lo que escogió Gabriel): los volúmenes sólo con sus
     // aristas a mano (un trazo delgado que se pasa de las esquinas), las caras
     // negras sin relleno; el piso con el rayado horizontal, tenue; el blanco,
     // bajado (blanco: lo que pesan las aristas).
-    fondo: '#000000', perspectiva: true, blanco: 0.72,
+    // cielo: blanco apagado (ni puro ni brillante), detrás del piso negro
+    fondo: '#000000', cielo: '#c4c4bf', perspectiva: true, blanco: 0.72,
     papel: {
       suelo: { tono: 0.13, paso: 2.6, arista: 0.2 }, calle: { tono: 0.06, paso: 3.4, arista: 0.25 }, banqueta: { tono: 0.18, paso: 2.2, arista: 0.4 },
       predio: { tono: 0.18, paso: 2.4, arista: 0.7 }, plaza: { tono: 0.25, paso: 2, arista: 0.5 }, verde: { tono: 0.16, paso: 2.6, arista: 0 },
       tezontle: { tono: 0.25, paso: 1.8, arista: 0 }, agua: { tono: 0.08, paso: 5, arista: 0.6 }, filtro: { tono: 0.2, paso: 2.2, arista: 0.4 },
       nave: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 }, industria: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 },
       cultura: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 }, aro: { modo: 2, tono: 0, gris: 0.025, arista: 0.95 },
-      modulo: { modo: 2, tono: 0, gris: 0.02, arista: 0.8 }, arbusto: { tono: 0.5, paso: 2.2, grueso: 0.35, arista: 0 },
-      copa: { tono: 0.5, paso: 2.4, grueso: 0.35, arista: 0 }, est: { tono: 0.1, paso: 6, arista: 0.4 }, proyecto: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 }
+      modulo: { modo: 2, tono: 0, gris: 0.02, arista: 0.8 }, modcom: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 }, arbusto: { tono: 0.5, paso: 2.2, grueso: 0.35, arista: 0 },
+      copa: { tono: 0.5, paso: 2.4, grueso: 0.35, arista: 0 }, est: { tono: 0.1, paso: 6, arista: 0.4 }, rampa: { tono: 0.3, paso: 2.2, arista: 0 }, proyecto: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 }
     },
-    lineas: { pasto: 0.36, flor: 0.85, junco: 0.34, tronco: 0.45, sendero: 0.3, rayo: 0.14, columna: 0.4, est: 0.3, sol: 0.45 }
+    lineas: { pasto: 0.36, flor: 0.85, junco: 0.34, tronco: 0.45, sendero: 0.3, rayo: 0.14, columna: 0.4, est: 0.3, rampa: 0.75, sol: 0.45 }
   },
   plano: {
-    fondo: '#000000', perspectiva: false,
+    fondo: '#000000', cielo: '#c4c4bf', perspectiva: false,
     // modo 1: relleno gris con luz
     papel: {
       suelo: { gris: 0.045, arista: 0.15 }, calle: { gris: 0.02, arista: 0.2 }, banqueta: { gris: 0.075, arista: 0.32 }, predio: { gris: 0.065, arista: 0.75 },
       plaza: { gris: 0.1, arista: 0.4 }, verde: { gris: 0.07, arista: 0 }, tezontle: { gris: 0.1, arista: 0 }, agua: { gris: 0.04, arista: 0.5 },
       filtro: { gris: 0.09, arista: 0.35 }, nave: { gris: 0.17, arista: 0.95 }, industria: { modo: 2, tono: 0.7, paso: 2.4, gris: 0.04, arista: 0.85 }, cultura: { gris: 0.18, arista: 0.95 },
-      aro: { gris: 0.24, arista: 1 }, modulo: { gris: 0.55, arista: 0.6 }, arbusto: { gris: 0.12, arista: 0 }, copa: { gris: 0.1, arista: 0 },
-      est: { gris: 0.05, arista: 0.4 }, proyecto: { gris: 0.17, arista: 1 }
+      aro: { gris: 0.24, arista: 1 }, modulo: { gris: 0.55, arista: 0.6 }, modcom: { gris: 0.17, arista: 0.95 }, arbusto: { gris: 0.12, arista: 0 }, copa: { gris: 0.1, arista: 0 },
+      est: { gris: 0.05, arista: 0.4 }, rampa: { gris: 0.12, arista: 0 }, proyecto: { gris: 0.17, arista: 1 }
     },
-    lineas: { pasto: 0.32, flor: 0.85, junco: 0.3, tronco: 0.4, sendero: 0.3, rayo: 0.15, columna: 0.4, est: 0.3, sol: 0.45 }
+    lineas: { pasto: 0.32, flor: 0.85, junco: 0.3, tronco: 0.4, sendero: 0.3, rayo: 0.15, columna: 0.4, est: 0.3, rampa: 0.75, sol: 0.45 }
   }
 };
 // colores del programa (lámina de usos), para el modo Color
 // (en tonos claros: sobre el fondo negro tienen que leerse)
 const PROGRAMA = { vivienda: '#ff5cb0', comercio: '#8a98ff', industria: '#d2d4d8', publico: '#ff6f63', cultura: '#c9a6ff', verde: '#a8e063', agua: '#8fd0ff', tez: '#ff9a6b', est: '#d2d4d8' };
 // qué programa / espacio es cada papel
-const PROG_DE = { nave: 'comercio', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', aro: 'publico', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est' };
-// privado: los volúmenes de vivienda y la industria; lo demás es público
+const PROG_DE = { nave: 'comercio', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', modcom: 'comercio', aro: 'publico', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est', rampa: 'est' };
+// Público / privado (un solo botón, dos colores): privado, los volúmenes de
+// vivienda y la industria; lo demás del proyecto, público (también los módulos
+// que se abren al aro, que son comercio). Lo que no es del proyecto (calles,
+// contexto, estacionamiento) no se colorea.
 const ESPACIO_DE = { modulo: 'privado', industria: 'privado' };
+const ESPACIO_COLOR = { publico: '#35d0c4', privado: '#ff7a3d' };
+const DEL_PROYECTO = ['predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'banqueta', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'arbusto', 'copa', 'proyecto'];
+const espacioDe = papel => DEL_PROYECTO.indexOf(papel) >= 0 ? (ESPACIO_DE[papel] || 'publico') : null;
 // qué papeles resalta cada opción de Resaltar (y las líneas de plantas van con el paisaje)
-const RESALTA_PAPELES = { modulos: ['modulo'], comercio: ['nave'], cultura: ['cultura', 'plaza'], industria: ['industria'], aro: ['aro'],
-  paisajismo: ['verde', 'tezontle', 'agua', 'filtro', 'arbusto', 'copa'], estacionamiento: ['est'] };
+const RESALTA_PAPELES = { modulos: ['modulo'], comercio: ['nave', 'modcom'], cultura: ['cultura', 'plaza'], industria: ['industria'], aro: ['aro'],
+  paisajismo: ['verde', 'tezontle', 'agua', 'filtro', 'arbusto', 'copa'], estacionamiento: ['est', 'rampa'] };
 const LINEAS_PAISAJE = ['pasto', 'flor', 'junco', 'tronco', 'sendero', 'rayo'];
 
 const VERT = /* glsl */`
@@ -305,12 +312,15 @@ function crea(svg, op) {
   const capaRot = document.createElement('div');
   capaRot.className = 'ad-3d-rotulos';
   trabajo.insertBefore(capaRot, svg);
+  const lienzoEsq = document.createElement('canvas');   // el esquema compositivo (2D, encima)
+  lienzoEsq.className = 'ad-3d-esquema';
+  trabajo.insertBefore(lienzoEsq, svg);
 
   const renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   const escena = new THREE.Scene();
   let estilo = ESTILOS.rayado;
-  escena.background = new THREE.Color(estilo.fondo);
+  escena.background = new THREE.Color(estilo.cielo || estilo.fondo);
 
   const camO = new THREE.OrthographicCamera(-1, 1, 1, -1, -2000, 4000);
   const camP = new THREE.PerspectiveCamera(30, 1, 1, 6000);
@@ -320,7 +330,9 @@ function crea(svg, op) {
   const MATS = {};      // clave → ShaderMaterial
   const ARISTAS = {};   // clave → LineBasicMaterial
   const LINEAS = {};    // nombre → LineBasicMaterial (plantas, columnas…)
-  let conColor = false, resalta = null, espacioAct = null;
+  let conColor = false, resalta = null, espacioAct = null, conEsquema = false, matPersEsq = null;
+  // con el esquema compositivo, el modelo entero queda muy tenue (pero se lee: no se va a negro)
+  const TENUE_ESQ = 0.32;
   const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   function material(papel) {
     if (MATS[papel]) return MATS[papel];
@@ -346,6 +358,7 @@ function crea(svg, op) {
   }
   const blanco = new THREE.Color(1, 1, 1);
   function tinta(papel) {
+    if (espacioAct) { const e = espacioDe(papel); return e ? new THREE.Color(ESPACIO_COLOR[e]) : blanco; }
     const pr = PROG_DE[papel];
     if (!conColor || !pr) return blanco;
     return new THREE.Color(PROGRAMA[pr]).lerp(blanco, 0.15);
@@ -353,14 +366,12 @@ function crea(svg, op) {
   // ¿queda opaco con lo que está resaltado? (programa o espacio)
   // con algo resaltado (un programa, lo público o lo privado), todo lo demás baja al 15 %
   function apagado(papel) {
-    if (espacioAct) return (ESPACIO_DE[papel] || 'publico') !== espacioAct;
-    if (!resalta) return false;
+    if (!resalta || espacioAct) return false;
     return (RESALTA_PAPELES[resalta] || []).indexOf(papel) < 0;
   }
   function apagadaLinea(base) {
-    if (espacioAct) return espacioAct === 'privado';
-    if (!resalta) return false;
-    return !(resalta === 'paisajismo' && LINEAS_PAISAJE.indexOf(base) >= 0) && !(resalta === 'estacionamiento' && base === 'est');
+    if (!resalta || espacioAct) return false;
+    return !(resalta === 'paisajismo' && LINEAS_PAISAJE.indexOf(base) >= 0) && !(resalta === 'estacionamiento' && (base === 'est' || base === 'rampa'));
   }
   const TENUE = 0.15;
   /* Nada es transparente: lo que no toca (ajeno al apartado o no resaltado)
@@ -368,8 +379,10 @@ function crea(svg, op) {
      elegido manda la planta baja: el paisaje, la plaza y lo que se desplanta
      en el piso suben; los módulos (arriba) bajan. */
   const PLANTA_BAJA = ['predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'arbusto', 'copa', 'nave', 'cultura', 'industria'];
+  // Inspeccionando un apartado, lo demás casi desaparece (REF)
+  const REF = 0.1;
   function enfasis(papel, ref) {
-    if (ref) return 0.28;
+    if (ref) return REF;
     if (apagado(papel)) return 1;
     if (!resalta && !espacioAct) {
       if (papel === 'modulo') return 0.5;
@@ -378,7 +391,7 @@ function crea(svg, op) {
     return 1;
   }
   function aplicaEstilo() {
-    escena.background = new THREE.Color(estilo.fondo);
+    escena.background = new THREE.Color(estilo.cielo || estilo.fondo);
     const nada = !resalta && !espacioAct;
     Object.keys(MATS).forEach(k => {
       const m = MATS[k], e = estilo.papel[m.userData.papel] || estilo.papel.proyecto, u = m.uniforms;
@@ -386,25 +399,32 @@ function crea(svg, op) {
       // con Color, más tinta: que contraste con el negro
       u.uTono.value = (e.tono || 0.4) * (conColor ? 1.35 : 1); u.uPaso.value = e.paso || 3; u.uGrueso.value = (e.grueso || 0.22) * (conColor ? 1.3 : 1); u.uMundo.value = e.mundo || 0; u.uGris.value = e.gris || 0.1;
       u.uTinta.value = tinta(m.userData.papel);
-      u.uBrillo.value = enfasis(m.userData.papel, m.userData.ref);
+      // Público / privado: las áreas se llenan de su color (el croquis sólo tenía aristas)
+      if (espacioAct && espacioDe(m.userData.papel)) {
+        if (u.uModo.value > 1.5) { u.uGris.value = Math.max(u.uGris.value, 0.2); u.uTono.value = Math.max(u.uTono.value, 0.45); }
+        else u.uTono.value = Math.min(1, u.uTono.value * 2.2);
+      }
+      u.uBrillo.value = enfasis(m.userData.papel, m.userData.ref) * (conEsquema ? TENUE_ESQ : 1);
       const ap = apagado(m.userData.papel);
       u.uOpacidad.value = ap ? TENUE : 1; m.transparent = ap; m.depthWrite = !ap; m.needsUpdate = true;
     });
     Object.keys(ARISTAS).forEach(k => {
       const m = ARISTAS[k], e = estilo.papel[m.userData.papel] || estilo.papel.proyecto;
       m.color.copy(tinta(m.userData.papel));
-      m.opacity = Math.min(1, (e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (estilo.blanco || 1);
+      m.opacity = Math.min(1, (e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1);
       m.visible = m.opacity > 0.001;
     });
     Object.keys(LINEAS).forEach(k => {
       const m = LINEAS[k], base = m.userData.nombre.split('-')[0];
       const pb = nada && ['pasto', 'flor', 'junco', 'tronco', 'sendero', 'rayo'].indexOf(base) >= 0 ? 1.3 : 1;
-      m.opacity = Math.min(1, (estilo.lineas[base] !== undefined ? estilo.lineas[base] : 0.4) * (m.userData.ref ? 0.3 : pb)) * (apagadaLinea(base) ? TENUE : 1);
-      if (conColor && m.userData.colorColor) m.color.set(m.userData.colorColor); else m.color.set(m.userData.color);
+      m.opacity = Math.min(1, (estilo.lineas[base] !== undefined ? estilo.lineas[base] : 0.4) * (m.userData.ref ? REF : pb)) * (apagadaLinea(base) ? TENUE : 1) * (conEsquema ? TENUE_ESQ : 1);
+      if (espacioAct && LINEAS_PAISAJE.indexOf(base) >= 0) m.color.set(ESPACIO_COLOR.publico);
+      else if (conColor && m.userData.colorColor) m.color.set(m.userData.colorColor); else m.color.set(m.userData.color);
     });
     // árboles de croquis: con Color, verde claro; tenues como referencia o si se resalta otra cosa
     const refArb = !GENERAL && ESC !== 'paisajismo', apArb = apagadaLinea('pasto');
-    matArbol.uniforms.uTinta.value.set(conColor ? '#c6ec8f' : '#ffffff').multiplyScalar(refArb ? 0.35 : 1);
+    matArbol.uniforms.uTinta.value.set(espacioAct ? ESPACIO_COLOR.publico : conColor ? '#c6ec8f' : '#ffffff').multiplyScalar((refArb ? REF : 1) * (conEsquema ? TENUE_ESQ : 1));
+    if (matPersEsq) matPersEsq.uniforms.uTinta.value.setScalar(conEsquema ? TENUE_ESQ : 1);
     matArbol.uniforms.uOpacidad.value = apArb ? TENUE : 1; matArbol.transparent = apArb; matArbol.depthWrite = !apArb;
     pide();
   }
@@ -422,7 +442,7 @@ function crea(svg, op) {
   }
   // Aristas de croquis: cada arista en dos trazos a mano (un poco chuecos, con
   // un quiebre a la mitad) que se pasan de las esquinas, como en un dibujo.
-  const CROQUIS = ['nave', 'industria', 'cultura', 'aro', 'modulo', 'proyecto'];
+  const CROQUIS = ['nave', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'proyecto'];
   function aristasCroquis(eg) {
     const p = eg.attributes.position.array, l = new Lineas(), azar = G.aleatorio(31);
     const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
@@ -442,7 +462,7 @@ function crea(svg, op) {
   }
   // malla + sus aristas (las que doblan más de umbral grados)
   function pon(grupo, malla, papel, ap, umbral, extraAristas) {
-    const ref = !GENERAL && ap && ap !== ESC && !(ESC === 'paisajismo' && ap === 'paisajismo');
+    const ref = !GENERAL && ap !== ESC;   // inspeccionando: todo lo ajeno, hasta el piso
     const clave = papel + (ref ? '-ref' : '');
     const mat = material(clave); mat.userData.papel = papel; mat.userData.ref = ref;
     const g = malla.geo ? malla.geo() : malla;
@@ -465,7 +485,7 @@ function crea(svg, op) {
   }
   function ponLineas(grupo, lin, nombre, color, colorColor, ap, extra) {
     if (!lin.p.length) return null;
-    const ref = !GENERAL && ap && ap !== ESC;
+    const ref = !GENERAL && ap !== ESC && nombre.indexOf('sol') !== 0;   // (el sol no se apaga)
     const m = linea(nombre + (ref ? '-ref' : ''), color);
     m.userData.ref = ref; if (colorColor) m.userData.colorColor = colorColor;
     Object.assign(m, extra || {});
@@ -509,7 +529,10 @@ function crea(svg, op) {
       THREE.ShapeUtils.triangulateShape(pol.map(q => new THREE.Vector2(q[0], q[1])), [hueco.map(q => new THREE.Vector2(q[0], q[1]))])
         .forEach(t => m.tri(...t.map(k => W(todos[k][0], todos[k][1], 0.2))));
     } else tapa(m, rect(PB.u0, PB.v0, PB.u1, PB.v1), 0.2);
-    suelos.push(pon(gPredio, m, PAI ? 'verde' : 'predio', null, 1));
+    // el área verde es del paisaje (se queda en su apartado) pero no se pica: picar el piso no abre nada
+    const verde = pon(gPredio, m, PAI ? 'verde' : 'predio', PAI ? 'paisajismo' : null, 1);
+    picables.splice(picables.indexOf(verde), 1);
+    suelos.push(verde);
     // plaza cultural: rectángulo menos el disco exterior del aro
     const r = ANILLO.re, cu = ANILLO.u, cv = ANILLO.v, P = PLAZA_C;
     const aN = Math.acos((P.u1 - cu) / r), aS = Math.PI - Math.asin((P.v0 - cv) / r), pl = [[P.u0, P.v1], [P.u1, P.v1]];
@@ -703,11 +726,11 @@ function crea(svg, op) {
   /* ===== 7. Módulos de vivienda ===== */
   const gMods = [];
   if (MOD) {
-    const A = MOD.a / 2, Bm = MOD.b / 2, porNivel = {};
+    const A = MOD.a / 2, Bm = MOD.b / 2, porNivel = {}, COM = MOD.tipos.indexOf('comercio');
     MOD.cajas.forEach(r => {
-      const nivel = r[2], z0 = MOD.z0 + nivel * MOD.alto, z1 = z0 + MOD.alto;
-      if (!porNivel[nivel]) porNivel[nivel] = { m: new Malla(), l: new Lineas() };
-      const { m, l } = porNivel[nivel];
+      const nivel = r[2], z0 = MOD.z0 + nivel * MOD.alto, z1 = z0 + MOD.alto, com = r[3] === COM, clave = (com ? 'c' : '') + nivel;
+      if (!porNivel[clave]) porNivel[clave] = { m: new Malla(), l: new Lineas(), com, nivel };
+      const { m, l } = porNivel[clave];
       const P = (x, y, z) => W(r[0] + MEX[0] * x + MEY[0] * y, r[1] + MEX[1] * x + MEY[1] * y, z);
       const junta = {};
       if (r[9]) r[9].forEach(j => { if (typeof j === 'number') junta[j] = true; else junta[j[0]] = j.slice(1); });
@@ -720,9 +743,18 @@ function crea(svg, op) {
           l.seg(f(t[k]), f(t[k + 1]));
         }
       }
+      // los de comercio (junto al aro): la caja entera, sin la cara que se abre
+      // al paso (r[10]); de esa sólo queda el marco
+      const abre = r[10] || [];
+      if (com) r = r.slice(0, 4).concat([1, 1, 1, 1], r.slice(8, 9), [0]);
       [[0, -Bm, A], [1, A, Bm], [0, Bm, A], [1, -A, Bm]].forEach((lado, i) => {
         const mm = r[4 + i];
         if (!mm) return;
+        if (abre.indexOf(i) >= 0) {
+          const a = lado[0] ? [lado[1], -lado[2]] : [-lado[2], lado[1]], b = lado[0] ? [lado[1], lado[2]] : [lado[2], lado[1]];
+          [[a, z0, b, z0], [b, z0, b, z1], [b, z1, a, z1], [a, z1, a, z0]].forEach(e => l.seg(P(e[0][0], e[0][1], e[1]), P(e[2][0], e[2][1], e[3])));
+          return;
+        }
         const t = mm === 1 ? [-lado[2], lado[2]] : mm;
         for (let k = 0; k < t.length; k += 2) {
           const a = lado[0] ? [lado[1], t[k]] : [t[k], lado[1]], b = lado[0] ? [lado[1], t[k + 1]] : [t[k + 1], lado[1]];
@@ -746,10 +778,16 @@ function crea(svg, op) {
       // fondo de la caja (se ve desde abajo y en los volados)
       m.quad(P(-A, -Bm, z0), P(-A, Bm, z0), P(A, Bm, z0), P(A, -Bm, z0));
     });
-    Object.keys(porNivel).sort((a, b) => a - b).forEach(n => {
+    Object.keys(porNivel).sort((a, b) => porNivel[a].nivel - porNivel[b].nivel).forEach(k => {
+      const p = porNivel[k], n = p.nivel;
+      if (p.com) {   // comercio: se queda aunque se apaguen los módulos (es parte del comercio)
+        const g = pieza('modcomercio' + n, 'comercio', 0.62 + n * 0.05);
+        pon(g, p.m, 'modcom', 'comercio', false, p.l);
+        return;
+      }
       const g = pieza('modulos' + n, 'vivienda', 0.6 + n * 0.05);
       g.userData.capa = 'modulos';
-      pon(g, porNivel[n].m, 'modulo', 'vivienda', false, porNivel[n].l);
+      pon(g, p.m, 'modulo', 'vivienda', false, p.l);
       gMods.push(g);
     });
   }
@@ -769,7 +807,7 @@ function crea(svg, op) {
   /* ===== 9. Estacionamiento: en rayos X (se ve a través del piso) ===== */
   const gEst = pieza('estacionamiento', 'estacionamiento', 0.05);
   let estNivel = 0;
-  const estLineas = [];
+  const estLineas = [], estRampas = [];
   if (EST) {
     const N = EST.sotanos, e = EST.entrepiso, xray = {};
     for (let k = 1; k <= N; k++) {
@@ -784,12 +822,33 @@ function crea(svg, op) {
     // aristas que bajan y las helicoidales (una vuelta por sótano)
     const l = new Lineas(), fondo = -N * e;
     EST.bloques.forEach(b => G.pares(b.planta).forEach(q => l.seg(W(q[0], q[1], 0.2), W(q[0], q[1], fondo))));
-    EST.rampas.forEach(r => (r.carriles || [r.r]).forEach(cr => {
-      const rr = (cr[0] + cr[1]) / 2, pasos = 48 * N, pts = [];
-      for (let i = 0; i <= pasos; i++) { const t = i / pasos, a = t * N * 2 * Math.PI; pts.push(W(r.c[0] + Math.cos(a) * rr, r.c[1] + Math.sin(a) * rr, -t * N * e)); }
-      l.poli(pts);
-    }));
     ponLineas(gEst, l, 'est-baja', 0xffffff, PROGRAMA.est, 'estacionamiento', xray);
+    /* helicoidales dobles: en cada rampa, dos losas helicoidales concéntricas
+       (el carril de adentro y el de afuera: uno baja y el otro sube), una
+       vuelta por sótano, con sus bordes y el muro del centro. Arrancan en 0°,
+       donde llega el acceso, y giran en el mismo sentido: la norte (se entra
+       desde el norte) baja en el sentido del reloj; la sur, al revés. Una
+       vuelta por sótano en su propio grupo, para separar los niveles. */
+    for (let k = 1; k <= N; k++) {
+      const m = new Malla(), lr = new Lineas(), PASOS = 64;
+      EST.rampas.forEach(r => {
+        const giro = r.bloque === 'norte' ? -1 : 1, en = (rad, t) => { const a = giro * (k - 1 + t) * 2 * Math.PI; return W(r.c[0] + Math.cos(a) * rad, r.c[1] + Math.sin(a) * rad, -(k - 1 + t) * e); };
+        (r.carriles || [r.r]).forEach(cr => {
+          for (let i = 0; i < PASOS; i++) {
+            const t0 = i / PASOS, t1 = (i + 1) / PASOS;
+            m.quad(en(cr[0], t0), en(cr[1], t0), en(cr[1], t1), en(cr[0], t1));
+            lr.seg(en(cr[0], t0), en(cr[0], t1)); lr.seg(en(cr[1], t0), en(cr[1], t1));
+          }
+          lr.seg(en(cr[0], 0), en(cr[1], 0));   // dónde empieza la vuelta
+        });
+        // el muro del centro: unas verticales
+        for (let i = 0; i < 12; i++) { const a = i / 12 * 2 * Math.PI, u = r.c[0] + Math.cos(a) * r.r[0], v = r.c[1] + Math.sin(a) * r.r[0]; lr.seg(W(u, v, -(k - 1) * e), W(u, v, -k * e)); }
+      });
+      const g = new THREE.Group(); gEst.add(g);
+      pon(g, m, 'rampa', 'estacionamiento', false);
+      ponLineas(g, lr, 'rampa-borde', 0xffffff, PROGRAMA.est, 'estacionamiento');
+      estRampas.push(g);
+    }
   }
 
   // fuera de su apartado el estacionamiento no se ve (está bajo el piso); en
@@ -844,6 +903,84 @@ function crea(svg, op) {
   sol.scale.set(0.05, 0.05, 1); gSol.add(sol);
   const horaSol = { t: '', p: [0, 0, 0], c: 'ad-3d-rot ad-3d-rot--hoy' }; rotSol.push(horaSol);
   rotSol.forEach(r => { r.el = document.createElement('span'); r.el.className = r.c; r.el.textContent = r.t; capaRot.appendChild(r.el); });
+
+  /* ===== Flechas de diagrama (de la lámina de flechas de Gabriel) =====
+     doble: cinta de contorno blanco y relleno negro, con punta abierta (la
+     cuarta); punteada: trazos gruesos y punta llena (la primera).
+     pts: [u, v, z]; puntas: [al final, al inicio]. */
+  function suaviza(p, n) {   // Chaikin, sin mover las puntas
+    for (let k = 0; k < n; k++) {
+      const q = [p[0]];
+      for (let i = 0; i < p.length - 1; i++) {
+        const a = p[i], b = p[i + 1];
+        q.push(a.map((x, j) => x * 0.75 + b[j] * 0.25), a.map((x, j) => x * 0.25 + b[j] * 0.75));
+      }
+      q.push(p[p.length - 1]); p = q;
+    }
+    return p;
+  }
+  // recorta la polilínea a [d0, L - d1] (deja sitio a las puntas)
+  function recorta(p, d0, d1) {
+    const acc = [0];
+    for (let i = 1; i < p.length; i++) acc.push(acc[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+    const L = acc[acc.length - 1];
+    const en = s => { let i = 1; while (i < p.length - 1 && acc[i] < s) i++; const f = (s - acc[i - 1]) / ((acc[i] - acc[i - 1]) || 1); return p[i - 1].map((x, j) => x + (p[i][j] - x) * f); };
+    const r = [en(d0)];
+    p.forEach((q, i) => { if (acc[i] > d0 && acc[i] < L - d1) r.push(q); });
+    r.push(en(L - d1));
+    return r;
+  }
+  function normales(p) {   // normal (a la izquierda) por vértice, promediada
+    return p.map((q, i) => {
+      const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)], du = b[0] - a[0], dv = b[1] - a[1], L = Math.hypot(du, dv) || 1;
+      return [-dv / L, du / L];
+    });
+  }
+  function punta(p, alFinal) {   // [la punta, dirección hacia ella]
+    const n = p.length, a = alFinal ? p[n - 1] : p[0];
+    let b = null;
+    for (let i = 1; i < n && !b; i++) { const q = alFinal ? p[n - 1 - i] : p[i]; if (Math.hypot(q[0] - a[0], q[1] - a[1]) > 1.5) b = q; }
+    b = b || (alFinal ? p[0] : p[n - 1]);
+    const du = a[0] - b[0], dv = a[1] - b[1], L = Math.hypot(du, dv) || 1;
+    return [a, du / L, dv / L];
+  }
+  function flechaDoble(m, l, pts, o) {
+    const w = o.ancho / 2, wp = o.ancho * 1.35, lp = o.ancho * 2.1, z = q => q[2] + 0.02;
+    let p = suaviza(pts, 3);
+    const pf = o.puntas[0] ? punta(p, true) : null, pi = o.puntas[1] ? punta(p, false) : null;
+    p = recorta(p, pi ? lp : 0, pf ? lp : 0);
+    const nr = normales(p);
+    const iz = p.map((q, i) => [q[0] + nr[i][0] * w, q[1] + nr[i][1] * w, z(q)]), de = p.map((q, i) => [q[0] - nr[i][0] * w, q[1] - nr[i][1] * w, z(q)]);
+    for (let i = 1; i < p.length; i++) m.quad(W(...de[i - 1]), W(...de[i]), W(...iz[i]), W(...iz[i - 1]));
+    l.poli(iz.map(q => W(...q))); l.poli(de.map(q => W(...q)));
+    // puntas abiertas (contorno) con relleno; la cinta entra por la base
+    [[pf, iz.length - 1], [pi, 0]].forEach(([t, k]) => {
+      if (!t) { l.seg(W(...iz[k]), W(...de[k])); return; }
+      const [a, du, dv] = t, b = p[k], nu = -dv, nv = du, zz = z(b);
+      const L1 = [b[0] + nu * wp, b[1] + nv * wp, zz], R1 = [b[0] - nu * wp, b[1] - nv * wp, zz], T = [a[0], a[1], zz];
+      m.tri(W(...R1), W(...T), W(...L1));
+      const lI = Math.hypot(iz[k][0] - L1[0], iz[k][1] - L1[1]) < Math.hypot(iz[k][0] - R1[0], iz[k][1] - R1[1]);
+      const aI = lI ? L1 : R1, aD = lI ? R1 : L1;
+      l.seg(W(...iz[k]), W(...aI)); l.seg(W(...aI), W(...T)); l.seg(W(...T), W(...aD)); l.seg(W(...aD), W(...de[k]));
+    });
+  }
+  function flechaPunteada(m, pts, o) {
+    const w = o.ancho / 2, wp = o.ancho * 1.5, lp = o.ancho * 2.4, tr = o.ancho * 1.6, hueco = o.ancho * 0.9;
+    let p = suaviza(pts, 3);
+    const pf = punta(p, true);
+    p = recorta(p, 0, lp);
+    const nr = normales(p), lado = (q, n, s) => W(q[0] + n[0] * w * s, q[1] + n[1] * w * s, q[2] + 0.02);
+    // trazos de tr, huecos de hueco
+    let d = 0, lleno = true, ini = 0;
+    for (let i = 1; i < p.length; i++) {
+      const a = p[i - 1], b = p[i];
+      if (lleno) m.quad(lado(a, nr[i - 1], 1), lado(b, nr[i], 1), lado(b, nr[i], -1), lado(a, nr[i - 1], -1));
+      d += Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (d - ini > (lleno ? tr : hueco)) { lleno = !lleno; ini = d; }
+    }
+    const [a, du, dv] = pf, b = p[p.length - 1], nu = -dv, nv = du, zz = b[2] + 0.02;
+    m.tri(W(b[0] - nu * wp, b[1] - nv * wp, zz), W(a[0], a[1], zz), W(b[0] + nu * wp, b[1] + nv * wp, zz));
+  }
 
   /* ===== 11. Personas =====
      Siluetas como la hoja de referencia de Gabriel: cuerpo alargado y
@@ -949,7 +1086,8 @@ function crea(svg, op) {
     return { tex, N, POSES, alto: A / 145 * 1.72, ancho: T / 145 * 1.72, camina: [0, 1, 2, 3, 4, 5, 6, 7, 8, 10] };   // m: la figura (y 11 → 156) mide 1.72 m
   })();
   const matPers = matAtlas(FIG.tex, FIG.N, FIG.POSES);
-  const PERS = [];   // { u, v, tile, esc, ruta, acc, largo, vel, s0, lado } o quieto { u, v, tile, esc, flip }
+  matPersEsq = matPers;
+  const PERS = [], RUTAS_PEAT = [];   // { u, v, tile, esc, ruta, acc, largo, vel, s0, lado } o quieto { u, v, tile, esc, flip }
   {
     const azar = G.aleatorio(77), img = (r, x, y) => [PB.u0 + (x - r[0]) / (r[2] - r[0]) * (PB.u1 - PB.u0), PB.v1 - (y - r[1]) / (r[3] - r[1]) * (PB.v1 - PB.v0)];
     // sólo banqueta y predio: de guarnición a guarnición
@@ -970,6 +1108,7 @@ function crea(svg, op) {
       [[625, 106], [624, 130], [622, 160], [616, 200], [612, 230], [610, 255], [600, 280], [580, 295], [560, 308], [552, 330], [551, 355]],
       [[556, 210], [575, 205], [592, 190], [605, 170], [620, 160], [632, 158]]].forEach(p => {
       const pts = p.map(q => dentro(img(R3, q[0], q[1])));
+      RUTAS_PEAT.push(pts);
       let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
       ruta(pts, Math.round(L * dens));
     });
@@ -995,6 +1134,14 @@ function crea(svg, op) {
   PERS.forEach((p, i) => { aEsc.setXY(i, FIG.ancho * p.esc, FIG.alto * p.esc); aTile.setX(i, p.tile); aVolt.setX(i, p.flip || 1); });
   geoP.setAttribute('aPos', aPos); geoP.setAttribute('aEsc', aEsc); geoP.setAttribute('aTile', aTile); geoP.setAttribute('aVolt', aVolt); geoP.setAttribute('aPose', aPose);
   const mallaP = new THREE.Mesh(geoP, matPers); mallaP.frustumCulled = false; gPers.add(mallaP);
+  // el flujo de personas de la lámina: flechas dobles (cinta y punta abierta) en
+  // los dos sentidos; la tercera es un ramal: sólo la punta de afuera
+  {
+    const m = new Malla(), l = new Lineas();
+    RUTAS_PEAT.forEach((r, k) => flechaDoble(m, l, (k === 2 ? r.slice().reverse() : r).map(q => [q[0], q[1], 0.3]), { ancho: 2.2, puntas: [true, k !== 2] }));
+    gPers.add(new THREE.Mesh(m.geo(), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+    gPers.add(new THREE.LineSegments(l.geo(), new THREE.LineBasicMaterial({ color: 0xffffff })));
+  }
   const derecha = new THREE.Vector3();
   function enRuta(p, s) {   // posición y dirección a la distancia s (ida y vuelta)
     const L = p.largo, t = ((s % (2 * L)) + 2 * L) % (2 * L), d = t <= L ? t : 2 * L - t, va = t <= L ? 1 : -1;
@@ -1026,6 +1173,7 @@ function crea(svg, op) {
   /* ===== 12. Accesos (lámina): peatonales en rojo, vehiculares en azul =====
      Un triángulo sobre la banqueta, apuntando hacia adentro del predio. */
   const gAcc = new THREE.Group(); gAcc.visible = false; escena.add(gAcc);
+  const gEstAcc = new THREE.Group(); gEstAcc.visible = false; escena.add(gEstAcc);
   {
     const img = (r, x, y) => [PB.u0 + (x - r[0]) / (r[2] - r[0]) * (PB.u1 - PB.u0), PB.v1 - (y - r[1]) / (r[3] - r[1]) * (PB.v1 - PB.v0)];
     // [x, y de la lámina, hacia adentro (du, dv)]
@@ -1048,56 +1196,268 @@ function crea(svg, op) {
     }
     flechas(peat, 0xe0393e);
     flechas(veh, 0x1f5fb4);
+    if (EST && ESC === 'estacionamiento') {
+      // el acceso al estacionamiento: el camino de los carros de la calle a la
+      // boca de la helicoidal (entrada) y de vuelta (salida), en flechas
+      // punteadas; la bajada ya la dibuja la helicoidal. Con la circulación de la derecha: se entra por
+      // el carril de la derecha. (Las bocas de las rampas no coinciden con los
+      // triángulos de la lámina, que siguen en Accesos.)
+      const m = new Malla(), z0 = 0.3;
+      const arco = (c, r, a0, a1) => Array.from({ length: 25 }, (_, i) => { const a = (a0 + (a1 - a0) * i / 24) * RAD; return [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r, z0]; });
+      const angV = (c, r, v) => Math.asin(Math.max(-1, Math.min(1, (v - c[1]) / r))) / RAD;   // ángulo (−90…90) donde el arco llega a v
+      const rn = EST.rampas.find(r => r.bloque === 'norte'), rs = EST.rampas.find(r => r.bloque === 'sur');
+      const ce = (GU.n + GF.n) / 2, cc = (GU.s + GF.s) / 2, ri = 6.7, re = 10.95;   // ejes de las calles; los carriles de la helicoidal
+      const rutas = [];
+      if (rn) {   // a Eulalia Guzmán (norte)
+        const c = rn.c, vb = c[1] + 5.3;   // ahí empiezan los arcos del acceso
+        const cA = [c[0] + ri - re, vb], ent = arco(cA, re, angV(cA, re, GU.n), 0);
+        rutas.push([[ent[0][0], ce, z0], ...ent, [c[0] + ri, c[1], z0]]);
+        const cB = [c[0] + 2 * re, vb], sal = arco(cB, re, 180, 180 - angV(cB, re, GU.n));
+        rutas.push([[c[0] + re, c[1], z0], [c[0] + re, vb, z0], ...sal, [sal[sal.length - 1][0], ce, z0]]);
+      }
+      if (rs) {   // a Clavel (sur)
+        const c = rs.c, vb = c[1] - 5.2;
+        const cA = [c[0] + 2 * re, vb], ent = arco(cA, re, 180 - angV(cA, re, GU.s), 180);
+        rutas.push([[ent[0][0], cc, z0], ...ent, [c[0] + re, c[1], z0]]);
+        const cB = [c[0] + ri - re, vb], sal = arco(cB, re, 0, angV(cB, re, GU.s));
+        rutas.push([[c[0] + ri, c[1], z0], [c[0] + ri, vb, z0], ...sal, [sal[sal.length - 1][0], cc, z0]]);
+      }
+      rutas.forEach(r => flechaPunteada(m, r, { ancho: 1.1 }));
+      // en rayos X, como el estacionamiento: la bajada se ve a través del piso
+      const me = new THREE.Mesh(m.geo(), new THREE.MeshBasicMaterial({ color: 0x3d7fe0, side: THREE.DoubleSide, depthTest: false }));
+      me.renderOrder = 5; gEstAcc.add(me);
+    }
   }
 
   /* ===== 13. Mapa Nolli =====
-     La planta como figura y fondo: el espacio público en blanco (calles,
-     banquetas, el piso libre del predio, la plaza y el interior público de
-     naves y pabellones, con su contorno), lo construido y lo privado en negro
-     (los edificios del contexto, la industria). La cámara se va a
-     planta, con el norte arriba; todo lo demás se esconde. */
+     La planta baja como figura y fondo, con lo que hay ahora: el espacio
+     público en blanco (calles, banquetas, el piso libre, la plaza, el interior
+     de las naves y de arte y cultura) y lo construido o privado en negro: los
+     edificios del contexto y la industria, llenos; los muros de naves y de
+     arte y cultura como bandas negras; la estructura (columnas del aro, de
+     arte y cultura y las que bajan de los módulos) en puntos y cuadros. Lo que
+     pasa por arriba (el aro, la losa de arte y cultura), punteado.
+     Grosor: un muro de 20 cm no se lee a esta escala; se dibuja de MURO (el
+     mínimo que se alcanza a ver). La cámara se va a planta, norte arriba. */
   const gNolli = new THREE.Group(); gNolli.visible = false; escena.add(gNolli);
   let nolliHecho = false;
+  const MURO = 0.8;
   function armaNolli() {
     if (nolliHecho) return;
     nolliHecho = true;
     const D = G.D, R = D.rect, blanco = new THREE.MeshBasicMaterial({ color: 0xeeeeea }), negro = new THREE.MeshBasicMaterial({ color: 0x0a0a0a });
     const piso = new Malla(); tapa(piso, rect(R.u0, R.v0, R.u1, R.v1), -0.05);
     gNolli.add(new THREE.Mesh(piso.geo(), blanco));
-    const ed = new Malla();
-    // los del contexto (no los que caen en el predio: ahí manda el proyecto)
+    const ed = new Malla(), z = 0.06;
+    // los edificios del contexto (no los que caen en el predio: ahí manda el proyecto)
     D.edificios.forEach(f => {
       const pol = G.pares(f, 1), cu = pol.reduce((a, q) => a + q[0], 0) / pol.length, cv = pol.reduce((a, q) => a + q[1], 0) / pol.length;
       if (!(cu > GU.o && cu < GU.e && cv > GU.s && cv < GU.n)) tapa(ed, pol, 0.05);
     });
-    if (MOD && MOD.industria) tapa(ed, G.pares(MOD.industria.planta), 0.06);
+    // la industria: privada, llena
+    if (MOD && MOD.industria) tapa(ed, G.pares(MOD.industria.planta), z);
+    // muros: una banda de MURO por dentro de cada lado del polígono
+    function muro(pol, t) {
+      const p = ccw(pol);
+      for (let k = 0; k < p.length; k++) {
+        const a = p[k], b = p[(k + 1) % p.length], du = b[0] - a[0], dv = b[1] - a[1], L = Math.hypot(du, dv);
+        if (L < 1e-3) continue;
+        const nu = -dv / L * t, nv = du / L * t;   // hacia adentro (a la izquierda, en sentido antihorario)
+        ed.quad(W(a[0], a[1], z), W(b[0], b[1], z), W(b[0] + nu, b[1] + nv, z), W(a[0] + nu, a[1] + nv, z));
+      }
+    }
+    // naves: su planta (recortada a las fachadas y por el círculo del aro)
+    G.NAVES.forEach(nv => { const pol = G.menosCirculo(rect(nv.L.u0, nv.L.v0, nv.L.u1, nv.L.v1), [ANILLO.u, ANILLO.v], CORTE); if (pol) muro(pol, MURO); });
+    // arte y cultura: los módulos de planta baja (núcleos, oficinas…) y el foso del auditorio
+    if (CD) CD.pisa.forEach((pol, k) => muro(pol, k ? MURO : MURO * 0.7));
+    // estructura: columnas del aro (Ø 0.8), de arte y cultura (Ø 0.6) y las que bajan de los módulos (□ 0.5, exageradas un poco)
+    const punto = (u, v, r) => { const c = circ([u, v], r, 12); for (let k = 0; k < 12; k++) ed.tri(W(u, v, z), W(c[k][0], c[k][1], z), W(c[(k + 1) % 12][0], c[(k + 1) % 12][1], z)); };
+    COLUMNAS.forEach(c => punto(c[0], c[1], 0.45));
+    if (CD) CD.cols.forEach(c => punto(c[0], c[1], 0.35));
+    if (PAI) PAI.columnas.forEach(c => tapa(ed, rect(c[0] - 0.25, c[1] - 0.25, c[0] + 0.25, c[1] + 0.25), z));
     gNolli.add(new THREE.Mesh(ed.geo(), negro));
-    // interior público: naves y pabellones (blanco con contorno), el predio y Heliotropo
+    // lo de arriba, punteado: el aro (sus dos bordes) y la losa de arte y cultura; y el límite del predio
     const l = new Lineas();
-    G.NAVES.forEach(nv => l.poli(rect(nv.L.u0, nv.L.v0, nv.L.u1, nv.L.v1).map(q => W(q[0], q[1], 0.08)), true));
-    CULTURA.pabellones.forEach(pb => {
-      const pts = [];
-      for (let i = 0; i <= 20; i++) { const t = (pb[0] + (pb[1] - pb[0]) * i / 20) * RAD; pts.push(W(ANILLO.u + Math.cos(t) * CULTURA.r1, ANILLO.v + Math.sin(t) * CULTURA.r1, 0.08)); }
-      for (let i = 20; i >= 0; i--) { const t = (pb[0] + (pb[1] - pb[0]) * i / 20) * RAD; pts.push(W(ANILLO.u + Math.cos(t) * CULTURA.r0, ANILLO.v + Math.sin(t) * CULTURA.r0, 0.08)); }
-      l.poli(pts, true);
+    [ANILLO.ri, ANILLO.re].forEach(r => l.poli(circ([ANILLO.u, ANILLO.v], r, 160).map(q => W(q[0], q[1], 0.08)), true));
+    if (CD) l.poli(CD.losa1.map(q => W(q[0], q[1], 0.08)), true);
+    const lineas = new THREE.LineSegments(l.geo(), new THREE.LineDashedMaterial({ color: 0x555555, dashSize: 1.2, gapSize: 0.9 }));
+    lineas.computeLineDistances();
+    gNolli.add(lineas);
+    const lp = new Lineas(); lp.poli(rect(PB.u0, PB.v0, PB.u1, PB.v1).map(q => W(q[0], q[1], 0.08)), true);
+    gNolli.add(new THREE.LineSegments(lp.geo(), new THREE.LineBasicMaterial({ color: 0x777777 })));
+  }
+
+  /* ===== 14. Esquema compositivo =====
+     Sólo lo que se levantó (vivienda, naves, industria, arte y cultura y el
+     aro), reducido a geometrías: el aro es el círculo que genera todo; cada
+     masa, su envolvente más simple (cada volumen de vivienda es una franja
+     diagonal de dos barras escalonadas: un rectángulo a lo largo de ella con
+     la azotea que baja de un extremo al otro; el prisma de las naves cortadas
+     por el círculo, el de la industria y el de arte y cultura). Las dos
+     franjas son paralelas: sus ejes, punteados.
+     Lo que se encontró en el modelo: los centros de los dos volúmenes de
+     vivienda caen sobre el aro (a ~42 y ~47 m del centro) y casi opuestos (su
+     recta pasa a ~2 m del centro): ese diámetro es el eje principal, el
+     acento. Las naves (oriente) contra la industria y arte y cultura
+     (poniente) dan el segundo eje; todas las masas giran alrededor del
+     círculo (el polígono que une sus centros).
+     Se dibuja en 2D sobre la imagen (el mismo grueso en pantalla, encima de
+     todo), proyectando los puntos 3D: al orbitar se mueve con el modelo. Los
+     ejes y los centros, en el plano del aro (+9.8): ahí las relaciones son
+     exactas y una recta en 3D sigue siendo recta en la imagen. */
+  const ESQ = (() => {
+    const zc = ANILLO.z, masas = [];
+    const centroide = pol => {
+      let a = 0, cu = 0, cv = 0;
+      for (let i = 0; i < pol.length; i++) {
+        const p = pol[i], q = pol[(i + 1) % pol.length], k = p[0] * q[1] - q[0] * p[1];
+        a += k; cu += (p[0] + q[0]) * k; cv += (p[1] + q[1]) * k;
+      }
+      return { c: [cu / (3 * a), cv / (3 * a)], area: Math.abs(a / 2) };
+    };
+    // vivienda: los módulos (sin los de comercio) en dos grupos (k-medias), cada uno con su caja en la retícula de los módulos
+    if (MOD) {
+      const COM = MOD.tipos.indexOf('comercio'), cs = MOD.cajas.filter(r => r[3] !== COM);
+      let g = [cs.filter(r => r[1] < ANILLO.v), cs.filter(r => r[1] >= ANILLO.v)];
+      for (let it = 0; it < 12; it++) {
+        const c = g.map(x => [x.reduce((s, r) => s + r[0], 0) / x.length, x.reduce((s, r) => s + r[1], 0) / x.length]);
+        g = [[], []];
+        cs.forEach(r => g[Math.hypot(r[0] - c[0][0], r[1] - c[0][1]) <= Math.hypot(r[0] - c[1][0], r[1] - c[1][1]) ? 0 : 1].push(r));
+      }
+      // cada volumen es una franja diagonal (dos barras escalonadas) que baja
+      // de un extremo al otro: un rectángulo a lo largo de la franja (su eje
+      // principal) con la azotea inclinada entre la altura de cada extremo
+      g.forEach(x => {
+        const c = [x.reduce((s, r) => s + r[0], 0) / x.length, x.reduce((s, r) => s + r[1], 0) / x.length];
+        let suu = 0, svv = 0, suv = 0;
+        x.forEach(r => { const du = r[0] - c[0], dv = r[1] - c[1]; suu += du * du; svv += dv * dv; suv += du * dv; });
+        const t = 0.5 * Math.atan2(2 * suv, suu - svv), ea = [Math.cos(t), Math.sin(t)], eb = [-ea[1], ea[0]];
+        // esquinas de las cajas en ese marco
+        const pts = [];
+        x.forEach(r => [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(q => {
+          const u = r[0] + MEX[0] * q[0] * MOD.a / 2 + MEY[0] * q[1] * MOD.b / 2, v = r[1] + MEX[1] * q[0] * MOD.a / 2 + MEY[1] * q[1] * MOD.b / 2;
+          pts.push([(u - c[0]) * ea[0] + (v - c[1]) * ea[1], (u - c[0]) * eb[0] + (v - c[1]) * eb[1], MOD.z0 + (r[2] + 1) * MOD.alto]);
+        }));
+        const a0 = Math.min(...pts.map(p => p[0])), a1 = Math.max(...pts.map(p => p[0])), b0 = Math.min(...pts.map(p => p[1])), b1 = Math.max(...pts.map(p => p[1]));
+        // la altura de cada extremo: la más alta en su cuarto de la franja
+        const alto = lado => Math.max(...pts.filter(p => lado < 0 ? p[0] < a0 + (a1 - a0) * 0.25 : p[0] > a1 - (a1 - a0) * 0.25).map(p => p[2]));
+        const z0a = alto(-1), z1a = alto(1), aUV = (p, q) => [c[0] + ea[0] * p + eb[0] * q, c[1] + ea[1] * p + eb[1] * q];
+        const pol = [aUV(a0, b0), aUV(a1, b0), aUV(a1, b1), aUV(a0, b1)], ztop = [z0a, z1a, z1a, z0a];
+        masas.push({ n: 'vivienda', c, peso: x.length * MOD.a * MOD.b, pol, z0: MOD.z0, ztop, eje: [aUV(a0, 0), aUV(a1, 0)] });
+      });
+    }
+    // naves (cortadas por el círculo), industria y arte y cultura
+    G.NAVES.forEach(nv => {
+      const pol = G.menosCirculo(rect(nv.L.u0, nv.L.v0, nv.L.u1, nv.L.v1), [ANILLO.u, ANILLO.v], CORTE);
+      if (!pol) return;
+      const p = pol.map(q => [q[0], q[1]]), m = centroide(ccw(p));
+      masas.push({ n: 'nave', c: m.c, peso: m.area, pol: p, z0: 0, z1: 9 });
     });
-    l.poli(rect(PB.u0, PB.v0, PB.u1, PB.v1).map(q => W(q[0], q[1], 0.08)), true);
-    gNolli.add(new THREE.LineSegments(l.geo(), new THREE.LineBasicMaterial({ color: 0x777777 })));
+    if (MOD && MOD.industria) { const p = G.pares(MOD.industria.planta), m = centroide(ccw(p)); masas.push({ n: 'industria', c: m.c, peso: m.area, pol: p, z0: MOD.industria.z0, z1: MOD.industria.z1 }); }
+    if (CD) { const p = CD.losa1.map(q => [q[0], q[1]]), m = centroide(ccw(p)); masas.push({ n: 'cultura', c: m.c, peso: m.area, pol: p, z0: 0, z1: ANILLO.z - 0.35 }); }
+    // los ejes: el diámetro de la vivienda; y el de las naves contra la industria + arte y cultura
+    const pesa = l => { const P = l.reduce((s, m) => s + m.peso, 0); return [l.reduce((s, m) => s + m.c[0] * m.peso, 0) / P, l.reduce((s, m) => s + m.c[1] * m.peso, 0) / P]; };
+    const viv = masas.filter(m => m.n === 'vivienda');
+    const ejes = [];
+    if (viv.length === 2) ejes.push({ a: viv[0].c, b: viv[1].c, acento: true });
+    const este = masas.filter(m => m.n === 'nave'), oeste = masas.filter(m => m.n === 'industria' || m.n === 'cultura');
+    if (este.length && oeste.length) ejes.push({ a: pesa(este), b: pesa(oeste) });
+    // el polígono de los centros, en orden alrededor del aro
+    const giro = masas.map(m => m.c).sort((p, q) => Math.atan2(p[1] - ANILLO.v, p[0] - ANILLO.u) - Math.atan2(q[1] - ANILLO.v, q[0] - ANILLO.u));
+    const P3 = (u, v, z) => new THREE.Vector3(...W(u, v, z));
+    return {
+      masas: masas.map(m => ({ pts: m.pol.flatMap((q, i) => [P3(q[0], q[1], m.z0), P3(q[0], q[1], m.ztop ? m.ztop[i] : m.z1)]), c: P3(m.c[0], m.c[1], zc) })),
+      // los ejes de las dos franjas de vivienda (paralelas)
+      franjas: masas.filter(m => m.eje).map(m => m.eje.map(q => P3(q[0], q[1], zc))),
+      ejes: ejes.map(e => ({ a: P3(e.a[0], e.a[1], zc), b: P3(e.b[0], e.b[1], zc), acento: e.acento })),
+      orbita: giro.map(c => P3(c[0], c[1], zc)),
+      circulo: circ([ANILLO.u, ANILLO.v], (ANILLO.ri + ANILLO.re) / 2, 160).map(q => P3(q[0], q[1], zc)),
+      centro: P3(ANILLO.u, ANILLO.v, zc)
+    };
+  })();
+  const vC = new THREE.Vector3();
+  // a pantalla (px); null si queda detrás de la cámara
+  function enPantalla(p, w, h) {
+    vC.copy(p).applyMatrix4(cam.matrixWorldInverse);
+    if (cam.isPerspectiveCamera && vC.z > -cam.near) return null;
+    vC.applyMatrix4(cam.projectionMatrix);
+    return [(vC.x + 1) / 2 * w, (1 - vC.y) / 2 * h];
+  }
+  function envolvente(p) {   // cadena monótona
+    p = p.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const x = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], hi = [];
+    p.forEach(q => { while (lo.length > 1 && x(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); });
+    p.slice().reverse().forEach(q => { while (hi.length > 1 && x(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); });
+    return lo.slice(0, -1).concat(hi.slice(0, -1));
+  }
+  // una recta de la imagen, de borde a borde
+  function recta(x, a, b, w, h) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+    if (L < 1e-6) return;
+    const k = (w + h) * 2 / L;
+    x.beginPath(); x.moveTo(a[0] - dx * k, a[1] - dy * k); x.lineTo(b[0] + dx * k, b[1] + dy * k); x.stroke();
+  }
+  let esqLimpio = true;
+  function dibujaEsquema() {
+    const pr = renderer.getPixelRatio(), w = lienzo.clientWidth, h = lienzo.clientHeight;
+    if (lienzoEsq.width !== Math.round(w * pr) || lienzoEsq.height !== Math.round(h * pr)) { lienzoEsq.width = Math.round(w * pr); lienzoEsq.height = Math.round(h * pr); }
+    const x = lienzoEsq.getContext('2d');
+    x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, lienzoEsq.width, lienzoEsq.height);
+    esqLimpio = !conEsquema;
+    if (!conEsquema) return;
+    x.setTransform(pr, 0, 0, pr, 0, 0);
+    x.lineJoin = 'round'; x.lineCap = 'round';
+    x.shadowColor = 'rgba(0,0,0,.6)'; x.shadowBlur = 3;   // halo: se leen también sobre el cielo claro
+    const B = '#ffffff', ACENTO = '#ff3b30', S = p => enPantalla(p, w, h);
+    // las masas: su envolvente en la imagen
+    x.strokeStyle = B; x.lineWidth = 1.2;
+    ESQ.masas.forEach(m => {
+      const p = m.pts.map(S).filter(Boolean);
+      if (p.length < 3) return;
+      const e = envolvente(p);
+      x.beginPath(); e.forEach((q, i) => i ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1])); x.closePath(); x.stroke();
+    });
+    // el círculo generador (el aro)
+    x.lineWidth = 1.4; x.beginPath();
+    let ab = false;
+    ESQ.circulo.concat([ESQ.circulo[0]]).forEach(p => { const q = S(p); if (!q) { ab = false; return; } if (ab) x.lineTo(q[0], q[1]); else { x.moveTo(q[0], q[1]); ab = true; } });
+    x.stroke();
+    // la órbita: el polígono de los centros de las masas
+    const o = ESQ.orbita.map(S);
+    if (o.every(Boolean)) { x.lineWidth = 0.9; x.setLineDash([6, 5]); x.beginPath(); o.forEach((q, i) => i ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1])); x.closePath(); x.stroke(); x.setLineDash([]); }
+    // las franjas de vivienda: sus ejes, paralelos, de borde a borde
+    x.lineWidth = 0.8; x.setLineDash([2, 4]);
+    ESQ.franjas.forEach(f => { const a = S(f[0]), b = S(f[1]); if (a && b) recta(x, a, b, w, h); });
+    x.setLineDash([]);
+    // los ejes, de borde a borde (el principal, en rojo)
+    ESQ.ejes.forEach(e => {
+      const a = S(e.a), b = S(e.b);
+      if (!a || !b) return;
+      x.strokeStyle = e.acento ? ACENTO : B; x.lineWidth = e.acento ? 2 : 1;
+      recta(x, a, b, w, h);
+    });
+    // los centros: de las masas (círculos) y el del aro (una cruz)
+    x.strokeStyle = B; x.lineWidth = 1.2;
+    ESQ.masas.forEach(m => { const q = S(m.c); if (q) { x.beginPath(); x.arc(q[0], q[1], 3.5, 0, Math.PI * 2); x.stroke(); } });
+    const c = S(ESQ.centro);
+    if (c) { x.strokeStyle = ACENTO; x.lineWidth = 1.6; x.beginPath(); x.moveTo(c[0] - 7, c[1]); x.lineTo(c[0] + 7, c[1]); x.moveTo(c[0], c[1] - 7); x.lineTo(c[0], c[1] + 7); x.stroke(); }
   }
 
   /* ----- capas ----- */
-  const capas = { modulos: !!MOD, paisaje: !!PAI, estructura: false, sol: false, flujos: false, arboles: false, personas: false, accesos: false, nolli: false };
+  const capas = { modulos: !!MOD, paisaje: !!PAI, estructura: false, sol: false, flujos: false, arboles: false, personas: false, accesos: false, nolli: false, planta: false, esquema: false };
   function visibles() {
     // Nolli: sólo la figura y fondo (más los accesos y las personas, si están)
     const n = capas.nolli;
     piezas.forEach(p => { p.g.visible = !n && !p.g.userData.oculto; });
-    gMods.forEach(g => { g.visible = !n && capas.modulos && !ocultos.has('vivienda'); });
+    // inspeccionando algo (un apartado), los módulos se van
+    gMods.forEach(g => { g.visible = !n && GENERAL && capas.modulos && !ocultos.has('vivienda'); });
     gPai.visible = gPlantas.visible = !n && capas.paisaje && !gPai.userData.oculto;
     gCol.visible = !n && capas.estructura;
     gEst.visible = !n && ESC === 'estacionamiento';
     gSol.visible = !n && capas.sol;
     gPers.visible = capas.personas;
     gAcc.visible = capas.accesos;
+    gEstAcc.visible = !n && ESC === 'estacionamiento' && !ocultos.has('estacionamiento');
     gNolli.visible = n;
     // lo que se ocultó desde el menú de lo propuesto
     piezas.forEach(p => { if (ocultos.has(p.ap)) p.g.visible = false; });
@@ -1187,6 +1547,7 @@ function crea(svg, op) {
     if (muerto) return;
     renderer.render(escena, cam);
     if (ext.pinta) ext.pinta(cam);
+    if (conEsquema || !esqLimpio) dibujaEsquema();
     if (capas.sol) {
       const w = lienzo.clientWidth, h = lienzo.clientHeight;
       rotSol.forEach(r => {
@@ -1242,11 +1603,14 @@ function crea(svg, op) {
     const era = capas[nombre];
     capas[nombre] = !!si;
     if (nombre === 'color') { conColor = !!si; aplicaEstilo(); return; }
+    if (nombre === 'esquema') { conEsquema = !!si; aplicaEstilo(); return; }
     visibles();
     if (nombre === 'paisaje') aplicaEstilo();
     if (nombre === 'sol' && era !== capas.sol) { solea(ultimoMs || performance.now()); vuelaA(); }
     if (nombre === 'personas' && si) camina(ultimoMs || performance.now());
-    if (nombre === 'nolli' && era !== capas.nolli) { if (si) armaNolli(); cam = si ? camO : (persp ? camP : camO); vuelaA(); }
+    if (nombre === 'nolli' && era !== capas.nolli) { if (si) armaNolli(); camaraSegun(); vuelaA(); }
+    // Planta: la misma escena, vista desde arriba en ortográfica (la página pone la cámara cenital, norte arriba)
+    if (nombre === 'planta' && era !== capas.planta) { camaraSegun(); vuelaA(); }
     if (ext.capa) ext.capa(nombre, !!si);
     pide();
   }
@@ -1294,6 +1658,7 @@ function crea(svg, op) {
   // Separar niveles del estacionamiento: cada sótano baja 6 m más que el de arriba
   function separa(si) {
     estLineas.forEach((l, i) => { l.position.y = si ? -(i + 1) * 6 : 0; });
+    estRampas.forEach((g, i) => { g.position.y = si ? -(i + 1) * 6 : 0; });
     if (ESC === 'estacionamiento') { encuadra(); ponCamara(); }
     pide();
   }
@@ -1339,7 +1704,7 @@ function crea(svg, op) {
     escena.traverse(o => { if (o.geometry) o.geometry.dispose(); });
     Object.values(MATS).forEach(m => m.dispose()); Object.values(ARISTAS).forEach(m => m.dispose()); Object.values(LINEAS).forEach(m => m.dispose());
     renderer.dispose();
-    lienzo.remove(); capaRot.remove();
+    lienzo.remove(); capaRot.remove(); lienzoEsq.remove();
     svg.style.display = '';
   }
   function cambiaEstilo(n) {
@@ -1348,7 +1713,9 @@ function crea(svg, op) {
     aplicaEstilo();
   }
   let persp = true;
-  function perspectiva(si) { persp = !!si; if (!capas.nolli) cam = si ? camP : camO; ponCamara(); }
+  // en planta y en el Nolli, siempre ortográfica
+  function camaraSegun() { cam = capas.nolli || capas.planta ? camO : persp ? camP : camO; }
+  function perspectiva(si) { persp = !!si; camaraSegun(); ponCamara(); }
 
   /* ----- extras (atlampa-3d-ctx.js) -----
      ext = EXTRAS.crea(api): lo que el motor les presta (herramientas de
@@ -1370,6 +1737,7 @@ function crea(svg, op) {
 
   return {
     vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio,
+    depura: () => ({ escena, capas }),   // para revisar desde la consola
     preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); }, separa,
     fluye(ms) { if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
     minimapa: G.minimapa, limitesElevacion: [EL_MIN, EL_MAX], escena: ESC, tipos: MOD ? MOD.tipos : [],

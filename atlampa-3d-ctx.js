@@ -250,7 +250,7 @@ export function crea(api) {
     if (flechasCtx) flechasCtx.visible = ctxVisible;
     if (antes !== ctxVisible && capas.flujos) mueveCarros(ultimoMs || performance.now());
     if (!ctxVisible) alSalir();
-    gSitioNom.forEach(me => { me.visible = !ctxVisible; });   // con el contexto, sólo el de la calle bajo el cursor
+    nombresFijos();
     pide();
   }
 
@@ -334,6 +334,24 @@ export function crea(api) {
     (CALLES[f[0]] = CALLES[f[0]] || { n: f[0], tramos: [] }).tramos.push(t.map(q => new THREE.Vector3(...W(q[0], q[1], 0.2))));
   }));
   const LCALLES = Object.values(CALLES);
+  /* con Flujos se prenden todos: uno por calle, a la mitad de su tramo más largo */
+  const gCalleNom = LCALLES.map(c => {
+    let t = c.tramos[0], Lt = 0;
+    c.tramos.forEach(x => { let L = 0; for (let i = 1; i < x.length; i++) L += x[i].distanceTo(x[i - 1]); if (L > Lt) { Lt = L; t = x; } });
+    if (Lt < 40) return null;
+    // el punto a la mitad del largo y la dirección del tramo ahí
+    let s = Lt / 2, i = 1;
+    for (; i < t.length - 1; i++) { const d = t[i].distanceTo(t[i - 1]); if (s <= d) break; s -= d; }
+    const a = t[i - 1], b = t[i], f = Math.min(1, s / (b.distanceTo(a) || 1));
+    const me = nombre(textura(c.n, '--muted'), { p: a.clone().lerp(b, f), d: b.clone().sub(a).setY(0).normalize(), px: 10 });
+    me.visible = false;
+    return me;
+  }).filter(Boolean);
+  // los del sitio: sin contexto, siempre; con el contexto, sólo con Flujos (si no, el de la calle bajo el cursor)
+  function nombresFijos() {
+    gSitioNom.forEach(me => { me.visible = !ctxVisible || !!capas.flujos; });
+    gCalleNom.forEach(me => { me.visible = ctxVisible && !!capas.flujos; });
+  }
   const txHover = textura(' ', '--fg');
   const puntas = [0, 1].map(() => { const me = nombre(txHover, { p: new THREE.Vector3(), d: new THREE.Vector3(1, 0, 0), px: 12, punta: true }); me.visible = false; return me; });
   let hover = null, tramoH = null, resalte = null;
@@ -403,6 +421,7 @@ export function crea(api) {
   function visibles() {
     gArb.visible = !!capas.arboles;
     gFlu.visible = !!capas.flujos;
+    nombresFijos();
   }
   function capa(nombre, si) {
     visibles();

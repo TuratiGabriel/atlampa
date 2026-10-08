@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlampa · Aro</title>
-<link rel="stylesheet" href="atlampa.css?v=20261008i">
-<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261008i">
+<link rel="stylesheet" href="atlampa.css?v=20261008s">
+<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261008s">
 <!-- Three.js del CDN (pendiente: copiarlo a lib/ para presentar sin internet) -->
 <script type="importmap">{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head>
@@ -103,6 +103,7 @@
         <button class="hud-op" type="button" data-capa="personas" aria-pressed="false">Personas</button>
         <button class="hud-op" type="button" data-capa="flujos" aria-pressed="false">Flujos</button>
         <button class="hud-op" type="button" data-capa="arboles" aria-pressed="false">Árboles</button>
+        <button class="hud-op" type="button" data-capa="esquema" aria-pressed="false">Esquema compositivo</button>
       </div>
     </details>
     <details class="hud-menu" name="hud">
@@ -110,14 +111,14 @@
       <div class="hud-panel">
         <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">Color</button>
         <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="true">Perspectiva</button>
+        <button class="hud-op" type="button" data-capa="planta" aria-pressed="false">Planta</button>
         <button class="hud-op" type="button" data-capa="nolli" aria-pressed="false">Mapa Nolli</button>
         <p class="hud-panel__t">Estilo</p>
         <button class="hud-op hud-op--radio" type="button" data-estilo="rayado" aria-pressed="true">Rayado</button>
         <button class="hud-op hud-op--radio" type="button" data-estilo="plano" aria-pressed="false">Plano</button>
         <p class="hud-panel__t">Resaltar</p>
         <button class="hud-op hud-op--radio" type="button" data-resalta="" aria-pressed="true">Nada</button>
-        <button class="hud-op hud-op--radio" type="button" data-resalta="publico" aria-pressed="false">Público</button>
-        <button class="hud-op hud-op--radio" type="button" data-resalta="privado" aria-pressed="false">Privado</button>
+        <button class="hud-op hud-op--radio" type="button" data-resalta="espacio" aria-pressed="false"><i class="hud-esp hud-esp--pub"></i>Público / <i class="hud-esp hud-esp--pri"></i>privado</button>
         <button class="hud-op hud-op--radio" type="button" data-resalta="modulos" aria-pressed="false">Vivienda</button>
         <button class="hud-op hud-op--radio" type="button" data-resalta="comercio" aria-pressed="false">Comercio</button>
         <button class="hud-op hud-op--radio" type="button" data-resalta="cultura" aria-pressed="false">Arte y cultura</button>
@@ -149,7 +150,7 @@
   </aside>
 
   <div class="hud-camara">
-    <svg class="ad-mini" data-minimapa role="img" aria-label="Posición de la cámara"></svg>
+    <svg class="ad-mini" data-minimapa role="button" tabindex="0" aria-label="Brújula: nortear la vista"></svg>
     <div class="ad-zoom" role="group" aria-label="Zoom">
       <button class="ad-zoom__b" type="button" data-zoom="mas" aria-label="Acercar">+</button>
       <button class="ad-zoom__b" type="button" data-zoom="0" aria-label="Regresar al encuadre">⟲</button>
@@ -159,11 +160,11 @@
 
   <p class="ad-ayuda">Arrastrar (derecho o izquierdo): orbitar · Shift + arrastrar o botón central: mover · rueda: zoom al cursor · doble clic: encuadre · clic en una parte: entrar</p>
 </main>
-<script src="atlampa-datos.js?v=20261008i"></script>
-<script src="atlampa-modulos.js?v=20261008i"></script>
-<script src="atlampa-estacionamiento.js?v=20261008i"></script>
-<script src="atlampa-paisaje.js?v=20261008i"></script>
-<script src="atlampa-geo.js?v=20261008i"></script>
-<script src="atlampa-pagina.js?v=20261008i"></script>
+<script src="atlampa-datos.js?v=20261008s"></script>
+<script src="atlampa-modulos.js?v=20261008s"></script>
+<script src="atlampa-estacionamiento.js?v=20261008s"></script>
+<script src="atlampa-paisaje.js?v=20261008s"></script>
+<script src="atlampa-geo.js?v=20261008s"></script>
+<script src="atlampa-pagina.js?v=20261008s"></script>
 </body>
 </html>

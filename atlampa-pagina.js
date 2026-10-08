@@ -90,7 +90,7 @@
   var LIM = [6, 70], msAnt = 0;
   var VEL = 40, TAU = 0.35, TAU_EL = 0.09;
   // al arrastrar, la cámara sigue a la mano: más rápida y con menos inercia
-  var VEL_MANO = 900, TAU_MANO = 0.06, mano = false;
+  var VEL_MANO = 900, TAU_MANO = 0.06, mano = false, rapido = false;   // rapido: un giro pedido (brújula)
   var flujos = false, personas = false, sol = false, visible = true, corriendo = false;
   var CURVAS = {
     suave: function (t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; },
@@ -113,11 +113,11 @@
       }
     }
     if (az !== azMeta) {
-      var d = azMeta - az, paso = d * (1 - Math.exp(-dt / (mano ? TAU_MANO : TAU))), vmax = mano ? VEL_MANO : VEL;
+      var d = azMeta - az, paso = d * (1 - Math.exp(-dt / (mano || rapido ? TAU_MANO : TAU))), vmax = mano || rapido ? VEL_MANO * (rapido ? 0.4 : 1) : VEL;
       paso = Math.max(-vmax * dt, Math.min(vmax * dt, paso));
       az = Math.abs(d) < 0.15 || quieto.matches ? azMeta : az + paso;
       cambia = true;
-      if (az === azMeta) ocioso();
+      if (az === azMeta) { rapido = false; ocioso(); }
     }
     if (el !== elMeta) {
       var de = elMeta - el;
@@ -142,7 +142,7 @@
   }
 
   /* ---------- Capas ---------- */
-  var ponMini = null, arbolesAntes = false, resAct = '';
+  var ponMini = null, resAct = '';
   function boton(n) { return document.querySelector('[data-capa="' + n + '"]'); }
   function prendida(n) { var b = boton(n); return !!b && b.getAttribute('aria-pressed') === 'true'; }
   function marca(b, si) {
@@ -152,12 +152,9 @@
     var n = b.getAttribute('data-capa');
     if (n) document.body.classList.toggle('sin-' + n, !si);
   }
-  // Los árboles son sólo del acercamiento: al alejarse se apagan y al volver
-  // regresan como estaban.
+  // (los árboles y el contexto son independientes: uno no apaga al otro)
   function ponContexto(si, inmediato) {
     if (!GENERAL) return;
-    if (si) { arbolesAntes = prendida('arboles'); if (arbolesAntes) ponCapa('arboles', false); }
-    else if (arbolesAntes) { arbolesAntes = false; ponCapa('arboles', true); }
     marca(boton('contexto'), si);
     dib.reencuadra();
     var listo = false;
@@ -175,16 +172,32 @@
     marca(boton(nombre), si);
     if (nombre === 'separa') { dib.separa(si); escala(); return; }
     if (nombre === 'perspectiva') { perspAct = si; if (dib.perspectiva) dib.perspectiva(si); return; }
-    // Mapa Nolli: la cámara se va a planta con el norte arriba, y al apagarlo regresa
-    if (nombre === 'nolli') {
-      if (si && !antesNolli) { antesNolli = { az: azMeta, el: elMeta }; azMeta += ((NORTE_ARRIBA - azMeta) % 360 + 540) % 360 - 180; elMeta = LIM[1]; mano = false; arranca(); }
-      else if (!si && antesNolli) { azMeta = antesNolli.az; elMeta = antesNolli.el; antesNolli = null; arranca(); }
+    // Planta y Mapa Nolli: la cámara se va arriba (cenital) con el norte arriba, y al apagar ambos regresa
+    if (nombre === 'nolli' || nombre === 'planta') {
+      var arriba = prendida('nolli') || prendida('planta');
+      if (arriba && !antesNolli) { antesNolli = { az: azMeta, el: elMeta }; azMeta += ((NORTE_ARRIBA - azMeta) % 360 + 540) % 360 - 180; elMeta = LIM[1]; mano = false; arranca(); }
+      else if (!arriba && antesNolli) { azMeta = antesNolli.az; elMeta = antesNolli.el; antesNolli = null; arranca(); }
     }
     dib.capa(nombre, si);
     if (nombre === 'flujos') { flujos = si; dib.fluye(performance.now()); arranca(); }
     if (nombre === 'personas') { personas = si; arranca(); }
     if (nombre === 'sol') { sol = si; arranca(); }
     if (nombre === 'color') document.body.classList.toggle('con-color', si);   // la leyenda también
+  }
+
+  /* ---------- Brújula ----------
+     El minimapa nortea: un clic (o Enter) gira la cámara hasta dejar el norte
+     arriba, por el camino más corto; la altura no cambia. */
+  function nortea() {
+    if (yendo || !dib) return;
+    azMeta += ((NORTE_ARRIBA - azMeta) % 360 + 540) % 360 - 180;
+    rapido = true;
+    arranca();
+  }
+  var brujula = document.querySelector('[data-minimapa]');
+  if (brujula) {
+    brujula.addEventListener('click', nortea);
+    brujula.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); nortea(); } });
   }
 
   /* ---------- Propuesto: ocultar partes ----------
@@ -221,15 +234,17 @@
   }
 
   /* ---------- Resaltar ----------
-     Uno a la vez: lo público o lo privado (se colorea y lo otro casi
-     desaparece), o un programa (vivienda, comercio, arte y cultura,
+     Uno a la vez: Público / privado (cada uno con su color, todo a la
+     vista), o un programa (vivienda, comercio, arte y cultura,
      industria, aro, paisaje: toma su color y lo demás queda tenue). Resaltar
      algo oculto lo muestra. */
   function ponResalta(v) {
     resAct = v || '';
-    var esp = resAct === 'publico' || resAct === 'privado';
-    dib.espacio(esp ? resAct : null);
+    if (resAct === 'publico' || resAct === 'privado') resAct = 'espacio';   // (de antes: eran dos botones)
+    var esp = resAct === 'espacio';
+    // (en este orden: seleccion() borra el espacio)
     dib.seleccion(esp || !resAct ? null : resAct);
+    dib.espacio(esp ? 'ambos' : null);
     [].forEach.call(document.querySelectorAll('[data-resalta]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-resalta') === resAct)); });
     var ap = PARTE_DE[resAct] || resAct;
     if (ocultos[ap]) ponOculta(ap, false);
@@ -254,11 +269,7 @@
     else if (b.hasAttribute('data-capa')) {
       var n = b.getAttribute('data-capa'), si = b.getAttribute('aria-pressed') !== 'true';
       if (n === 'contexto') ponContexto(si);
-      else {
-        // prender los árboles desde el contexto acerca la cámara al predio
-        if (n === 'arboles' && si && prendida('contexto')) { arbolesAntes = false; ponContexto(false); }
-        ponCapa(n, si);
-      }
+      else ponCapa(n, si);
     } else if (b.hasAttribute('data-resalta')) { var v = b.getAttribute('data-resalta'); ponResalta(resAct === v ? '' : v); }
     else if (b.hasAttribute('data-estilo')) { estiloAct = b.getAttribute('data-estilo'); if (dib.estilo) dib.estilo(estiloAct); marcaGrupo('data-estilo', estiloAct); }
     else if (b.hasAttribute('data-sotano')) { var s = +b.getAttribute('data-sotano'); dib.sotano(s); marcaGrupo('data-sotano', s); }
@@ -343,7 +354,7 @@
     if (quieto.matches || location.protocol === 'file:' || !window.fetch || !window.DOMParser) { salta(ap); return; }
     var de = ESCENA, doc = traePagina(ap), listo = false, hecho = false;
     // el contexto urbano es sólo de la general: se apaga al salir
-    if (prendida('contexto')) { marca(boton('contexto'), false); if (arbolesAntes) { arbolesAntes = false; marca(boton('arboles'), true); } }
+    if (prendida('contexto')) marca(boton('contexto'), false);
     bloquea(true);
     document.body.classList.add('cambia-pagina');
     function sigue() {
@@ -529,7 +540,7 @@
   }
   monta();
   if (h.indexOf('contexto') >= 0) ponContexto(true, true);
-  ['flujos', 'arboles', 'personas', 'color', 'sol'].forEach(function (n) { if (h.indexOf(n) >= 0) ponCapa(n, true); });
+  ['flujos', 'arboles', 'personas', 'color', 'sol', 'esquema'].forEach(function (n) { if (h.indexOf(n) >= 0) ponCapa(n, true); });
   if (h.indexOf('estructura') >= 0) ponOculta('estructura', false);
   if (h.indexOf('sinmodulos') >= 0) ponOculta('vivienda', true);
   var th = h.filter(function (s) { return /^resalta=/.test(s); })[0];

@@ -25,6 +25,11 @@ que cada uno se guarda como centro + nivel + tipo.
 4. Industria (capa 'industry_bake - Copy'): un prisma; se guarda su planta
    (el contorno de la cara de abajo) y sus alturas.
 
+0. El aro (antes de todo): su cubierta pasa entre los módulos. Los que
+   estorban el paso (cruzan la banda del aro a la altura de la cubierta y
+   2.5 m libres encima) se quitan; los que quedan junto al paso se abren
+   hacia el aro (esa cara no se cierra) y pasan a comercio (tipo 'comercio').
+
 Marco: nuevos bloques.3dm está en el mismo giro que Contexto.3dm, corrido
 (497.59, 391.73) en planta; su suelo está en −6.96.
 """
@@ -38,7 +43,7 @@ from collections import Counter, defaultdict
 import numpy as np
 import rhino3dm
 from PIL import Image, ImageDraw
-from shapely.geometry import box as sbox
+from shapely.geometry import Point, Polygon, box as sbox
 from shapely.ops import unary_union
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -56,6 +61,9 @@ MIN_PX = 3                                # píxeles para contar una caja como v
 ELEVACIONES = [(6, 2), (15, 2), (30, 1), (48, 2), (70, 3)]   # alturas de cámara (°) y paso de azimut
 BANDAS = {'baja': (6, 15, 30), 'alta': (30, 48, 70)}           # el navegador usa 'baja' bajo 30°
 CORTE_BANDA = 30
+ANILLO = (505.75, 409.05, 39.5, 46.55, 9.8)   # u, v, radio interior y exterior, cubierta (como en atlampa-geo.js)
+LIBRE = 2.5                                   # altura libre sobre la cubierta
+JUNTO = 1.5                                   # a menos de esto del paso, un módulo da al aro
 
 
 def lee():
@@ -164,6 +172,37 @@ def main():
         vistos[llave] = c
         unicas.append(c)
     cajas = unicas
+
+    # 0. El aro: quita los que estorban el paso; abre y pasa a comercio los de junto
+    AU, AV, RI, RE, AZ = ANILLO
+    banda = Point(AU, AV).buffer(RE, 256).difference(Point(AU, AV).buffer(RI, 256))
+    ex0, ey0 = (eg, sg), (-sg, eg)
+
+    def esquina(c, lx, ly):
+        return (c['c'][0] + DU + ex0[0] * lx + ey0[0] * ly, c['c'][1] + DV + ex0[1] * lx + ey0[1] * ly)
+    quedan, quitadas = [], 0
+    for c in cajas:
+        z0 = Z0 + DZ + c['k'] * H
+        c['abre'] = []
+        if z0 + H <= AZ - 0.35 or z0 >= AZ + LIBRE:
+            quedan.append(c)
+            continue
+        pol = Polygon([esquina(c, x * A / 2, y * B / 2) for x, y in ((-1, -1), (1, -1), (1, 1), (-1, 1))])
+        if pol.intersection(banda).area > 0.3:
+            quitadas += 1
+            continue
+        if pol.distance(banda) < JUNTO:
+            # las caras que miran al paso: las que, al salir de ellas, se acercan a él
+            for lado, (mx, my, nx, ny) in enumerate(((0, -B / 2, 0, -1), (A / 2, 0, 1, 0), (0, B / 2, 0, 1), (-A / 2, 0, -1, 0))):
+                m = esquina(c, mx, my)
+                fuera = esquina(c, mx + nx, my + ny)
+                if Point(m).distance(banda) < JUNTO + 1 and Point(fuera).distance(banda) < Point(m).distance(banda) - 0.3:
+                    c['abre'].append(lado)
+            if c['abre']:
+                c['comercio'] = True
+        quedan.append(c)
+    cajas = quedan
+    print('aro: quitados', quitadas, '· a comercio', sum(1 for c in cajas if c.get('comercio')))
 
     por_nivel = defaultdict(list)
     for c in cajas:
@@ -328,7 +367,8 @@ def main():
             tapa = 1
         else:
             tapa = [[r2(v) for p in pts for v in p] for pts in c['tapa']]
-        return [r2(c['u']), r2(c['v']), c['k'], CAPAS.index(c['capa'])] + muros + [tapa]
+        tipo = len(CAPAS) if c.get('comercio') else CAPAS.index(c['capa'])
+        return [r2(c['u']), r2(c['v']), c['k'], tipo] + muros + [tapa]
 
     # 4. Juntas: las aristas entre caras coplanares de módulos del mismo
     # departamento no se dibujan; sólo se marca el cambio de departamento.
@@ -396,11 +436,13 @@ def main():
             parciales += 1
     for n, js in enumerate(cajas_js):
         js.append(sorted(quita[n], key=lambda x: x if isinstance(x, int) else x[0]) or 0)
+        if shell[n]['abre']:
+            js.append(shell[n]['abre'])
     print('juntas sin dibujar', juntas, '· aristas cortadas en parte', parciales)
 
     datos = {
         'giro': round(math.degrees(giro), 4), 'a': A, 'b': B, 'alto': H, 'z0': round(Zb, 2),
-        'tipos': CAPAS, 'sector': SECTOR, 'banda': CORTE_BANDA,
+        'tipos': CAPAS + ['comercio'], 'sector': SECTOR, 'banda': CORTE_BANDA,
         'cajas': cajas_js,
         'sectores': sectores,
         'industria': industria(),
@@ -411,12 +453,13 @@ def main():
            '   Fuente: Rhino/nuevos bloques.3dm, capas ' + ', '.join(CAPAS) + '.\n'
            '   ' + str(len(cajas)) + ' módulos (' + ', '.join('%s %d' % (k, cuenta[k]) for k in CAPAS) + '); '
            'aquí sólo los ' + str(len(shell)) + ' con alguna cara al exterior, y sólo esas caras.\n'
-           '   cajas: [u, v, nivel, tipo, muro −Y, muro +X, muro +Y, muro −X, tapa, juntas]; muro 1 = completo,\n'
+           '   cajas: [u, v, nivel, tipo, muro −Y, muro +X, muro +Y, muro −X, tapa, juntas(, abiertas)]; muro 1 = completo,\n'
            '   0 = tapado, lista = tramos descubiertos (coordenadas locales). juntas: aristas que no se\n'
            '   dibujan por ser del mismo departamento (cara × 100 + arista; cara 0-3 muros, 4 tapa), o\n'
            '   [código, t0, t1, …] con los tramos que sí se dibujan. sectores {baja, alta}: bits de las\n'
            '   cajas visibles desde cada sector de ' + str(SECTOR) + '° de azimut, con la cámara bajo o sobre\n'
-           '   ' + str(CORTE_BANDA) + '° de altura. */\n')
+           '   ' + str(CORTE_BANDA) + '° de altura. Tipo comercio: junto al aro, con las caras de la lista\n'
+           '   «abiertas» (0-3) hacia él; los que estorbaban su paso ya no están. */\n')
     with open(SALIDA, 'w', encoding='utf-8') as f:
         f.write(cab + 'window.ATLAMPA_MODULOS = ' + json.dumps(datos, separators=(',', ':')) + ';\n')
     print('escrito', SALIDA, os.path.getsize(SALIDA), 'bytes')
