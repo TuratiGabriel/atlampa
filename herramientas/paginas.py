@@ -2,7 +2,7 @@
 
     python herramientas/paginas.py      (desde diagrama/)
 
-Todas comparten el dibujo (atlampa-contexto.js con <body data-escena>), la
+Todas comparten el dibujo 3D (atlampa-3d.js con <body data-escena>), la
 página (atlampa-pagina.js) y el mismo tablero: el modelo a pantalla completa
 y encima, como en un videojuego, los menús desplegables, el minimapa en la
 esquina y la ficha del apartado. Menús:
@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261008h'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261008i'      # versión de los archivos (para que el navegador no use los viejos)
 
 SOTANOS = '''
       <div class="hud-grupo" role="group" aria-label="Sótanos">
@@ -35,7 +35,7 @@ SOTANOS = '''
 
 GENERAL_DESC = ('Axonometría del predio de Atlampa entre las calles del Fresno, Sabino y Clavel y la avenida Profesora '
                 'Eulalia Guzmán: las dos naves de comercio cortadas por el círculo del aro, el aro elevado, la industria, '
-                'la chimenea, los pabellones de arte y cultura con su plaza, los módulos de vivienda apilados hasta ocho '
+                'el edificio de arte y cultura con su plaza, los módulos de vivienda apilados hasta ocho '
                 'niveles, el paisaje de la planta baja (áreas verdes, humedales, estanques y la laguna), el estacionamiento '
                 'en sótanos como un volumen tenue y la espuela de ferrocarril por la calle Heliotropo. Los menús de arriba '
                 'abren o esconden cada parte de lo propuesto, prenden capas y diagramas (contexto urbano, sol, flujos, '
@@ -67,8 +67,8 @@ APARTADOS = {
     },
     'industria': {
         'titulo': 'Industria',
-        'desc': 'La nave industrial y la chimenea existente.',
-        'datos': ['Nave industrial', 'Chimenea existente'],
+        'desc': 'La nave industrial.',
+        'datos': ['Nave industrial'],
         'extra': '', 'leyenda': [],
     },
     'cultura': {
@@ -102,17 +102,17 @@ def pagina(k):
 
 
 # capa: [clave, nombre, prendida de inicio, clases extra] (solo-general: sólo en
-# la general; solo-3d / solo-svg: sólo con ese motor)
+# la general)
 CAPAS = [('modulos', 'Módulos', True, ''), ('paisaje', 'Paisaje', True, ''), ('sol', 'Sol', False, ''),
          ('contexto', 'Contexto urbano', False, 'solo-general')]
-DIAGRAMAS = [('accesos', 'Accesos', False, 'solo-3d'), ('personas', 'Personas', False, ''),
+DIAGRAMAS = [('accesos', 'Accesos', False, ''), ('personas', 'Personas', False, ''),
              ('flujos', 'Flujos', False, ''), ('arboles', 'Árboles', False, '')]
 RESALTA = [('', 'Nada'), ('publico', 'Público'), ('privado', 'Privado'), ('modulos', 'Vivienda'),
            ('comercio', 'Comercio'), ('cultura', 'Arte y cultura'), ('industria', 'Industria'),
            ('aro', 'Aro'), ('paisajismo', 'Paisaje')]
 # Propuesto: [clave para ocultar, nombre]. Las que tienen apartado van a él al
 # inspeccionar; la vivienda se resalta y la estructura es una capa (apagada de
-# inicio). El motor SVG sólo sabe ocultar la vivienda y la estructura.
+# inicio).
 PROPUESTO = [('vivienda', 'Vivienda'), ('comercio', 'Comercio'), ('industria', 'Industria'), ('cultura', 'Arte y cultura'),
              ('aro', 'Aro'), ('paisajismo', 'Paisajismo'), ('estacionamiento', 'Estacionamiento'), ('estructura', 'Estructura')]
 
@@ -172,11 +172,11 @@ PLANTILLA = '''<!doctype html>
       <summary class="hud-menu__t">Vista</summary>
       <div class="hud-panel">
         <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">Color</button>
-        <button class="hud-op solo-3d" type="button" data-capa="perspectiva" aria-pressed="true">Perspectiva</button>
-        <button class="hud-op solo-3d" type="button" data-capa="nolli" aria-pressed="false">Mapa Nolli</button>
-        <p class="hud-panel__t solo-3d">Estilo</p>
-        <button class="hud-op hud-op--radio solo-3d" type="button" data-estilo="rayado" aria-pressed="true">Rayado</button>
-        <button class="hud-op hud-op--radio solo-3d" type="button" data-estilo="plano" aria-pressed="false">Plano</button>
+        <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="true">Perspectiva</button>
+        <button class="hud-op" type="button" data-capa="nolli" aria-pressed="false">Mapa Nolli</button>
+        <p class="hud-panel__t">Estilo</p>
+        <button class="hud-op hud-op--radio" type="button" data-estilo="rayado" aria-pressed="true">Rayado</button>
+        <button class="hud-op hud-op--radio" type="button" data-estilo="plano" aria-pressed="false">Plano</button>
         <p class="hud-panel__t">Resaltar</p>
 {resalta}
       </div>
@@ -187,7 +187,6 @@ PLANTILLA = '''<!doctype html>
         <ul class="ad-leyenda">{leyenda}
         </ul>
         <p class="ad-fuente">Calles © colaboradores de OpenStreetMap</p>
-        <p class="ad-fuente"><a class="hud-motor solo-3d" href="?motor=svg">Ver con el motor SVG (respaldo)</a><a class="hud-motor solo-svg-motor" href="?">Ver en 3D</a></p>
       </div>
     </details>
   </nav>
@@ -209,10 +208,9 @@ PLANTILLA = '''<!doctype html>
 </main>
 <script src="atlampa-datos.js?v={v}"></script>
 <script src="atlampa-modulos.js?v={v}"></script>
-<script src="atlampa-personas.js?v={v}"></script>
 <script src="atlampa-estacionamiento.js?v={v}"></script>
 <script src="atlampa-paisaje.js?v={v}"></script>
-<script src="atlampa-contexto.js?v={v}"></script>
+<script src="atlampa-geo.js?v={v}"></script>
 <script src="atlampa-pagina.js?v={v}"></script>
 </body>
 </html>
@@ -240,14 +238,13 @@ def botones(lista):
 def propuesto():
     h = []
     for k, t in PROPUESTO:
-        svg = '' if k in ('vivienda', 'estructura') else ' solo-3d'
         h.append('        <details class="hud-parte" name="hud-parte" data-parte="%s">\n'
                  '          <summary class="hud-parte__t">%s</summary>\n'
                  '          <div class="hud-parte__sub">\n'
                  '            <button class="hud-acc" type="button" data-inspecciona="%s">Inspeccionar</button>\n'
-                 '            <button class="hud-acc%s" type="button" data-oculta="%s">%s</button>\n'
+                 '            <button class="hud-acc" type="button" data-oculta="%s">%s</button>\n'
                  '          </div>\n'
-                 '        </details>' % (k, t, k, svg, k, 'Mostrar' if k == 'estructura' else 'Ocultar'))
+                 '        </details>' % (k, t, k, k, 'Mostrar' if k == 'estructura' else 'Ocultar'))
     return '\n'.join(h)
 
 

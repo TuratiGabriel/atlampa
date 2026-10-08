@@ -5,7 +5,7 @@
 
    Todo lo estático va fusionado (una malla / unas LineSegments por tipo);
    los carros son UNA InstancedMesh y sólo se mueven sus matrices.
-   Contenido: el del motor SVG (atlampa-contexto.js); el método, otro.
+   Contenido: el que tenía el motor SVG (ya retirado); el método, otro.
    ============================================================ */
 export function crea(api) {
   const { THREE, G, W, rect, Malla, Lineas, tapa, prisma, pieza, pon, ponLineas, material, raizG, trabajo, capas, pide, aplicaEstilo, ESTILOS, GENERAL } = api;

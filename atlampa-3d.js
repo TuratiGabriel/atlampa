@@ -1,12 +1,12 @@
 /* ============================================================
    ATLAMPA — el dibujo en 3D (Three.js, WebGL)
-   Misma interfaz que atlampa-contexto.js (crea(svg, {escena}) → vista,
-   capa, acerca…), así que el tablero no cambia. La geometría se arma UNA vez
+   crea(svg, {escena}) → vista, capa, acerca… (la interfaz que usa el
+   tablero, atlampa-pagina.js). La geometría se arma UNA vez
    en coordenadas del mundo y la tarjeta de video sólo mueve la cámara: girar
    no recalcula nada. Las líneas ocultas las resuelve el depth buffer.
 
-   Datos y cálculos: los del motor SVG (window.AtlampaContexto.geo): naves
-   recortadas por el aro, plantas, árboles, sol, laguna…
+   Datos y cálculos del sitio: atlampa-geo.js (window.AtlampaGeo): naves
+   recortadas por el aro, plantas, árboles, sol, laguna, minimapa…
 
    Mundo: x = u − CEN.u (este-oeste del modelo), y = z (arriba),
           z = −(v − CEN.v). La cámara usa el mismo azimut y altura que el SVG.
@@ -18,13 +18,13 @@
              rayado fino (más luz = más rayas); aristas blancas; perspectiva.
      plano   el de siempre: rellenos grises con luz y sombra, aristas.
 
-   Fase 1: sitio, naves, industria, chimenea, cultura, aro, módulos,
+   Fase 1: sitio, naves, industria, cultura, aro, módulos,
    paisaje, estructura, estacionamiento (en rayos X) y sol. Pendiente:
    contexto urbano, personas, flujos, árboles de banqueta, rótulos de calles.
    ============================================================ */
 import * as THREE from 'three';
 
-const G = window.AtlampaContexto.geo;
+const G = window.AtlampaGeo;
 // Extras (fase 2: contexto urbano, árboles de banqueta, postes, flujos,
 // rótulos de calles) en su propio archivo; si no está, el motor sigue igual.
 const VER = import.meta.url.split('?')[1] || '';
@@ -223,7 +223,7 @@ function mallaAtlas(n, mat) {
 const ARBOLES_TEX = (() => {
   const T = 160, A = 200, S = 2, N = 4, c = document.createElement('canvas');
   c.width = N * T * S; c.height = A * S;
-  const x = c.getContext('2d'), azar = window.AtlampaContexto.geo.aleatorio(5);
+  const x = c.getContext('2d'), azar = window.AtlampaGeo.aleatorio(5);
   x.lineJoin = 'round'; x.lineCap = 'round';
   // un racimo: nube con el borde de hojitas (dientes y bucles chicos)
   function racimo(cx, cy, rx, ry) {
@@ -631,17 +631,12 @@ function crea(svg, op) {
     porNave.forEach((m, nv) => { const g = pieza('nave' + i, 'comercio', 0.35 + 0.05 * i++); pon(g, m, 'nave', 'comercio', 12); });
   }
 
-  /* ===== 4. Industria y chimenea ===== */
+  /* ===== 4. Industria (la chimenea existente ya no va) ===== */
   if (MOD && MOD.industria) {
     const g = pieza('industria', 'industria', 0.4), m = new Malla(), I = MOD.industria;
     prisma(m, G.pares(I.planta), I.z0, I.z1); pon(g, m, 'industria', 'industria', 20);
   }
-  if (MOD && MOD.chimenea) {
-    const g = pieza('chimenea', 'industria', 0.55), m = new Malla(), C = MOD.chimenea;
-    const b = rect(C.base[0], C.base[1], C.base[2], C.base[3]), t = rect(C.remate[0], C.remate[1], C.remate[2], C.remate[3]);
-    for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; m.quad(W(b[i][0], b[i][1], C.z0), W(b[j][0], b[j][1], C.z0), W(t[j][0], t[j][1], C.z1), W(t[i][0], t[i][1], C.z1)); }
-    tapa(m, t, C.z1); pon(g, m, 'industria', 'industria', 20);
-  }
+
 
   /* ===== 5. Arte y cultura ===== */
   {
@@ -1059,7 +1054,7 @@ function crea(svg, op) {
      La planta como figura y fondo: el espacio público en blanco (calles,
      banquetas, el piso libre del predio, la plaza y el interior público de
      naves y pabellones, con su contorno), lo construido y lo privado en negro
-     (los edificios del contexto, la industria, la chimenea). La cámara se va a
+     (los edificios del contexto, la industria). La cámara se va a
      planta, con el norte arriba; todo lo demás se esconde. */
   const gNolli = new THREE.Group(); gNolli.visible = false; escena.add(gNolli);
   let nolliHecho = false;
@@ -1076,7 +1071,6 @@ function crea(svg, op) {
       if (!(cu > GU.o && cu < GU.e && cv > GU.s && cv < GU.n)) tapa(ed, pol, 0.05);
     });
     if (MOD && MOD.industria) tapa(ed, G.pares(MOD.industria.planta), 0.06);
-    if (MOD && MOD.chimenea) { const c = MOD.chimenea.base; tapa(ed, rect(c[0], c[1], c[2], c[3]), 0.06); }
     gNolli.add(new THREE.Mesh(ed.geo(), negro));
     // interior público: naves y pabellones (blanco con contorno), el predio y Heliotropo
     const l = new Lineas();
@@ -1134,7 +1128,7 @@ function crea(svg, op) {
     const mete = q => { us.push(q[0]); vs.push(q[1]); };
     if (ap === 'estacionamiento' && EST) { EST.bloques.forEach(b => G.pares(b.planta).forEach(mete)); z0 = -EST.sotanos * EST.entrepiso; z1 = 0; }
     else if (ap === 'comercio') { G.NAVES.forEach(nv => { mete([nv.L.u0, nv.L.v0]); mete([nv.L.u1, nv.L.v1]); }); z1 = 9; }
-    else if (ap === 'industria' && MOD && MOD.industria) { G.pares(MOD.industria.planta).forEach(mete); if (MOD.chimenea) { mete(MOD.chimenea.base.slice(0, 2)); mete(MOD.chimenea.base.slice(2)); } z1 = MOD.chimenea ? MOD.chimenea.z1 : MOD.industria.z1; }
+    else if (ap === 'industria' && MOD && MOD.industria) { G.pares(MOD.industria.planta).forEach(mete); z1 = MOD.industria.z1; }
     else if (ap === 'cultura') { [[PLAZA_C.u0, PLAZA_C.v0], [PLAZA_C.u1, PLAZA_C.v1]].forEach(mete); mete([ANILLO.u - ANILLO.re, ANILLO.v - ANILLO.re]); z1 = ANILLO.z; }
     else if (ap === 'aro') { mete([ANILLO.u - ANILLO.re, ANILLO.v - ANILLO.re]); mete([ANILLO.u + ANILLO.re, ANILLO.v + ANILLO.re]); z1 = ANILLO.z + 1; }
     else { mete([PB.u0, PB.v0]); mete([PB.u1, PB.v1]); z1 = 2; }
@@ -1297,6 +1291,12 @@ function crea(svg, op) {
     estLineas.forEach((l, i) => { l.material = l.material.clone(); l.material.opacity = !k || k === i + 1 ? (k ? 0.9 : 0.4) : 0.08; });
     pide();
   }
+  // Separar niveles del estacionamiento: cada sótano baja 6 m más que el de arriba
+  function separa(si) {
+    estLineas.forEach((l, i) => { l.position.y = si ? -(i + 1) * 6 : 0; });
+    if (ESC === 'estacionamiento') { encuadra(); ponCamara(); }
+    pide();
+  }
   function apartadoEn(ev) {
     if (!ev || ev.clientX === undefined) return null;
     const r = lienzo.getBoundingClientRect();
@@ -1370,7 +1370,7 @@ function crea(svg, op) {
 
   return {
     vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio,
-    preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); }, separa() {},
+    preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); }, separa,
     fluye(ms) { if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
     minimapa: G.minimapa, limitesElevacion: [EL_MIN, EL_MAX], escena: ESC, tipos: MOD ? MOD.tipos : [],
     aumento: () => 1, azimut: () => AZ, elevacion: () => EL, estilo: cambiaEstilo, perspectiva, estilos: Object.keys(ESTILOS), motor: '3d'

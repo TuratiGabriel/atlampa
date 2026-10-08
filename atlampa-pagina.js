@@ -47,7 +47,7 @@
   'use strict';
 
   var svg = document.querySelector('[data-dibujo]');
-  if (!svg || !window.AtlampaContexto) return;
+  if (!svg || !window.AtlampaGeo) return;
   var PAGINAS = { general: 'index.html', estacionamiento: 'estacionamiento.html', comercio: 'comercio.html',
     industria: 'industria.html', cultura: 'cultura.html', aro: 'aro.html', paisajismo: 'paisajismo.html' };
   var NOMBRES = { estacionamiento: 'Estacionamiento', comercio: 'Comercio', industria: 'Industria', cultura: 'Arte y cultura', aro: 'Aro', paisajismo: 'Paisajismo' };
@@ -57,16 +57,13 @@
   var trabajo = svg.parentNode, pagina = document.querySelector('.ad-pagina');
   var zona = trabajo;   // ratón, teclado y tamaño: el contenedor (adentro va el SVG o el lienzo 3D)
   zona.tabIndex = 0;
-  // Motor: 3D (atlampa-3d.js, Three.js) salvo ?motor=svg o si no carga.
-  var MOTOR = /[?&]motor=svg\b/.test(location.search) ? 'svg' : '3d';
+  // El dibujo: atlampa-3d.js (Three.js); los datos del sitio, atlampa-geo.js.
   var VER = (document.currentScript && document.currentScript.src.split('?')[1]) || '';
   var estiloAct = 'rayado', perspAct = true;
   var antesNolli = null, NORTE_ARRIBA = -9.96;   // azimut con el norte arriba (el modelo está girado 9.96°)
   function creaDibujo() {
-    var d = MOTOR === '3d' && window.Atlampa3D ? window.Atlampa3D.crea(svg, { escena: ESCENA }) : window.AtlampaContexto.crea(svg, { escena: ESCENA });
-    document.body.classList.toggle('motor-3d', !!d.motor);
-    document.body.classList.toggle('motor-svg', !d.motor);
-    if (d.estilo) { d.estilo(estiloAct); d.perspectiva(perspAct); }
+    var d = window.Atlampa3D.crea(svg, { escena: ESCENA });
+    d.estilo(estiloAct); d.perspectiva(perspAct);
     return d;
   }
   var dib = null;
@@ -179,7 +176,7 @@
     if (nombre === 'separa') { dib.separa(si); escala(); return; }
     if (nombre === 'perspectiva') { perspAct = si; if (dib.perspectiva) dib.perspectiva(si); return; }
     // Mapa Nolli: la cámara se va a planta con el norte arriba, y al apagarlo regresa
-    if (nombre === 'nolli' && dib.motor) {
+    if (nombre === 'nolli') {
       if (si && !antesNolli) { antesNolli = { az: azMeta, el: elMeta }; azMeta += ((NORTE_ARRIBA - azMeta) % 360 + 540) % 360 - 180; elMeta = LIM[1]; mano = false; arranca(); }
       else if (!si && antesNolli) { azMeta = antesNolli.az; elMeta = antesNolli.el; antesNolli = null; arranca(); }
     }
@@ -192,16 +189,13 @@
 
   /* ---------- Propuesto: ocultar partes ----------
      ocultos: lo escondido, del tablero (sobrevive al cambiar de apartado).
-     La estructura es la capa 'estructura' (empieza oculta). El motor SVG no
-     tiene oculta(): ahí sólo se esconden la vivienda (capa 'modulos') y la
-     estructura. */
+     La estructura es la capa 'estructura' (empieza oculta). */
   var ocultos = { estructura: true };
   var PARTE_DE = { modulos: 'vivienda' };   // clave de resaltar → clave de ocultar
   function aplicaOculta(ap) {
     var si = !!ocultos[ap];
     if (ap === 'estructura') dib.capa('estructura', !si);
-    else if (dib.oculta) dib.oculta(ap, si);
-    else if (ap === 'vivienda') dib.capa('modulos', !si);
+    else dib.oculta(ap, si);
   }
   function ponOculta(ap, si) {
     ocultos[ap] = !!si;
@@ -513,11 +507,15 @@
   if (quieto.addEventListener) quieto.addEventListener('change', function () { if (dib) dib.fluye(performance.now()); arranca(); });
 
   /* ---------- Arranque ----------
-     Con el motor 3D primero se trae atlampa-3d.js (y Three.js, del CDN); si
-     no carga, se queda el SVG. */
+     Primero se trae atlampa-3d.js (y Three.js, del CDN); si no carga, se avisa. */
   var h = location.hash.replace('#', '').split(',');
-  if (MOTOR === '3d') import('./atlampa-3d.js' + (VER ? '?' + VER : '')).then(arranque, function (e) { console.warn('Sin motor 3D:', e); MOTOR = 'svg'; arranque(); });
-  else arranque();
+  import('./atlampa-3d.js' + (VER ? '?' + VER : '')).then(arranque, function (e) {
+    console.error('No cargó el visor 3D:', e);
+    var p = document.createElement('p');
+    p.className = 'ad-error';
+    p.textContent = 'No se pudo cargar el visor 3D (hace falta internet para Three.js, o un navegador con WebGL).';
+    trabajo.appendChild(p);
+  });
   function arranque() {
   function num(pre) { var s = h.filter(function (v) { return v.indexOf(pre + '=') === 0; })[0]; return s ? parseFloat(s.slice(pre.length + 1)) : null; }
   if (num('az') !== null) az = azMeta = num('az');
