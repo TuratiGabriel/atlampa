@@ -56,89 +56,117 @@ html, body{ background:var(--bg); color:var(--fg); }
 body{ font-family:var(--font-ui); font-weight:300; min-height:100vh; display:flex; flex-direction:column; }
 button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
 
-/* ---------- Página ----------
-   Tres secciones: la cabeza (título), el espacio de trabajo (el modelo, que
-   llena todo lo que queda de la pantalla) y la columna lateral, dividida en
-   Cámara, Capas, Espacio, Programa y Leyenda. */
-body{ height:100vh; overflow:hidden; }
-.ad-pagina{
-  flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) 232px; grid-template-rows:auto minmax(0,1fr);
-}
-.ad-cabeza{
-  grid-column:1; grid-row:1; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:8px 24px;
-  padding:18px var(--gutter) 14px; border-bottom:1px solid var(--trazo);
-}
-.ad-titulo{ font-family:var(--font-display); font-weight:400; font-size:clamp(28px, 3vw, 44px); line-height:1; letter-spacing:.02em; }
-.ad-micro{ font-family:var(--font-display); font-size:13px; letter-spacing:.06em; color:var(--muted); }
+/* ---------- Tablero ----------
+   El modelo llena la pantalla, como en cine; encima flota el tablero, como en
+   un videojuego: la marca y la ruta arriba a la izquierda, los menús
+   desplegables arriba a la derecha (Propuesto, Capas, Diagramas, Vista,
+   Leyenda), la
+   ficha del apartado a la izquierda, el minimapa y el zoom en la esquina de
+   abajo. Fuera de los menús no hay texto que haga ruido. */
+body{ height:100vh; height:100dvh; overflow:hidden; }
+.ad-pagina{ position:fixed; inset:0; }
+.ad-trabajo{ position:absolute; inset:0; }
+.ad-dibujo{ display:block; width:100%; height:100%; overflow:hidden; --k:1; touch-action:none; user-select:none; }
+.ad-ayuda{ position:absolute; left:50%; bottom:12px; transform:translateX(-50%); font-size:10.5px; letter-spacing:.03em; color:rgba(154,154,154,.5); pointer-events:none; white-space:nowrap; }
 
-.ad-trabajo{ grid-column:1; grid-row:2; position:relative; min-width:0; min-height:0; }
-.ad-dibujo{ display:block; width:100%; height:100%; overflow:hidden; --k:1; cursor:default; touch-action:none; user-select:none; }
-.ad-dibujo.con-zoom{ cursor:grab; }
-.ad-dibujo.con-zoom:active{ cursor:grabbing; }
-.ad-ayuda{ position:absolute; left:var(--gutter); bottom:10px; font-size:10.5px; letter-spacing:.03em; color:rgba(154,154,154,.55); pointer-events:none; }
+.hud-cabeza, .hud-barra, .hud-ficha, .hud-camara{ position:absolute; z-index:3; transition:opacity .3s var(--ease-ui); }
+.hud-cabeza{ top:18px; left:var(--gutter); display:flex; align-items:baseline; gap:14px; pointer-events:none; }
+.hud-marca{ pointer-events:auto; font-family:var(--font-display); font-size:clamp(26px, 2.4vw, 36px); line-height:1; letter-spacing:.02em; color:var(--fg); text-decoration:none; }
+.hud-ruta{ font-family:var(--font-display); font-size:16px; letter-spacing:.05em; color:var(--muted); }
+body[data-escena="general"] .hud-ruta{ font-size:13px; }
+.hud-marca:focus-visible{ outline:1px solid var(--fg); outline-offset:4px; }
 
-.ad-lado{
-  grid-column:2; grid-row:1 / 3; display:flex; flex-direction:column; min-height:0; overflow-y:auto;
-  border-left:1px solid var(--trazo); padding:0 20px 16px;
+/* menús: una fila de pestañas; cada una abre su panel debajo */
+.hud-barra{ top:16px; right:var(--gutter); display:flex; gap:6px; align-items:flex-start; }
+.hud-menu{ position:relative; }
+.hud-menu__t{
+  list-style:none; cursor:pointer; display:flex; align-items:center; gap:9px; padding:7px 13px 6px;
+  font-family:var(--font-display); font-size:15px; letter-spacing:.05em; color:var(--muted);
+  background:rgba(0,0,0,.62); border:1px solid var(--trazo); border-radius:3px;
+  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+  transition:color .2s var(--ease-ui), border-color .2s var(--ease-ui);
 }
-.ad-seccion{ display:flex; flex-direction:column; gap:10px; padding:16px 0; border-bottom:1px solid var(--trazo); }
-.ad-seccion[hidden]{ display:none; }
-.ad-seccion__t{ font-family:var(--font-ui); font-weight:400; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:rgba(154,154,154,.75); }
-.ad-fuente{ margin-top:auto; padding-top:14px; }
+.hud-menu__t::-webkit-details-marker{ display:none; }
+.hud-menu__t::after{ content:""; width:5px; height:5px; border-right:1px solid currentColor; border-bottom:1px solid currentColor; transform:rotate(45deg) translateY(-2px); transition:transform .2s var(--ease-ui); }
+.hud-menu[open] > .hud-menu__t{ color:var(--fg); border-color:rgba(255,255,255,.4); }
+.hud-menu[open] > .hud-menu__t::after{ transform:rotate(-135deg) translateY(-1px); }
+@media (hover:hover){ .hud-menu__t:hover{ color:var(--fg); } }
+.hud-menu__t:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
+.hud-panel{
+  position:absolute; top:calc(100% + 6px); right:0; min-width:190px; max-height:calc(100dvh - 120px); overflow-y:auto;
+  display:flex; flex-direction:column; gap:2px; padding:10px 14px 12px;
+  background:rgba(0,0,0,.8); border:1px solid var(--trazo); border-radius:3px;
+  -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+  animation:hud-abre .18s var(--ease-ui);
+}
+@keyframes hud-abre{ from{ opacity:0; transform:translateY(-4px); } }
+.hud-panel__t{ margin:8px 0 2px; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:rgba(154,154,154,.7); }
 
-.ad-zoom{ display:flex; gap:6px; align-self:center; }
+/* opciones: apagada gris; prendida blanca con un punto */
+.hud-op{
+  position:relative; display:block; width:100%; padding:4px 0 4px 16px; text-align:left;
+  font-family:var(--font-display); font-size:15px; letter-spacing:.04em; color:var(--muted); text-decoration:none;
+  transition:color .2s var(--ease-ui);
+}
+.hud-op::before{ content:""; position:absolute; left:2px; top:50%; width:6px; height:6px; margin-top:-3px; border:1px solid currentColor; border-radius:50%; opacity:.6; }
+.hud-op[aria-pressed="true"], .hud-op[aria-current]{ color:var(--fg); }
+.hud-op[aria-pressed="true"]::before, .hud-op[aria-current]::before{ background:currentColor; opacity:1; }
+.hud-ir::before{ border-radius:0; border-width:0 1px 1px 0; transform:rotate(-45deg); width:5px; height:5px; }
+.hud-ir[aria-current]::before{ background:none; }
+@media (hover:hover){ .hud-op:hover{ color:var(--fg); } }
+.hud-op:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
+body:not([data-escena="general"]) .solo-general{ display:none; }
+/* Propuesto: cada parte abre su submenú (Inspeccionar · Ocultar). El punto
+   lleno es que se ve; hueco y tenue, que está oculta. */
+.hud-panel--propuesto{ min-width:220px; }
+.hud-parte__t{
+  position:relative; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 2px 4px 16px;
+  list-style:none; cursor:pointer; font-family:var(--font-display); font-size:15px; letter-spacing:.04em; color:var(--muted);
+  transition:color .2s var(--ease-ui), opacity .2s var(--ease-ui);
+}
+.hud-parte__t::-webkit-details-marker{ display:none; }
+.hud-parte__t::before{ content:""; position:absolute; left:2px; top:50%; width:6px; height:6px; margin-top:-3px; border:1px solid currentColor; border-radius:50%; background:currentColor; }
+.hud-parte__t::after{ content:""; width:4px; height:4px; border-right:1px solid currentColor; border-bottom:1px solid currentColor; transform:rotate(-45deg); opacity:.6; transition:transform .2s var(--ease-ui); }
+.hud-parte[open] > .hud-parte__t, .hud-parte.es-actual > .hud-parte__t{ color:var(--fg); }
+.hud-parte[open] > .hud-parte__t::after{ transform:rotate(45deg); }
+.hud-parte.es-oculta > .hud-parte__t{ opacity:.45; }
+.hud-parte.es-oculta > .hud-parte__t::before{ background:none; }
+@media (hover:hover){ .hud-parte__t:hover{ color:var(--fg); } }
+.hud-parte__t:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
+.hud-parte__sub{ display:flex; gap:6px; margin:2px 0 6px 16px; animation:hud-abre .15s var(--ease-ui); }
+.hud-acc{
+  padding:3px 9px 2px; font-family:var(--font-display); font-size:13.5px; letter-spacing:.04em; color:var(--muted);
+  border:1px solid var(--trazo); border-radius:2px; transition:color .2s var(--ease-ui), border-color .2s var(--ease-ui);
+}
+@media (hover:hover){ .hud-acc:hover{ color:var(--fg); border-color:rgba(255,255,255,.4); } }
+.hud-acc:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
+.hud-panel .ad-leyenda{ padding:4px 0; }
+.hud-panel .ad-fuente{ margin-top:10px; }
+
+/* ficha del apartado */
+.hud-ficha{
+  top:76px; left:var(--gutter); width:236px; display:flex; flex-direction:column; gap:10px; padding:14px 16px;
+  background:rgba(0,0,0,.62); border:1px solid var(--trazo); border-radius:3px;
+  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+}
+.hud-ficha[hidden]{ display:none; }
+.hud-ficha__t{ font-family:var(--font-display); font-weight:400; font-size:22px; letter-spacing:.03em; line-height:1.1; }
+.hud-grupo{ display:grid; grid-template-columns:1fr 1fr; gap:0 8px; }
+.hud-grupo .hud-op{ font-size:13.5px; }
+.hud-op--linea{ font-size:14px; }
+
+/* cámara: minimapa y zoom en la esquina */
+.hud-camara{ right:var(--gutter); bottom:18px; display:flex; align-items:flex-end; gap:8px; }
+.ad-zoom{ display:flex; flex-direction:column; gap:4px; }
 .ad-zoom__b{
-  width:30px; height:26px; border:1px solid var(--trazo); border-radius:3px; color:var(--muted); font-size:15px; line-height:1;
+  width:28px; height:26px; border:1px solid var(--trazo); border-radius:3px; background:rgba(0,0,0,.62); color:var(--muted); font-size:15px; line-height:1;
   transition:color .2s var(--ease-ui), border-color .2s var(--ease-ui);
 }
 @media (hover:hover){ .ad-zoom__b:hover{ color:var(--fg); border-color:rgba(255,255,255,.4); } }
 .ad-zoom__b:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
 
-/* botones: apagado gris; prendido blanco y con una raya a la izquierda */
-.ad-capas{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
-.ad-boton{
-  position:relative; font-family:var(--font-display); font-size:17px; letter-spacing:.04em;
-  color:var(--muted); padding:2px 0; transition:color .3s var(--ease-ui), opacity .3s var(--ease-ui);
-}
-@media (hover:hover){ .ad-boton:hover{ color:var(--fg); } }
-.ad-boton[aria-pressed="true"]{ color:var(--fg); }
-.ad-boton[aria-pressed="true"]::before{ content:""; position:absolute; left:-12px; top:50%; width:7px; border-top:1.5px solid var(--fg); }
-.ad-boton:focus-visible{ outline:1px solid var(--fg); outline-offset:4px; }
-/* Con una capa prendida, los botones de las demás bajan la opacidad. */
-.ad-capas.hay-activa .ad-boton[aria-pressed="false"]{ opacity:.35; }
-
-/* Espacio: Público / Privado, uno a la vez */
-.ad-espacio:has([aria-pressed="true"]) .ad-boton[aria-pressed="false"]{ opacity:.35; }
-.ad-espacio .ad-boton{ display:flex; align-items:center; gap:9px; }
-.ad-espacio__m{ width:12px; height:12px; border:1px solid var(--fg); }
-.ad-espacio__m--publico{ background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--c-publico) 70%, transparent) 0 1px, color-mix(in srgb, var(--c-publico) 26%, #141414) 1px 3px); }
-.ad-espacio__m--privado{ background:color-mix(in srgb, var(--c-vivienda) 45%, #2a2a2a); }
-
-/* Programa: un menú desplegable por tipología; cada opción resalta lo suyo y
-   lo demás casi desaparece */
-.ad-menus{ display:flex; flex-direction:column; gap:2px; }
-.ad-menu__t{
-  list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; padding:4px 0;
-  font-family:var(--font-display); font-size:16px; letter-spacing:.04em; color:var(--muted); transition:color .2s var(--ease-ui);
-}
-.ad-menu__t::-webkit-details-marker{ display:none; }
-.ad-menu__t::after{ content:""; width:6px; height:6px; border-right:1px solid currentColor; border-bottom:1px solid currentColor; transform:rotate(45deg) translateY(-2px); transition:transform .2s var(--ease-ui); }
-.ad-menu[open] > .ad-menu__t::after{ transform:rotate(-135deg) translateY(-1px); }
-.ad-menu[open] > .ad-menu__t, .ad-menu:has([aria-pressed="true"]) > .ad-menu__t{ color:var(--fg); }
-@media (hover:hover){ .ad-menu__t:hover{ color:var(--fg); } }
-.ad-menu__t:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
-.ad-menu .ad-tipos{ padding:2px 0 8px 2px; }
-.ad-tipos{ display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; list-style:none; }
-.ad-tipo{
-  display:flex; align-items:center; gap:8px; width:100%; padding:3px 0; text-align:left;
-  font-family:var(--font-display); font-size:13px; letter-spacing:.04em; color:var(--muted); transition:color .2s var(--ease-ui), opacity .2s var(--ease-ui);
-}
-@media (hover:hover){ .ad-tipo:hover{ color:var(--fg); } }
-.ad-tipo[aria-pressed="true"]{ color:var(--fg); }
-.ad-menus.hay-activa .ad-tipo[aria-pressed="false"]{ opacity:.45; }
-.ad-tipo:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
-.ad-tipo__muestra{ flex:none; width:14px; height:10px; border:1px solid var(--l2); background:color-mix(in srgb, var(--m, #fff) 45%, #2a2a2a); }
-
+/* leyenda: sólo lo de las capas prendidas */
+.ad-fuente{ margin-top:auto; padding-top:14px; }
 .ad-leyenda{ display:flex; flex-direction:column; gap:7px; list-style:none; }
 .ad-leyenda li{ display:flex; align-items:center; gap:9px; font-family:var(--font-display); font-size:13px; letter-spacing:.04em; color:var(--muted); }
 .ad-leyenda i{ flex:none; width:16px; height:10px; border:1px solid var(--l3); }
@@ -164,22 +192,28 @@ body.con-color .ad-leyenda__anillo{ border-color:color-mix(in srgb, var(--c-circ
 body.con-color .ad-leyenda__cultura{ background:color-mix(in srgb, var(--c-cultura) var(--pc), #5a5a5a); }
 .ad-leyenda__chimenea{ width:6px !important; height:14px !important; margin:0 5px; background:var(--chim); border-color:var(--l2) !important; }
 .ad-leyenda__persona{ border:0 !important; width:16px !important; height:14px !important; }
+.ad-leyenda__verde{ background:rgba(140,190,110,.14); border-color:rgba(255,255,255,.25) !important; }
+body.con-color .ad-leyenda__verde{ background:color-mix(in srgb, #6f9445 40%, #0c0c0c); }
+.ad-leyenda__sol{ border-radius:50%; width:12px !important; height:12px !important; margin:0 2px; background:#f4f4f4; border-color:#f4f4f4 !important; box-shadow:0 0 0 3px rgba(255,255,255,.12); }
+body.con-color .ad-leyenda__sol{ background:#ffcf6b; border-color:#ffcf6b !important; }
+body.sin-modulos [data-l="modulos"], body.sin-paisaje [data-l="paisaje"], body.sin-estructura [data-l="estructura"],
+body.sin-sol [data-l="sol"], body.sin-arboles [data-l="arboles"], body.sin-personas [data-l="personas"]{ display:none; }
 
+/* con cinco menús la ruta ya no cabe junto a ellos (la ficha dice dónde se está) */
+@media (max-width:1000px){ .hud-ruta{ display:none; } }
 @media (max-width:820px){
-  body{ height:auto; overflow:auto; }
-  .ad-pagina{ grid-template-columns:1fr; grid-template-rows:auto auto auto; }
-  .ad-trabajo{ height:72vh; }
-  .ad-lado{ grid-column:1; grid-row:3; border-left:0; overflow:visible; }
+  .hud-barra{ top:auto; bottom:14px; left:12px; right:auto; flex-wrap:wrap; }
+  .hud-panel{ top:auto; bottom:calc(100% + 6px); left:0; right:auto; max-height:60dvh; }
+  .hud-ficha{ display:none; }
+  .ad-ayuda{ display:none; }
 }
 
-/* ---------- Minimapa: arriba de la columna lateral ---------- */
+/* ---------- Minimapa: en la esquina, sólo indica ---------- */
 .ad-mini{
-  display:block; align-self:center; width:140px; height:140px; clip-path:circle(50%);
+  display:block; align-self:center; width:84px; height:84px; clip-path:circle(50%);
   background:rgba(0,0,0,.82); border:1px solid var(--trazo); border-radius:50%;
-  cursor:grab; touch-action:none;
+  pointer-events:none;
 }
-.ad-mini:active{ cursor:grabbing; }
-.ad-mini:focus-visible{ outline:1px solid var(--fg); outline-offset:3px; }
 .ad-mini-orbita{ fill:none; stroke:var(--l4); stroke-width:.8; stroke-dasharray:2 3; }
 .ad-mini-bloque{ fill:#0d0d0d; stroke:var(--l4); stroke-width:.5; }
 .ad-mini-predio{ fill:var(--predio); stroke:var(--l1); stroke-width:.8; stroke-dasharray:2 1.5; }
@@ -287,10 +321,13 @@ body.con-color .ad-leyenda__cultura{ background:color-mix(in srgb, var(--c-cultu
 .ad[data-resalta="modulos88"] .ad-mod--modulos88{ --m:color-mix(in srgb, var(--c-88) var(--pc), var(--m-uno)); --mt:56%; --ml:36%; --ms:20%; }
 .ad[data-resalta="modulosamenidades"] .ad-mod--modulosamenidades{ --m:color-mix(in srgb, var(--c-amenidades) var(--pc), var(--m-uno)); --mt:56%; --ml:36%; --ms:20%; }
 .ad[data-resalta="modulosextra"] .ad-mod--modulosextra{ --m:color-mix(in srgb, var(--c-extra) var(--pc), var(--m-uno)); --mt:56%; --ml:36%; --ms:20%; }
-.ad-dibujo .ad-mod path{ vector-effect:none; stroke:color-mix(in srgb, var(--m) 70%, transparent); stroke-width:calc(var(--k) * .7px); stroke-linejoin:round; }
-.ad-mod-tapa{ fill:color-mix(in srgb, var(--m) var(--mt), #000); }
-.ad-mod-luz{ fill:color-mix(in srgb, var(--m) var(--ml), #000); }
-.ad-mod-sombra{ fill:color-mix(in srgb, var(--m) var(--ms), #000); }
+/* Las caras llevan un contorno de su mismo color (tapa la rendija entre
+   módulos); la línea sólo va en .ad-mod-arista: el cambio de departamento. */
+.ad-dibujo .ad-mod path{ vector-effect:none; stroke-width:calc(var(--k) * 1px); stroke-linejoin:round; }
+.ad-mod-tapa{ --f:color-mix(in srgb, var(--m) var(--mt), #000); fill:var(--f); stroke:var(--f); }
+.ad-mod-luz{ --f:color-mix(in srgb, var(--m) var(--ml), #000); fill:var(--f); stroke:var(--f); }
+.ad-mod-sombra{ --f:color-mix(in srgb, var(--m) var(--ms), #000); fill:var(--f); stroke:var(--f); }
+.ad-dibujo .ad-mod .ad-mod-arista{ fill:none; stroke:color-mix(in srgb, var(--m) 70%, transparent); stroke-width:calc(var(--k) * .7px); stroke-linecap:round; }
 
 /* Programa: lo no elegido (módulos, naves, industria) casi desaparece */
 .ad.con-sel .ad-mod, .ad.con-sel .ad-nave, .ad.con-sel .ad-industria, .ad.con-sel .ad-cultura, .ad.con-sel .ad-plaza-cultural{ opacity:var(--fantasma); }
@@ -369,3 +406,198 @@ body.con-color .ad-leyenda__cultura{ background:color-mix(in srgb, var(--c-cultu
 .ad-flecha{ fill:none; stroke:var(--l3); stroke-width:.8px; stroke-linecap:round; stroke-linejoin:round; }
 .ad-carro{ fill:#1e1e1e; stroke:var(--l3); stroke-width:var(--w3); stroke-linejoin:round; }
 .ad-carro--cabina{ fill:#5e5e5e; }
+
+/* ---------- Apartados ----------
+   En la general cada apartado se señala al pasar el ratón (más claro, con su
+   nombre junto al cursor) y se abre con un clic. */
+.ad-dibujo{ cursor:grab; }
+.ad-dibujo:focus{ outline:none; }
+.ad-dibujo:focus-visible{ outline:1px solid var(--l3); outline-offset:-1px; }
+.ad-dibujo.sobre-ap{ cursor:pointer; }
+.ad-dibujo.arrastra{ cursor:grabbing; }
+.ad-dibujo.arrastra--mueve{ cursor:move; }
+.ad[data-sobre="comercio"] .ad-ap--comercio, .ad[data-sobre="industria"] .ad-ap--industria,
+.ad[data-sobre="cultura"] .ad-ap--cultura, .ad[data-sobre="aro"] .ad-ap--aro{ filter:brightness(1.7); }
+.ad[data-sobre="estacionamiento"] .ad-est-huella-f{ fill:rgba(255,255,255,.05); stroke:var(--l2); }
+.ad[data-sobre="paisajismo"] .ad-pai-tez{ fill:rgba(255,255,255,.075); }
+.ad[data-sobre="paisajismo"] .ad-pai-agua{ stroke:var(--l1); }
+.ad-etiqueta{
+  position:absolute; pointer-events:none; z-index:2; padding:3px 8px; border:1px solid var(--l3); background:rgba(0,0,0,.85);
+  font-family:var(--font-display); font-size:13px; letter-spacing:.04em; color:var(--fg); white-space:nowrap;
+}
+.ad-apartados{ list-style:none; display:flex; flex-direction:column; gap:4px; }
+.ad-ir, .ad-volver{
+  font-family:var(--font-display); font-size:17px; letter-spacing:.04em; color:var(--muted); text-decoration:none;
+  transition:color .2s var(--ease-ui);
+}
+.ad-ir::after{ content:" →"; opacity:0; transition:opacity .2s var(--ease-ui); }
+@media (hover:hover){ .ad-ir:hover, .ad-volver:hover{ color:var(--fg); } .ad-ir:hover::after{ opacity:1; } }
+.ad-ir:focus-visible, .ad-volver:focus-visible{ outline:1px solid var(--fg); outline-offset:3px; }
+.ad-volver{ font-size:15px; }
+.ad-datos{ list-style:none; display:flex; flex-direction:column; gap:6px; font-size:12.5px; color:var(--muted); line-height:1.35; }
+.ad-sotanos{ display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; }
+.ad-sotanos .ad-tipo{ font-size:14px; }
+.ad-sotanos:has([aria-pressed="true"]:not([data-sotano="0"])) .ad-tipo[aria-pressed="false"]{ opacity:.45; }
+
+/* Animación entre apartados: los rótulos se apagan al irse y se prenden al
+   llegar (las piezas se mueven solas). Mientras corre, nada responde. */
+.ad-rotulos{ transition:opacity .4s var(--ease-ui); }
+.ad.se-va .ad-rotulos, .ad.llega .ad-rotulos{ opacity:0; }
+.ad.llega .ad-rotulos{ transition:none; }
+.ad-trabajo.armando .ad-dibujo{ cursor:default; }
+.ad-trabajo.armando .ad-etiqueta{ display:none; }
+.hud-ruta{ transition:opacity .3s var(--ease-ui); }
+.cambia-pagina .hud-ruta, .cambia-pagina .hud-ficha{ opacity:0; pointer-events:none; }
+.ad-pagina.armando .hud-ficha{ pointer-events:none; }
+
+/* Contexto inmediato (en un apartado): lo demás del predio, tenue; el aro
+   siempre, el resto sólo con el botón */
+.ad-ref{ opacity:.3; transition:opacity .2s var(--ease-ui); }
+.ad-ref--siempre{ opacity:.4; }
+
+/* ---------- Estacionamiento ----------
+   En la general: sólo su volumen, en rayos X y muy tenue (contorno en el piso,
+   el del fondo y las aristas que bajan). En su página: líneas (los cuatro
+   sótanos se ven a la vez); el sótano elegido se rellena. */
+.ad-est-huella-f{ fill:rgba(255,255,255,.012); stroke:rgba(255,255,255,.2); stroke-width:var(--w3); stroke-linejoin:round; pointer-events:all; transition:fill .2s, stroke .2s; }
+.ad-est-huella-l{ fill:none; stroke:rgba(255,255,255,.09); stroke-width:var(--w4); stroke-linejoin:round; pointer-events:none; transition:stroke .2s; }
+.ad[data-sobre="estacionamiento"] .ad-est-huella-l{ stroke:var(--l3); }
+.ad-est{ --e:var(--l2); }
+.ad.con-color .ad-est{ --e:color-mix(in srgb, var(--c-estacionamiento) 70%, #fff); }
+.ad-est-losa{ fill:none; stroke:var(--e); stroke-width:var(--w2); stroke-linejoin:round; }
+.ad-est-losa--sel{ fill:rgba(255,255,255,.07); stroke:var(--l1); stroke-width:var(--w1); }
+.ad-est-cajon{ fill:none; stroke:var(--l4); stroke-width:var(--w4); }
+.ad-est-cajon--sel{ stroke:var(--l2); stroke-width:var(--w3); }
+.ad-est-jaula{ fill:none; stroke:var(--l4); stroke-width:var(--w3); }
+.ad-est-helice{ fill:none; stroke:var(--l1); stroke-width:var(--w2); stroke-linejoin:round; }
+.ad-est-paso{ fill:none; stroke:var(--l4); stroke-width:var(--w4); }
+.ad-est-acceso{ fill:none; stroke:var(--l2); stroke-width:var(--w3); }
+.ad-est-cuarto{ fill:none; stroke:var(--l3); stroke-width:var(--w3); stroke-dasharray:3 2; }
+.ad.con-sotano .ad-est-losa:not(.ad-est-losa--sel){ stroke:var(--l4); }
+.ad-est-rot{ font-family:var(--font-display); font-size:calc(var(--k) * 12px); fill:var(--muted); paint-order:stroke; stroke:var(--bg); stroke-width:calc(var(--k) * 3px); }
+.ad-est-rot.es-sel{ fill:var(--fg); }
+.ad-leyenda__est{ background:transparent; border:1px dashed var(--l2) !important; }
+.ad-leyenda__cajon{ background:repeating-linear-gradient(90deg, var(--l3) 0 1px, transparent 1px 5px); }
+.ad-leyenda__helice{ border-radius:50%; width:12px !important; height:12px !important; border:1px solid var(--l1) !important; margin:0 2px; }
+.ad-leyenda__ref{ opacity:.35; background:#555; }
+
+/* ---------- Paisajismo ----------
+   El área verde es un plano con pasto punteado (todo lo construido la tapa).
+   Lo genérico: uno que otro árbol, copa redonda en línea. El proyecto de
+   paisaje: arbustos (domos rellenos), pastos en macollo, flores (un punto),
+   agaves, juncos en los humedales y árboles de acento, con un poco más de luz
+   que lo genérico. El agua es lo más oscuro, con su orilla en línea. En
+   blanco y negro todo es gris; con Color cada cosa toma su tono, apagado. */
+.ad{ --tez:rgba(255,255,255,.028); --agua:#15181c; --agua-l:rgba(255,255,255,.4);
+  --pa-hoja:rgba(255,255,255,.3); --pa-arb:#0d0d0d; --pa-arb-l:rgba(255,255,255,.34); --pa-copa:#0c0c0c; --pa-copa-l:rgba(255,255,255,.45);
+  --pa-acento-l:rgba(255,255,255,.62); --pa-tronco:rgba(255,255,255,.35); --pa-junco:rgba(255,255,255,.26);
+  --pa-flor-0:rgba(255,255,255,.75); --pa-flor-1:rgba(255,255,255,.55); --pa-flor-2:rgba(255,255,255,.9); }
+.ad.con-color{ --tez:color-mix(in srgb, #b4583a 14%, transparent); --agua:color-mix(in srgb, #2f3860 50%, #0c0c0c); --agua-l:color-mix(in srgb, #7fb0de 75%, transparent);
+  --pa-hoja:color-mix(in srgb, #9db84a 60%, transparent); --pa-arb:color-mix(in srgb, #3f6b35 42%, #0c0c0c); --pa-arb-l:color-mix(in srgb, #9db84a 55%, transparent);
+  --pa-copa:color-mix(in srgb, #355e2e 40%, #0c0c0c); --pa-copa-l:color-mix(in srgb, #8fb35a 60%, transparent); --pa-acento-l:color-mix(in srgb, #c9a0dc 70%, transparent);
+  --pa-tronco:color-mix(in srgb, #8a6a4a 70%, transparent); --pa-junco:color-mix(in srgb, #7fb0de 55%, transparent);
+  --pa-flor-0:color-mix(in srgb, #e58ab0 75%, #444); --pa-flor-1:color-mix(in srgb, #f2c94c 70%, #444); --pa-flor-2:color-mix(in srgb, #c9a0dc 75%, #444); }
+.ad:not(.con-paisaje) .ad-pai{ display:none; }
+.ad-verde{ fill:url(#ad-pasto); stroke:none; }
+/* el patrón vive en <defs>, fuera de .ad: sus tonos cuelgan de :root y del body */
+:root{ --verde:#0f110f; --verde-h:rgba(255,255,255,.13); }
+body.con-color{ --verde:color-mix(in srgb, #4d7a35 26%, #0b0b0b); --verde-h:color-mix(in srgb, #9db84a 40%, transparent); }
+.ad-f-pasto{ fill:var(--verde); } .ad-h-pasto{ stroke:var(--verde-h); stroke-width:.35; stroke-linecap:round; }
+.ad.ver-publico .ad-verde{ fill:url(#ad-publico); }
+.ad-pai-tez{ fill:var(--tez); stroke:none; transition:fill .2s; }
+.ad-pai-sendero{ fill:none; stroke:var(--l4); stroke-width:var(--w3); stroke-dasharray:3 2.5; stroke-linecap:round; }
+.ad-pai-rayo{ fill:none; stroke:rgba(255,255,255,.13); stroke-width:var(--w4); stroke-linecap:round; }
+.ad-pai-jardin{ fill:rgba(255,255,255,.02); stroke:var(--agua-l); stroke-width:var(--w3); stroke-dasharray:6 4; stroke-opacity:.6; }
+.ad-pai-agua{ fill:var(--agua); stroke:var(--agua-l); stroke-width:var(--w3); stroke-linejoin:round; transition:stroke .2s; }
+.ad-pai-orilla{ fill:rgba(255,255,255,.035); stroke:var(--l4); stroke-width:var(--w4); stroke-dasharray:1.5 2; }
+.ad-pai-fondo{ fill:none; stroke:var(--agua-l); stroke-width:var(--w4); stroke-opacity:.45; }
+.ad-pai-filtro{ fill:rgba(255,255,255,.045); stroke:var(--l3); stroke-width:var(--w4); stroke-linejoin:round; }
+.ad.con-color .ad-pai-filtro{ fill:color-mix(in srgb, #7fb0de 18%, transparent); }
+.ad-plantas path{ fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.ad-plantas .ad-pa-arbusto{ fill:var(--pa-arb); stroke:var(--pa-arb-l); stroke-width:.5px; }
+.ad-pa-pasto, .ad-pa-agave{ stroke:var(--pa-hoja); stroke-width:.5px; }
+.ad-pa-tallo{ stroke:var(--pa-hoja); stroke-width:.4px; }
+.ad-pa-tallo--junco{ stroke:var(--pa-junco); }
+.ad-pa-flor{ stroke-width:2px; }
+.ad-pa-flor--0{ stroke:var(--pa-flor-0); } .ad-pa-flor--1{ stroke:var(--pa-flor-1); } .ad-pa-flor--2{ stroke:var(--pa-flor-2); }
+.ad-pa-junco{ stroke:var(--pa-junco); stroke-width:1.6px; stroke-linecap:butt; }
+.ad-plantas .ad-pa-copa{ fill:var(--pa-copa); stroke:var(--pa-copa-l); stroke-width:.7px; }
+.ad-plantas .ad-pa-copa--acento{ stroke:var(--pa-acento-l); }
+.ad-pa-tronco{ stroke:var(--pa-tronco); stroke-width:.9px; }
+
+/* Estructura: sólo las columnas que llegan al piso, en línea gris */
+.ad-col{ display:none; pointer-events:none; }
+.ad.con-estructura .ad-col{ display:inline; }
+.ad-col path{ fill:none; stroke:rgba(255,255,255,.34); stroke-width:.7px; stroke-linejoin:round; }
+
+.ad-leyenda__alta{ border:0 !important; background:repeating-linear-gradient(90deg, rgba(255,255,255,.55) 0 1px, transparent 1px 3px); }
+.ad-leyenda__baja{ border:0 !important; height:5px !important; margin-top:5px; background:repeating-linear-gradient(90deg, rgba(255,255,255,.35) 0 1px, transparent 1px 2.5px); }
+.ad-leyenda__tezontle{ border:0 !important; background:rgba(255,255,255,.09); }
+.ad-leyenda__agua{ background:var(--agua, #15181c); border-color:rgba(255,255,255,.5) !important; }
+.ad-leyenda__laguna{ background:#15181c; border-radius:46% 54% 50% 50% / 60% 45% 55% 40%; border-color:rgba(255,255,255,.5) !important; }
+.ad-leyenda__filtro{ background:rgba(255,255,255,.08); }
+.ad-leyenda__jardin{ background:transparent; border:1px dashed rgba(255,255,255,.4) !important; }
+.ad-leyenda__sendero{ border:0 !important; height:0 !important; border-top:1px dashed var(--l3) !important; }
+.ad-leyenda__rayo{ border:0 !important; background:repeating-linear-gradient(60deg, rgba(255,255,255,.3) 0 1px, transparent 1px 4px); }
+.ad-leyenda__col{ border:0 !important; width:8px !important; margin:0 4px; border-left:1px solid var(--l2) !important; border-bottom:1px solid var(--l2) !important; }
+body.con-color .ad-leyenda__alta{ background:repeating-linear-gradient(90deg, #9db84a 0 1px, transparent 1px 3px); }
+body.con-color .ad-leyenda__baja{ background:repeating-linear-gradient(90deg, #6f9445 0 1px, transparent 1px 2.5px); }
+body.con-color .ad-leyenda__agua, body.con-color .ad-leyenda__laguna{ background:color-mix(in srgb, #2f3860 50%, #0c0c0c); border-color:#7fb0de !important; }
+body.con-color .ad-leyenda__tezontle{ background:color-mix(in srgb, #b4583a 35%, transparent); }
+body.con-color .ad-leyenda__filtro{ background:color-mix(in srgb, #7fb0de 30%, transparent); }
+
+/* ---------- Sol ----------
+   La bóveda en línea fina: el horizonte punteado con sus rumbos, los tres
+   recorridos (21 de junio, equinoccio, 21 de diciembre), la ventana solar
+   entre los solsticios como un velo, las horas que la cruzan y el recorrido
+   de hoy, más claro, con el sol (un disco y su halo; sin rayos ni sombras).
+   Lo de atrás de la bóveda queda detrás de los edificios. */
+.ad-sol{ display:none; pointer-events:none; }
+.ad.con-sol .ad-sol{ display:inline; }
+.ad-sol path{ fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.ad-sol .ad-sol-ventana{ fill:rgba(255,255,255,.035); stroke:none; }
+.ad-sol-horizonte{ stroke:var(--l4); stroke-width:var(--w3); stroke-dasharray:2 4; }
+.ad-sol-rumbo{ stroke:var(--l3); stroke-width:var(--w2); }
+.ad-sol-hora{ stroke:rgba(255,255,255,.2); stroke-width:var(--w4); }
+.ad-sol-arco{ stroke:var(--l3); stroke-width:var(--w3); }
+.ad-sol-arco--equinoccio{ stroke-dasharray:5 4; }
+.ad-sol-hoy{ stroke:var(--l1); stroke-width:var(--w2); stroke-dasharray:1 3; }
+.ad-sol-disco{ fill:#f4f4f4; }
+.ad-sol-halo{ fill:rgba(255,255,255,.08); stroke:rgba(255,255,255,.3); stroke-width:var(--w4); }
+.ad-sol-rot{ font-family:var(--font-display); font-size:calc(var(--k) * 11px); letter-spacing:.04em; fill:var(--muted); }
+.ad-sol-rot--rumbo{ font-size:calc(var(--k) * 13px); fill:var(--fg); }
+.ad-sol-rot--hoy{ font-size:calc(var(--k) * 12px); fill:var(--fg); }
+.ad.con-color .ad-sol .ad-sol-ventana{ fill:color-mix(in srgb, #ffcf6b 5%, transparent); }
+.ad.con-color .ad-sol-arco--verano{ stroke:color-mix(in srgb, #ffb04a 70%, transparent); }
+.ad.con-color .ad-sol-arco--invierno{ stroke:color-mix(in srgb, #7fb0de 70%, transparent); }
+.ad.con-color .ad-sol-hoy{ stroke:#ffcf6b; }
+.ad.con-color .ad-sol-disco{ fill:#ffcf6b; }
+.ad.con-color .ad-sol-halo{ fill:color-mix(in srgb, #ffcf6b 12%, transparent); stroke:color-mix(in srgb, #ffcf6b 45%, transparent); }
+
+/* ---------- Motor 3D ----------
+   El lienzo WebGL ocupa el lugar del SVG; los rótulos (del sol) van en una
+   capa de HTML encima. Lo que el 3D todavía no tiene se oculta del menú. */
+.ad-3d{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+.ad-3d-rotulos{ position:absolute; inset:0; pointer-events:none; overflow:hidden; display:none; }
+.ad-3d-rotulos.con-sol{ display:block; }
+.ad-3d-rot{ position:absolute; left:0; top:0; font-family:var(--font-display); font-size:11px; letter-spacing:.04em; color:var(--muted); white-space:nowrap; will-change:transform; }
+.ad-3d-rot--rumbo{ font-size:13px; color:var(--fg); }
+.ad-3d-rot--hoy{ font-size:12px; color:var(--fg); }
+body.con-color .ad-3d-rot--hoy{ color:#ffcf6b; }
+.ad-trabajo{ cursor:grab; outline:none; }
+.ad-trabajo.sobre-ap{ cursor:pointer; }
+.ad-trabajo.arrastra{ cursor:grabbing; }
+.ad-trabajo.arrastra--mueve{ cursor:move; }
+.ad-trabajo:focus-visible{ outline:1px solid var(--l3); outline-offset:-1px; }
+body.motor-3d .solo-svg{ display:none; }
+body:not(.motor-3d) .solo-3d{ display:none; }
+body.motor-3d .solo-svg-motor{ display:none; }
+.hud-motor{ color:var(--muted); text-decoration:underline; text-underline-offset:2px; }
+@media (hover:hover){ .hud-motor:hover{ color:var(--fg); } }
+
+/* Accesos y Nolli en la leyenda */
+.ad-leyenda__acceso{ border:0 !important; width:0 !important; height:0 !important; margin:0 4px 0 3px; border-left:5px solid transparent !important; border-right:5px solid transparent !important; border-bottom:9px solid #e0393e !important; }
+.ad-leyenda__acceso--vehicular{ border-bottom-color:#1f5fb4 !important; }
+.ad-leyenda__nolli-p{ background:#eeeeea; border-color:#777 !important; }
+.ad-leyenda__nolli-c{ background:#0a0a0a; border-color:#eeeeea !important; }
+body.sin-accesos [data-l="accesos"], body.sin-nolli [data-l="nolli"]{ display:none; }

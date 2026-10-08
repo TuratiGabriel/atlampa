@@ -3,122 +3,164 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Atlampa · Contexto</title>
-<link rel="stylesheet" href="atlampa.css?v=20261006d">
+<title>Atlampa · Predio</title>
+<link rel="stylesheet" href="atlampa.css?v=20261008h">
+<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261008h">
+<!-- Three.js del CDN (pendiente: copiarlo a lib/ para presentar sin internet) -->
+<script type="importmap">{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head>
-<body>
+<body data-escena="general">
+<!-- Generada por herramientas/paginas.py: no editar a mano. -->
 <main class="ad-pagina">
-  <header class="ad-cabeza">
-    <h1 class="ad-titulo">Atlampa</h1>
-    <p class="ad-micro">Col. Atlampa, Cuauhtémoc, CDMX</p>
-  </header>
-
   <section class="ad-trabajo" aria-label="Modelo">
-    <svg class="ad-dibujo" data-dibujo role="img" aria-labelledby="ad-titulo-dibujo" aria-describedby="ad-desc-dibujo">
-      <title id="ad-titulo-dibujo">Axonometría</title>
-      <desc id="ad-desc-dibujo">Axonometría del predio de Atlampa entre las calles del Fresno, Sabino y Clavel y la avenida Profesora Eulalia Guzmán, con sus dos naves de techos a dos aguas cortadas por el círculo del anillo, el anillo elevado sobre sus columnas, la industria, la chimenea, dos pabellones curvos de arte y cultura bajo el anillo con su plaza cultural, los módulos de vivienda apilados hasta ocho niveles, la espuela de ferrocarril que entra por la calle Heliotropo, banquetas, postes y estaciones de Ecobici. El botón Contexto aleja la cámara a un bloque de 890 por 800 metros; Flujos muestra el sentido de cada calle con carros esquemáticos; Árboles muestra los árboles de la planta baja, sólo de cerca; Personas, gente que pasa, entra al sitio o corre por dentro. Público resalta lo público (planta baja libre, naves y anillo) y Privado lo privado (vivienda e industria); el menú Programa colorea módulos, comercio e industria según lo que se elija. El minimapa gira la cámara alrededor del predio; la rueda del ratón o el pellizco acercan el dibujo.</desc>
+    <svg class="ad-dibujo" data-dibujo role="img" tabindex="0" aria-labelledby="ad-titulo-dibujo" aria-describedby="ad-desc-dibujo">
+      <title id="ad-titulo-dibujo">Axonometría · Atlampa</title>
+      <desc id="ad-desc-dibujo">Axonometría del predio de Atlampa entre las calles del Fresno, Sabino y Clavel y la avenida Profesora Eulalia Guzmán: las dos naves de comercio cortadas por el círculo del aro, el aro elevado, la industria, la chimenea, los pabellones de arte y cultura con su plaza, los módulos de vivienda apilados hasta ocho niveles, el paisaje de la planta baja (áreas verdes, humedales, estanques y la laguna), el estacionamiento en sótanos como un volumen tenue y la espuela de ferrocarril por la calle Heliotropo. Los menús de arriba abren o esconden cada parte de lo propuesto, prenden capas y diagramas (contexto urbano, sol, flujos, árboles, personas, accesos) y resaltan lo público, lo privado o un programa. Arrastrar orbita la cámara; con el botón derecho se mueve; la rueda acerca hacia el cursor.</desc>
     </svg>
-    <p class="ad-ayuda">Rueda: zoom · arrastrar: mover · doble clic: encuadre</p>
   </section>
 
-  <aside class="ad-lado">
-    <section class="ad-seccion" aria-labelledby="ad-s-camara">
-      <h2 class="ad-seccion__t" id="ad-s-camara">Cámara</h2>
-      <svg class="ad-mini" data-minimapa role="slider" tabindex="0" aria-label="Posición de la cámara: arrastra el punto o usa las flechas" aria-valuemin="0" aria-valuemax="360"></svg>
-      <div class="ad-zoom" role="group" aria-label="Zoom">
-        <button class="ad-zoom__b" type="button" data-zoom="menos" aria-label="Alejar">−</button>
-        <button class="ad-zoom__b" type="button" data-zoom="0" aria-label="Regresar al encuadre">⟲</button>
-        <button class="ad-zoom__b" type="button" data-zoom="mas" aria-label="Acercar">+</button>
-      </div>
-    </section>
+  <header class="hud-cabeza">
+    <a class="hud-marca" href="index.html" data-ir="general">Atlampa</a>
+    <span class="hud-ruta" data-ruta>Col. Atlampa, Cuauhtémoc, CDMX</span>
+  </header>
 
-    <section class="ad-seccion" aria-labelledby="ad-s-capas">
-      <h2 class="ad-seccion__t" id="ad-s-capas">Capas</h2>
-      <div class="ad-capas" role="group" aria-labelledby="ad-s-capas">
-        <button class="ad-boton" type="button" data-capa="modulos" aria-pressed="true">Módulos</button>
-        <button class="ad-boton" type="button" data-capa="contexto" aria-pressed="false">Contexto</button>
-        <button class="ad-boton" type="button" data-capa="flujos" aria-pressed="false">Flujos</button>
-        <button class="ad-boton" type="button" data-capa="arboles" aria-pressed="false">Árboles</button>
-        <button class="ad-boton" type="button" data-capa="personas" aria-pressed="false">Personas</button>
-        <button class="ad-boton ad-boton--color" type="button" data-capa="color" aria-pressed="false">Color</button>
-      </div>
-    </section>
-
-    <section class="ad-seccion" aria-labelledby="ad-s-espacio">
-      <h2 class="ad-seccion__t" id="ad-s-espacio">Espacio</h2>
-      <div class="ad-capas ad-espacio" role="group" aria-labelledby="ad-s-espacio">
-        <button class="ad-boton" type="button" data-espacio="publico" aria-pressed="false"><i class="ad-espacio__m ad-espacio__m--publico" aria-hidden="true"></i>Público</button>
-        <button class="ad-boton" type="button" data-espacio="privado" aria-pressed="false"><i class="ad-espacio__m ad-espacio__m--privado" aria-hidden="true"></i>Privado</button>
-      </div>
-    </section>
-
-    <section class="ad-seccion" aria-labelledby="ad-s-programa">
-      <h2 class="ad-seccion__t" id="ad-s-programa">Programa</h2>
-      <div class="ad-menus" data-programa>
-        <details class="ad-menu" name="programa" open>
-          <summary class="ad-menu__t">Módulos</summary>
-          <ul class="ad-tipos">
-            <li><button class="ad-tipo" type="button" data-sel="modulos" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-vivienda)" aria-hidden="true"></i>Todas</button></li>
-            <li><button class="ad-tipo" type="button" data-sel="modulos44" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-44)" aria-hidden="true"></i>44</button></li>
-            <li><button class="ad-tipo" type="button" data-sel="44SOC" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-44soc)" aria-hidden="true"></i>44 SOC</button></li>
-            <li><button class="ad-tipo" type="button" data-sel="modulos66" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-66)" aria-hidden="true"></i>66</button></li>
-            <li><button class="ad-tipo" type="button" data-sel="modulos88" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-88)" aria-hidden="true"></i>88</button></li>
-            <li><button class="ad-tipo" type="button" data-sel="modulosamenidades" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-amenidades)" aria-hidden="true"></i>Amenidades</button></li>
-            <li><button class="ad-tipo" type="button" data-sel="modulosextra" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-extra)" aria-hidden="true"></i>Extra</button></li>
-          </ul>
+  <nav class="hud-barra" aria-label="Menús">
+    <details class="hud-menu" name="hud">
+      <summary class="hud-menu__t">Propuesto</summary>
+      <div class="hud-panel hud-panel--propuesto">
+        <a class="hud-op hud-ir" href="index.html" data-ir="general">Predio completo</a>
+        <details class="hud-parte" name="hud-parte" data-parte="vivienda">
+          <summary class="hud-parte__t">Vivienda</summary>
+          <div class="hud-parte__sub">
+            <button class="hud-acc" type="button" data-inspecciona="vivienda">Inspeccionar</button>
+            <button class="hud-acc" type="button" data-oculta="vivienda">Ocultar</button>
+          </div>
         </details>
-        <details class="ad-menu" name="programa">
-          <summary class="ad-menu__t">Comercio</summary>
-          <ul class="ad-tipos">
-            <li><button class="ad-tipo" type="button" data-sel="comercio" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-comercio)" aria-hidden="true"></i>Todas</button></li>
-            <li><button class="ad-tipo" type="button" data-sel="nave-sur" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-comercio)" aria-hidden="true"></i>Nave sur</button></li>
-            <li><button class="ad-tipo" type="button" data-sel="nave-norte" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-comercio)" aria-hidden="true"></i>Nave norte</button></li>
-          </ul>
+        <details class="hud-parte" name="hud-parte" data-parte="comercio">
+          <summary class="hud-parte__t">Comercio</summary>
+          <div class="hud-parte__sub">
+            <button class="hud-acc" type="button" data-inspecciona="comercio">Inspeccionar</button>
+            <button class="hud-acc solo-3d" type="button" data-oculta="comercio">Ocultar</button>
+          </div>
         </details>
-        <details class="ad-menu" name="programa">
-          <summary class="ad-menu__t">Cultura</summary>
-          <ul class="ad-tipos">
-            <li><button class="ad-tipo" type="button" data-sel="cultura" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-cultura)" aria-hidden="true"></i>Todo</button></li>
-            <li><button class="ad-tipo" type="button" data-sel="pabellones" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-cultura)" aria-hidden="true"></i>Pabellones</button></li>
-            <li><button class="ad-tipo" type="button" data-sel="plaza-cultural" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-cultura)" aria-hidden="true"></i>Plaza cultural</button></li>
-          </ul>
+        <details class="hud-parte" name="hud-parte" data-parte="industria">
+          <summary class="hud-parte__t">Industria</summary>
+          <div class="hud-parte__sub">
+            <button class="hud-acc" type="button" data-inspecciona="industria">Inspeccionar</button>
+            <button class="hud-acc solo-3d" type="button" data-oculta="industria">Ocultar</button>
+          </div>
         </details>
-        <details class="ad-menu" name="programa">
-          <summary class="ad-menu__t">Industria</summary>
-          <ul class="ad-tipos">
-            <li><button class="ad-tipo" type="button" data-sel="industria" aria-pressed="false"><i class="ad-tipo__muestra" style="--m:var(--c-industria)" aria-hidden="true"></i>Nave industrial</button></li>
-          </ul>
+        <details class="hud-parte" name="hud-parte" data-parte="cultura">
+          <summary class="hud-parte__t">Arte y cultura</summary>
+          <div class="hud-parte__sub">
+            <button class="hud-acc" type="button" data-inspecciona="cultura">Inspeccionar</button>
+            <button class="hud-acc solo-3d" type="button" data-oculta="cultura">Ocultar</button>
+          </div>
+        </details>
+        <details class="hud-parte" name="hud-parte" data-parte="aro">
+          <summary class="hud-parte__t">Aro</summary>
+          <div class="hud-parte__sub">
+            <button class="hud-acc" type="button" data-inspecciona="aro">Inspeccionar</button>
+            <button class="hud-acc solo-3d" type="button" data-oculta="aro">Ocultar</button>
+          </div>
+        </details>
+        <details class="hud-parte" name="hud-parte" data-parte="paisajismo">
+          <summary class="hud-parte__t">Paisajismo</summary>
+          <div class="hud-parte__sub">
+            <button class="hud-acc" type="button" data-inspecciona="paisajismo">Inspeccionar</button>
+            <button class="hud-acc solo-3d" type="button" data-oculta="paisajismo">Ocultar</button>
+          </div>
+        </details>
+        <details class="hud-parte" name="hud-parte" data-parte="estacionamiento">
+          <summary class="hud-parte__t">Estacionamiento</summary>
+          <div class="hud-parte__sub">
+            <button class="hud-acc" type="button" data-inspecciona="estacionamiento">Inspeccionar</button>
+            <button class="hud-acc solo-3d" type="button" data-oculta="estacionamiento">Ocultar</button>
+          </div>
+        </details>
+        <details class="hud-parte" name="hud-parte" data-parte="estructura">
+          <summary class="hud-parte__t">Estructura</summary>
+          <div class="hud-parte__sub">
+            <button class="hud-acc" type="button" data-inspecciona="estructura">Inspeccionar</button>
+            <button class="hud-acc" type="button" data-oculta="estructura">Mostrar</button>
+          </div>
         </details>
       </div>
-    </section>
+    </details>
+    <details class="hud-menu" name="hud">
+      <summary class="hud-menu__t">Capas</summary>
+      <div class="hud-panel">
+        <button class="hud-op" type="button" data-capa="modulos" aria-pressed="true">Módulos</button>
+        <button class="hud-op" type="button" data-capa="paisaje" aria-pressed="true">Paisaje</button>
+        <button class="hud-op" type="button" data-capa="sol" aria-pressed="false">Sol</button>
+        <button class="hud-op solo-general" type="button" data-capa="contexto" aria-pressed="false">Contexto urbano</button>
+      </div>
+    </details>
+    <details class="hud-menu" name="hud">
+      <summary class="hud-menu__t">Diagramas</summary>
+      <div class="hud-panel">
+        <button class="hud-op solo-3d" type="button" data-capa="accesos" aria-pressed="false">Accesos</button>
+        <button class="hud-op" type="button" data-capa="personas" aria-pressed="false">Personas</button>
+        <button class="hud-op" type="button" data-capa="flujos" aria-pressed="false">Flujos</button>
+        <button class="hud-op" type="button" data-capa="arboles" aria-pressed="false">Árboles</button>
+      </div>
+    </details>
+    <details class="hud-menu" name="hud">
+      <summary class="hud-menu__t">Vista</summary>
+      <div class="hud-panel">
+        <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">Color</button>
+        <button class="hud-op solo-3d" type="button" data-capa="perspectiva" aria-pressed="true">Perspectiva</button>
+        <button class="hud-op solo-3d" type="button" data-capa="nolli" aria-pressed="false">Mapa Nolli</button>
+        <p class="hud-panel__t solo-3d">Estilo</p>
+        <button class="hud-op hud-op--radio solo-3d" type="button" data-estilo="rayado" aria-pressed="true">Rayado</button>
+        <button class="hud-op hud-op--radio solo-3d" type="button" data-estilo="plano" aria-pressed="false">Plano</button>
+        <p class="hud-panel__t">Resaltar</p>
+        <button class="hud-op hud-op--radio" type="button" data-resalta="" aria-pressed="true">Nada</button>
+        <button class="hud-op hud-op--radio" type="button" data-resalta="publico" aria-pressed="false">Público</button>
+        <button class="hud-op hud-op--radio" type="button" data-resalta="privado" aria-pressed="false">Privado</button>
+        <button class="hud-op hud-op--radio" type="button" data-resalta="modulos" aria-pressed="false">Vivienda</button>
+        <button class="hud-op hud-op--radio" type="button" data-resalta="comercio" aria-pressed="false">Comercio</button>
+        <button class="hud-op hud-op--radio" type="button" data-resalta="cultura" aria-pressed="false">Arte y cultura</button>
+        <button class="hud-op hud-op--radio" type="button" data-resalta="industria" aria-pressed="false">Industria</button>
+        <button class="hud-op hud-op--radio" type="button" data-resalta="aro" aria-pressed="false">Aro</button>
+        <button class="hud-op hud-op--radio" type="button" data-resalta="paisajismo" aria-pressed="false">Paisaje</button>
+      </div>
+    </details>
+    <details class="hud-menu" name="hud">
+      <summary class="hud-menu__t">Leyenda</summary>
+      <div class="hud-panel">
+        <ul class="ad-leyenda">
+          <li><i class="ad-leyenda__espuela"></i>Espuela</li>
+          <li><i class="ad-leyenda__banqueta"></i>Banqueta</li>
+          <li data-l="paisaje"><i class="ad-leyenda__agua"></i>Agua</li>
+        </ul>
+        <p class="ad-fuente">Calles © colaboradores de OpenStreetMap</p>
+        <p class="ad-fuente"><a class="hud-motor solo-3d" href="?motor=svg">Ver con el motor SVG (respaldo)</a><a class="hud-motor solo-svg-motor" href="?">Ver en 3D</a></p>
+      </div>
+    </details>
+  </nav>
 
-    <section class="ad-seccion" aria-labelledby="ad-s-leyenda">
-      <h2 class="ad-seccion__t" id="ad-s-leyenda">Leyenda</h2>
-      <ul class="ad-leyenda">
-        <li><i class="ad-leyenda__predio"></i>Predio</li>
-        <li><i class="ad-leyenda__nave"></i>Naves</li>
-        <li><i class="ad-leyenda__industria"></i>Industria</li>
-        <li><i class="ad-leyenda__cultura"></i>Arte y cultura</li>
-        <li><i class="ad-leyenda__chimenea"></i>Chimenea</li>
-        <li><i class="ad-leyenda__anillo"></i>Anillo</li>
-        <li><i class="ad-leyenda__mod"></i>Módulos</li>
-        <li><i class="ad-leyenda__espuela"></i>Espuela</li>
-        <li><i class="ad-leyenda__banqueta"></i>Banqueta</li>
-        <li><i class="ad-leyenda__arroyo"></i>Arroyo</li>
-        <li><svg viewBox="0 0 16 14" aria-hidden="true"><path d="M8 14V8M8 8L3 3M8 8l1-6M8 8l5-4M3 3L1 1M3 3l1-2.5M13 4l2-2M13 4l2.5 1" fill="none" stroke="rgba(240,239,236,.7)" stroke-width="1" stroke-linecap="round"/></svg>Árboles</li>
-        <li><i class="ad-leyenda__poste"></i>Postes</li>
-        <li><i class="ad-leyenda__bici"></i>Ecobici</li>
-        <li><svg viewBox="0 0 16 14" aria-hidden="true"><ellipse cx="8.3" cy="1.6" rx="1.2" ry="1.5" fill="#e8e8e8"/><path d="M6.6 3.6h3l.4 4.6H6.4z" fill="#e8e8e8"/><path d="M8 8.2l-2.4 5.4h-1M8.4 8.2l2.2 5.4h1.2M9.4 4l1.6 3.4" fill="none" stroke="#e8e8e8" stroke-width="1" stroke-linecap="round"/></svg>Personas</li>
-      </ul>
-    </section>
+  <aside class="hud-ficha" data-ficha hidden>
 
-    <p class="ad-fuente">Calles © colaboradores de OpenStreetMap</p>
   </aside>
+
+  <div class="hud-camara">
+    <svg class="ad-mini" data-minimapa role="img" aria-label="Posición de la cámara"></svg>
+    <div class="ad-zoom" role="group" aria-label="Zoom">
+      <button class="ad-zoom__b" type="button" data-zoom="mas" aria-label="Acercar">+</button>
+      <button class="ad-zoom__b" type="button" data-zoom="0" aria-label="Regresar al encuadre">⟲</button>
+      <button class="ad-zoom__b" type="button" data-zoom="menos" aria-label="Alejar">−</button>
+    </div>
+  </div>
+
+  <p class="ad-ayuda">Arrastrar (derecho o izquierdo): orbitar · Shift + arrastrar o botón central: mover · rueda: zoom al cursor · doble clic: encuadre · clic en una parte: entrar</p>
 </main>
-<script src="atlampa-datos.js?v=20261006d"></script>
-<script src="atlampa-modulos.js?v=20261006d"></script>
-<script src="atlampa-personas.js?v=20261006d"></script>
-<script src="atlampa-contexto.js?v=20261006d"></script>
-<script src="atlampa-pagina.js?v=20261006d"></script>
+<script src="atlampa-datos.js?v=20261008h"></script>
+<script src="atlampa-modulos.js?v=20261008h"></script>
+<script src="atlampa-personas.js?v=20261008h"></script>
+<script src="atlampa-estacionamiento.js?v=20261008h"></script>
+<script src="atlampa-paisaje.js?v=20261008h"></script>
+<script src="atlampa-contexto.js?v=20261008h"></script>
+<script src="atlampa-pagina.js?v=20261008h"></script>
 </body>
 </html>

@@ -13,11 +13,16 @@ que cada uno se guarda como centro + nivel + tipo.
    arriba) y no se guardan. Las cajas sin ninguna cara exterior se omiten.
 2. Visibilidad: para cada grado de azimut se pintan las cajas en el mismo
    orden que el navegador (de lejos a cerca, de abajo arriba) en un búfer de
-   identificadores, y se anota cuáles quedan a la vista. Por sector de 10°
+   identificadores, y se anota cuáles quedan a la vista; esto a varias alturas
+   de cámara (de 6° a 70°), porque la cámara sube y baja. Por sector de 10°
    se guarda la unión (con 3° de margen): el navegador sólo construye y
    pinta las cajas del sector de la cámara.
 
-3. Industria (capa 'industry_bake - Copy'): un prisma; se guarda su planta
+3. Juntas: con herramientas/departamentos.json (qué departamento es cada
+   módulo), las aristas entre caras coplanares del mismo departamento no se
+   dibujan: cada departamento se lee como un solo volumen.
+
+4. Industria (capa 'industry_bake - Copy'): un prisma; se guarda su planta
    (el contorno de la cara de abajo) y sus alturas.
 
 Marco: nuevos bloques.3dm está en el mismo giro que Contexto.3dm, corrido
@@ -40,6 +45,7 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
 MODELO = os.path.join(RAIZ, '..', 'Rhino', 'nuevos bloques.3dm')
 SALIDA = os.path.join(RAIZ, 'atlampa-modulos.js')
+DEPTOS = os.path.join(AQUI, 'departamentos.json')   # de herramientas/departamentos.py
 
 CAPAS = ['modulos44', '44SOC', 'modulos66', 'modulos88', 'modulosamenidades', 'modulosextra']   # subcapas de 'Módulos'
 DU, DV, DZ = 497.59, 391.73, 6.96          # nuevos bloques → marco del diagrama
@@ -47,7 +53,9 @@ TOL = 0.03
 SECTOR, MARGEN = 10, 3                    # grados
 PX = 0.15                                 # m por píxel en la prueba de visibilidad
 MIN_PX = 3                                # píxeles para contar una caja como visible
-PH = math.radians(30)
+ELEVACIONES = [(6, 2), (15, 2), (30, 1), (48, 2), (70, 3)]   # alturas de cámara (°) y paso de azimut
+BANDAS = {'baja': (6, 15, 30), 'alta': (30, 48, 70)}           # el navegador usa 'baja' bajo 30°
+CORTE_BANDA = 30
 
 
 def lee():
@@ -247,54 +255,58 @@ def main():
             lista.append(((0, 0, 1), [(*uv(c, p[0], p[1]), z1) for p in pts]))
         c['caras'] = lista
 
-    # 2. Visibilidad por grado
-    sp, cp = math.sin(PH), math.cos(PH)
+    # 2. Visibilidad por grado, a varias alturas de cámara (la cámara sube y
+    # baja): cada grado guarda la unión de lo visible a esas alturas.
     n = len(shell)
-    vis_grado = []
-    for az in range(360):
-        a = math.radians(az)
-        ct, st = math.cos(a), math.sin(a)
+    vis_alt = {}
+    for elev, paso in ELEVACIONES:
+        vis_grado = vis_alt.setdefault(elev, [set() for _ in range(360)])
+        sp, cp = math.sin(math.radians(elev)), math.cos(math.radians(elev))
+        for az in range(0, 360, paso):
+            a = math.radians(az)
+            ct, st = math.cos(a), math.sin(a)
+            orden = sorted(range(n), key=lambda i: (-(shell[i]['u'] * st + shell[i]['v'] * ct), shell[i]['z0d']))
+            polis = []
+            xs, ys = [], []
+            for i in orden:
+                for nrm, pts in shell[i]['caras']:
+                    if len(nrm) == 2 and nrm[0] * st + nrm[1] * ct >= -1e-6:
+                        continue      # mira hacia atrás
+                    pp = [(p[0] * ct - p[1] * st, -(p[0] * st + p[1] * ct) * sp - p[2] * cp) for p in pts]
+                    polis.append((i, pp))
+                    xs += [q[0] for q in pp]
+                    ys += [q[1] for q in pp]
+            x0, y0 = min(xs) - 2, min(ys) - 2
+            w = int((max(xs) + 2 - x0) / PX) + 1
+            h = int((max(ys) + 2 - y0) / PX) + 1
+            img = Image.new('I', (w, h), 0)
+            d = ImageDraw.Draw(img)
+            for i, pp in polis:
+                d.polygon([((q[0] - x0) / PX, (q[1] - y0) / PX) for q in pp], fill=i + 1)
+            ids, cuenta = np.unique(np.asarray(img), return_counts=True)
+            ve = {int(k) - 1 for k, c in zip(ids, cuenta) if k > 0 and c >= MIN_PX}
+            for g in range(az, az + paso):
+                vis_grado[g % 360] |= ve
+        print('  altura', elev, 'visibles por grado: mín', min(map(len, vis_grado)), 'máx', max(map(len, vis_grado)))
 
-        def xl(u, v):
-            return u * ct - v * st
-
-        def yl(u, v, z):
-            return -(u * st + v * ct) * sp - z * cp
-
-        orden = sorted(range(n), key=lambda i: (-(shell[i]['u'] * st + shell[i]['v'] * ct), shell[i]['z0d']))
-        polis = []
-        xs, ys = [], []
-        for i in orden:
-            for nrm, pts in shell[i]['caras']:
-                if len(nrm) == 2 and nrm[0] * st + nrm[1] * ct >= -1e-6:
-                    continue      # mira hacia atrás
-                pp = [(xl(p[0], p[1]), yl(p[0], p[1], p[2])) for p in pts]
-                polis.append((i, pp))
-                xs += [q[0] for q in pp]
-                ys += [q[1] for q in pp]
-        x0, y0 = min(xs) - 2, min(ys) - 2
-        w = int((max(xs) + 2 - x0) / PX) + 1
-        h = int((max(ys) + 2 - y0) / PX) + 1
-        img = Image.new('I', (w, h), 0)
-        d = ImageDraw.Draw(img)
-        for i, pp in polis:
-            d.polygon([((q[0] - x0) / PX, (q[1] - y0) / PX) for q in pp], fill=i + 1)
-        ids, cuenta = np.unique(np.asarray(img), return_counts=True)
-        vis_grado.append({int(k) - 1 for k, c in zip(ids, cuenta) if k > 0 and c >= MIN_PX})
-    print('visibles por grado: mín', min(map(len, vis_grado)), 'máx', max(map(len, vis_grado)))
-
-    sectores = []
-    for s in range(0, 360, SECTOR):
-        u = set()
-        for g in range(s - MARGEN, s + SECTOR + MARGEN):
-            u |= vis_grado[g % 360]
-        bits = bytearray((n + 7) // 8)
-        for i in u:
-            bits[i >> 3] |= 1 << (i & 7)
-        sectores.append(base64.b64encode(bytes(bits)).decode())
-        print('  sector', s, len(u))
-    nunca = n - len(set().union(*vis_grado))
-    print('cajas del shell que nunca se ven', nunca)
+    # por banda de altura (cámara baja / alta; se comparte la de 30°): por
+    # sector de azimut, la unión con su margen
+    sectores = {}
+    for banda, alturas in BANDAS.items():
+        sectores[banda] = []
+        for s0 in range(0, 360, SECTOR):
+            u = set()
+            for elev in alturas:
+                for g in range(s0 - MARGEN, s0 + SECTOR + MARGEN):
+                    u |= vis_alt[elev][g % 360]
+            bits = bytearray((n + 7) // 8)
+            for i in u:
+                bits[i >> 3] |= 1 << (i & 7)
+            sectores[banda].append(base64.b64encode(bytes(bits)).decode())
+        print('  banda', banda, 'cajas por sector: mín', min(bin(int.from_bytes(base64.b64decode(x), 'little')).count('1') for x in sectores[banda]),
+              'máx', max(bin(int.from_bytes(base64.b64decode(x), 'little')).count('1') for x in sectores[banda]))
+    vistas = set().union(*(v for vs in vis_alt.values() for v in vs))
+    print('cajas del shell que nunca se ven', n - len(vistas))
 
     # 3. Salida
     def r2(x):
@@ -318,10 +330,78 @@ def main():
             tapa = [[r2(v) for p in pts for v in p] for pts in c['tapa']]
         return [r2(c['u']), r2(c['v']), c['k'], CAPAS.index(c['capa'])] + muros + [tapa]
 
+    # 4. Juntas: las aristas entre caras coplanares de módulos del mismo
+    # departamento no se dibujan; sólo se marca el cambio de departamento.
+    cajas_js = [caja_js(c) for c in shell]
+    deptos = json.load(open(DEPTOS, encoding='utf-8'))
+    LADOS = [(0, -B / 2, A / 2), (1, A / 2, B / 2), (0, B / 2, A / 2), (1, -A / 2, B / 2)]   # eje del tramo, coordenada fija, medio largo
+
+    def aristas(c, js):
+        """(código, plano, p, q) de cada arista de cada cara, en el orden en que
+        el navegador arma las caras; código = cara × 100 + número de arista."""
+        X, Y = c['X'], c['Y']
+        out = []
+        for i, (eje, fijo, L) in enumerate(LADOS):
+            m = js[4 + i]
+            if not m:
+                continue
+            t = [-L, L] if m == 1 else m
+            plano = ('muro', i, round((X + fijo) if eje else (Y + fijo), 2))
+            for k in range(0, len(t), 2):
+                a = (fijo, t[k]) if eje else (t[k], fijo)
+                b = (fijo, t[k + 1]) if eje else (t[k + 1], fijo)
+                pts = [(a, 0), (b, 0), (b, H), (a, H)]
+                for e in range(4):
+                    (p, zp), (q, zq) = pts[e], pts[(e + 1) % 4]
+                    out.append((i * 100 + 2 * k + e, plano, (X + p[0], Y + p[1], zp), (X + q[0], Y + q[1], zq)))
+        tp = js[8]
+        polis = [[-A / 2, -B / 2, A / 2, -B / 2, A / 2, B / 2, -A / 2, B / 2]] if tp == 1 else (tp or [])
+        n = 0
+        for pl in polis:
+            pts = [(pl[j], pl[j + 1]) for j in range(0, len(pl), 2)]
+            for j in range(len(pts)):
+                p, q = pts[j], pts[(j + 1) % len(pts)]
+                out.append((400 + n, ('tapa',), (X + p[0], Y + p[1], H), (X + q[0], Y + q[1], H)))
+                n += 1
+        return out
+
+    def recta(p, q):
+        eje = max(range(3), key=lambda j: abs(q[j] - p[j]))
+        fijo = tuple(p[j] for j in range(3) if j != eje)
+        return eje, fijo, min(p[eje], q[eje]), max(p[eje], q[eje])
+
+    grupos = defaultdict(list)
+    for n, (c, js) in enumerate(zip(shell, cajas_js)):
+        d = deptos['%s|%.1f|%.1f|%d' % (c['capa'], c['c'][0], c['c'][1], c['k'])]
+        for cod, plano, p, q in aristas(c, js):
+            grupos[(d, plano)].append((n, cod, p, q, recta(p, q)))
+    quita = defaultdict(list)
+    juntas = parciales = 0
+    for lista in grupos.values():
+        for n, cod, p, q, (eje, fijo, lo, hi) in lista:
+            cubre = [(o[4][2], o[4][3]) for o in lista
+                     if o[0] != n and o[4][0] == eje and all(abs(f - g) < 0.05 for f, g in zip(o[4][1], fijo))]
+            if not cubre:
+                continue
+            quedan = resta(lo, hi, sorted(cubre))
+            if quedan == [(lo, hi)]:
+                continue
+            if not quedan:
+                quita[n].append(cod)
+                juntas += 1
+                continue
+            # tramos que sí se dibujan, como fracción de p a q
+            t = sorted(((a - p[eje]) / (q[eje] - p[eje]), (b - p[eje]) / (q[eje] - p[eje])) for a, b in quedan)
+            quita[n].append([cod] + [round(v, 3) for iv in t for v in sorted(iv)])
+            parciales += 1
+    for n, js in enumerate(cajas_js):
+        js.append(sorted(quita[n], key=lambda x: x if isinstance(x, int) else x[0]) or 0)
+    print('juntas sin dibujar', juntas, '· aristas cortadas en parte', parciales)
+
     datos = {
         'giro': round(math.degrees(giro), 4), 'a': A, 'b': B, 'alto': H, 'z0': round(Zb, 2),
-        'tipos': CAPAS, 'sector': SECTOR,
-        'cajas': [caja_js(c) for c in shell],
+        'tipos': CAPAS, 'sector': SECTOR, 'banda': CORTE_BANDA,
+        'cajas': cajas_js,
         'sectores': sectores,
         'industria': industria(),
         'chimenea': chimenea(),
@@ -331,9 +411,12 @@ def main():
            '   Fuente: Rhino/nuevos bloques.3dm, capas ' + ', '.join(CAPAS) + '.\n'
            '   ' + str(len(cajas)) + ' módulos (' + ', '.join('%s %d' % (k, cuenta[k]) for k in CAPAS) + '); '
            'aquí sólo los ' + str(len(shell)) + ' con alguna cara al exterior, y sólo esas caras.\n'
-           '   cajas: [u, v, nivel, tipo, muro −Y, muro +X, muro +Y, muro −X, tapa]; muro 1 = completo,\n'
-           '   0 = tapado, lista = tramos descubiertos (coordenadas locales). sectores: bits de las\n'
-           '   cajas visibles desde cada sector de ' + str(SECTOR) + '° de azimut. */\n')
+           '   cajas: [u, v, nivel, tipo, muro −Y, muro +X, muro +Y, muro −X, tapa, juntas]; muro 1 = completo,\n'
+           '   0 = tapado, lista = tramos descubiertos (coordenadas locales). juntas: aristas que no se\n'
+           '   dibujan por ser del mismo departamento (cara × 100 + arista; cara 0-3 muros, 4 tapa), o\n'
+           '   [código, t0, t1, …] con los tramos que sí se dibujan. sectores {baja, alta}: bits de las\n'
+           '   cajas visibles desde cada sector de ' + str(SECTOR) + '° de azimut, con la cámara bajo o sobre\n'
+           '   ' + str(CORTE_BANDA) + '° de altura. */\n')
     with open(SALIDA, 'w', encoding='utf-8') as f:
         f.write(cab + 'window.ATLAMPA_MODULOS = ' + json.dumps(datos, separators=(',', ':')) + ';\n')
     print('escrito', SALIDA, os.path.getsize(SALIDA), 'bytes')
