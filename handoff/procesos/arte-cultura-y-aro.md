@@ -1,7 +1,7 @@
 # Arte y cultura, y el aro
 
 ## Arte y cultura
-- Fuente: `arte_y_cultura_concepto.html` (en la carpeta del proyecto, junto a `diagrama/`). `herramientas/prepara-cultura.py` genera `atlampa-3d-cultura.js`.
+- Fuente: `diagrama/modelo/arte_y_cultura_concepto.html`. `herramientas/prepara-cultura.py` genera `atlampa-3d-cultura.js`.
   Sistema Rhino +497.9986, +392.0954, +0.52.
 - **`atlampa-3d-cultura.js` tiene ediciones a mano** que el script no tiene. No lo regeneres sin migrar antes esas ediciones
   a `prepara-cultura.py`. Lo correcto es pasarlo al flujo Rhino → script como el mercado.

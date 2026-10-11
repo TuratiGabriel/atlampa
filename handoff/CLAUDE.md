@@ -1,17 +1,17 @@
 # Atlampa — flujo general (léelo siempre)
 
 <instalacion>
-Así se arma la carpeta del proyecto (una vez):
+Así se arma la carpeta (una vez):
 ```
-Atlampa/                          ← abre Claude Code aquí
-  CLAUDE.md                       ← copia de diagrama/handoff/CLAUDE.md
-  diagrama/                       ← git clone https://github.com/TuratiGabriel/atlampa.git diagrama
-  Rhino/Contexto.3dm              ← del zip de Gabriel (no está en el repo)
-  arte_y_cultura_concepto.html    ← del zip
-  Paisaje planta.html             ← del zip
+Atlampa/                 ← abre Claude Code aquí
+  CLAUDE.md              ← copia de diagrama/handoff/CLAUDE.md
+  diagrama/              ← git clone https://github.com/TuratiGabriel/atlampa.git diagrama
+    modelo/              ← Contexto.3dm de Gabriel y los HTML de referencia (vienen en el repo)
 ```
-Los procesos están en `diagrama/handoff/procesos/`. Todas las rutas de este archivo son relativas a `Atlampa/`.
-Para recibir lo nuevo de Gabriel: `git -C diagrama pull`. Él te manda un `Contexto.3dm` nuevo cuando cambie.
+Todas las rutas de este archivo son relativas a `Atlampa/`. Los procesos están en `diagrama/handoff/procesos/`.
+Antes de trabajar, trae lo nuevo de Gabriel: `git -C diagrama pull` (código y Contexto.3dm).
+Tus modelos (`Industria.3dm`, `Cultura.3dm`) van en `diagrama/modelo/` y se suben en tu rama.
+`diagrama/modelo/Contexto.3dm` es de Gabriel: no lo guardes ni lo subas modificado.
 </instalacion>
 
 <quien>
@@ -30,8 +30,8 @@ Ejes compositivos: el de la vivienda pasa por el aro; el segundo va de las naves
 </proyecto>
 
 <flujo_general>
-1. **Rhino es la fuente de verdad.** `Rhino/Contexto.3dm` (mm) es el modelo de Gabriel: **sólo se lee, no se edita aquí**.
-   El usuario modela su programa en **su propio archivo** (`Rhino/Industria.3dm`, `Rhino/Cultura.3dm`), en el mismo sistema
+1. **Rhino es la fuente de verdad.** `diagrama/modelo/Contexto.3dm` (mm) es el modelo de Gabriel: **sólo se lee, no se edita aquí**.
+   El usuario modela su programa en **su propio archivo** (`diagrama/modelo/Industria.3dm`, `diagrama/modelo/Cultura.3dm`), en el mismo sistema
    de coordenadas de Contexto.3dm (copia de Contexto, o Contexto como referencia con Insert/Worksession). Así Gabriel lo inserta en su
    modelo sin pisar nada.
 2. **Un script por programa** en `diagrama/herramientas/prepara-<programa>.py`. Lee el `.3dm` con **rhino3dm** (sin abrir Rhino),

@@ -26,6 +26,9 @@ import re
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
 FUENTE = os.path.join(os.path.dirname(RAIZ), 'arte_y_cultura_concepto.html')
+# sin la carpeta del proyecto (colaboradores): la copia que va en el repo, diagrama/modelo/
+if not os.path.exists(FUENTE):
+    FUENTE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'modelo', 'arte_y_cultura_concepto.html')
 SALIDA = os.path.join(RAIZ, 'atlampa-3d-cultura.js')
 
 CONSTRUYE = r'''

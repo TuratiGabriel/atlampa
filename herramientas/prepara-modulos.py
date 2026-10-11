@@ -57,6 +57,9 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
 MODELO = os.path.join(RAIZ, '..', 'Rhino', 'nuevos bloques.3dm')
 CONTEXTO = os.path.join(RAIZ, '..', 'Rhino', 'Contexto.3dm')
+# sin la carpeta del proyecto (colaboradores): la copia que va en el repo, diagrama/modelo/
+if not os.path.exists(CONTEXTO):
+    CONTEXTO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'modelo', 'Contexto.3dm')
 SALIDA = os.path.join(RAIZ, 'atlampa-modulos.js')
 DEPTOS = os.path.join(AQUI, 'departamentos.json')   # de herramientas/departamentos.py
 

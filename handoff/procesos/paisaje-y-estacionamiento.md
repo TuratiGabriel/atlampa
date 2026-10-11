@@ -1,7 +1,7 @@
 # Paisaje, sol y estacionamiento
 
 ## Paisaje
-- Fuente: `Atlampa/Paisaje planta.html` (planta de un amigo de Gabriel). `herramientas/prepara-paisaje.py` genera `atlampa-paisaje.js`.
+- Fuente: `diagrama/modelo/Paisaje planta.html` (planta de un amigo de Gabriel). `herramientas/prepara-paisaje.py` genera `atlampa-paisaje.js`.
   Marco: 447.92–558.99 × 322.18–488.49.
 - Laguna orgánica: no copiar el círculo. Cae sobre Heliotropo/espuela, sin resolver.
 - Todo lo que no tiene desplante es área verde (patrón pasto). Hay ~35 árboles sueltos, nunca bajo módulos, aro, edificios, agua ni plaza.

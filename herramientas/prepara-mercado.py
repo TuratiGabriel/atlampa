@@ -29,6 +29,9 @@ import rhino3dm as r
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
 FUENTE = os.path.join(os.path.dirname(RAIZ), 'Rhino', 'Contexto.3dm')
+# sin la carpeta del proyecto (colaboradores): la copia que va en el repo, diagrama/modelo/
+if not os.path.exists(FUENTE):
+    FUENTE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'modelo', 'Contexto.3dm')
 SALIDA = os.path.join(RAIZ, 'atlampa-mercado.js')
 
 DX, DY, DZ = 503.255, 404.153, 0.11

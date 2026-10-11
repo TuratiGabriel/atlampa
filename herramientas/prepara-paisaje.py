@@ -40,6 +40,9 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
 ATLAMPA = os.path.dirname(RAIZ)
 HTML = os.path.join(ATLAMPA, 'Paisaje planta.html')
+# sin la carpeta del proyecto (colaboradores): la copia que va en el repo, diagrama/modelo/
+if not os.path.exists(HTML):
+    HTML = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'modelo', 'Paisaje planta.html')
 PDF = os.path.join(ATLAMPA, 'Rhino', 'PB siluetas y estructura.pdf')
 
 # marco de la planta (SVG) y del predio (diagrama)

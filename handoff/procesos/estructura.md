@@ -10,7 +10,7 @@
 - La estructura nueva de otros programas es **acero independiente** de la vivienda: puede ir pegada, con junta de 5 cm, pero sin conectarse.
 
 ## Archivos
-- `analisis/nb/v2/` (PROPUESTA_V2.html/.md, generador) se hornea con `nb_bake_v2.py` en `Rhino/nuevos bloques_V2 claude.3dm`
+- `analisis/nb/v2/` (PROPUESTA_V2.html/.md, generador) se hornea con `nb_bake_v2.py` en `Rhino/nuevos bloques_V2 claude.3dm` (sólo en la máquina de Gabriel)
   (capa `V2 claude`). Da ~2,385 t.
 - Tabla de secciones: `ESTRUCTURA_columnas_y_vigas.md`. Hoja: `Predimensionamiento_V4.xlsx`.
 - En el visor, las columnas de PB salen de un PDF de Gabriel (`herramientas/columnas-pb.json`). `Contexto.3dm` trae la V4 con 75 columnas a piso; está sin unificar.

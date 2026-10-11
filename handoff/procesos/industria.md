@@ -8,7 +8,7 @@
 - La ficha de `paginas.py` dice "La nave industrial": está por escribir.
 
 ## Plan (igual que el mercado; lee `mercado.md`)
-1. Lee con rhino3dm el archivo del usuario (`Rhino/Industria.3dm`, en el sistema de Contexto.3dm). Lista sus capas y pídele que
+1. Lee con rhino3dm el archivo del usuario (`diagrama/modelo/Industria.3dm`, en el sistema de Contexto.3dm). Lista sus capas y pídele que
    las ordene en `Layer 01::INDUSTRIA::<nave>::<parte>`. Comprueba que calce con la industria de Contexto.3dm (< 1 cm).
 2. Crea `herramientas/prepara-industria.py` (copia la estructura de `prepara-mercado.py`) y genera `atlampa-industria.js`.
    Se dibuja sólo con `ESC === 'industria'`; la general queda con el prisma.
