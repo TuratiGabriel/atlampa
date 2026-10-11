@@ -6,11 +6,14 @@ Fuentes (no se tocan):
   ../Paisaje planta.html               planta de paisajismo (SVG 1570 × 2330 + un script
                                        que reparte la vegetación con semilla 1191)
   ../Rhino/PB siluetas y estructura.pdf  planta baja con las columnas que bajan al piso
-                                       (imagen: los cuadritos son las columnas)
+                                       (imagen: los cuadritos son las columnas; ya leídas
+                                       en herramientas/columnas-pb.json)
 
 Las dos plantas comparten el marco (el rectángulo punteado = las guarniciones
 del predio). El marco se sacó calzando las 212 columnas del PDF contra las
-esquinas de los módulos (mediana 6 cm): u 447.51–558.58, v 321.81–488.12.
+esquinas de los módulos (mediana 6 cm): u 447.51–558.58, v 321.81–488.12; el
+2026-10-09 se corrió con los módulos (+0.4056, +0.3694: van donde están en
+Rhino/Contexto.3dm), y así el marco cae en el predio de Rhino (±0.2 m).
 
 Salida: window.ATLAMPA_PAISAJE = {
   tezontle   [[u, v, …]]  manchas de cubresuelos (polígonos)
@@ -41,7 +44,7 @@ PDF = os.path.join(ATLAMPA, 'Rhino', 'PB siluetas y estructura.pdf')
 
 # marco de la planta (SVG) y del predio (diagrama)
 SX0, SY0, SW, SH = 18, 18, 1532, 2290
-U0, U1, V0, V1 = 447.51, 558.58, 321.81, 488.12
+U0, U1, V0, V1 = 447.9156, 558.9856, 322.1794, 488.4894
 KU, KV = (U1 - U0) / SW, (V1 - V0) / SH   # m por unidad del SVG
 
 
@@ -198,24 +201,13 @@ def cinta(pts, ancho):
 
 
 def columnas():
-    """Las columnas del PDF (cuadritos) en metros, cada una hasta el fondo del
-    módulo más bajo que se apoya en ella."""
-    import pymupdf
-    from PIL import Image
-    from scipy import ndimage
-    pix = pymupdf.open(PDF)[0].get_pixmap(dpi=300)
-    im = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)[:, :, :3].mean(axis=2)
-    lab, n = ndimage.label(im < 160)
-    pts = []
-    for o in ndimage.find_objects(lab):
-        h, w = o[0].stop - o[0].start, o[1].stop - o[1].start
-        if 6 <= h <= 30 and 6 <= w <= 30 and abs(h - w) < 6:
-            pts.append(((o[1].start + o[1].stop) / 2, (o[0].start + o[0].stop) / 2))
-    # el marco del PDF a 300 dpi: (152, 133)–(1113, 1572) a 110 dpi
-    k = 300 / 110
-    x0, x1, y0, y1 = 152 * k, 1113 * k, 133 * k, 1572 * k
-    P = [(U0 + (x - x0) / (x1 - x0) * (U1 - U0), V1 - (y - y0) / (y1 - y0) * (V1 - V0)) for x, y in pts]
-    # módulos: esquinas y nivel
+    """Las columnas de planta baja, cada una hasta el fondo del módulo más bajo
+    que se apoya en ella. Se sacaron el 2026-10-07 de los cuadritos del PDF
+    (en esquinas de módulo); el PDF cambió después (hoy trae 68 cuadritos que no
+    caen en esquinas de módulo: pendiente con Gabriel), así que se leen de
+    columnas-pb.json (marco de entonces) y se pasan a la esquina del mismo
+    módulo en su posición de Rhino/Contexto.3dm (atlampa-modulos.js)."""
+    viejas = json.load(open(os.path.join(AQUI, 'columnas-pb.json'), encoding='utf-8'))['columnas']
     s = open(os.path.join(RAIZ, 'atlampa-modulos.js'), encoding='utf-8').read()
     i = s.index('ATLAMPA_MODULOS = ') + len('ATLAMPA_MODULOS = ')
     M = json.loads(s[i:s.rindex('}') + 1])
@@ -227,19 +219,20 @@ def columnas():
             esq.append((c[0] + math.cos(g) * x - math.sin(g) * y, c[1] + math.sin(g) * x + math.cos(g) * y, c[2]))
     E = np.array(esq)
     out, lejos = [], 0
-    for u, v in P:
+    for u, v, z in viejas:
+        u, v = u + 0.4056, v + 0.3694          # el corrimiento de los módulos (prepara-modulos.py)
         d = np.hypot(E[:, 0] - u, E[:, 1] - v)
-        cerca = d < 0.8
-        if not cerca.any():
+        j = int(np.argmin(d))
+        if d[j] > 1.2:                         # (1.2: los 33 de B1 que en Contexto están 1 m más allá)
             lejos += 1
             continue
-        j = np.argmin(np.where(cerca, E[:, 2], 99))
+        cerca = d < max(0.8, d[j] + 0.05)
+        j = int(np.argmin(np.where(cerca, E[:, 2], 99)))   # hasta el fondo del módulo más bajo (como se sacaron del PDF)
         out.append([r1(E[j, 0]), r1(E[j, 1]), round(M['z0'] + E[j, 2] * M['alto'], 2)])
-    # una columna por punto
     unicas = {}
     for c in out:
         unicas.setdefault((c[0], c[1]), c)
-    print('columnas del PDF', len(P), '· en esquina de módulo', len(out), '· sueltas', lejos, '· únicas', len(unicas))
+    print('columnas', len(viejas), '· en esquina de módulo', len(out), '· sin módulo', lejos, '· únicas', len(unicas))
     return sorted(unicas.values())
 
 

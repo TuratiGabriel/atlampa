@@ -82,7 +82,7 @@ function frustum(b,t,h){const B=[[b[0],b[1]],[b[2],b[1]],[b[2],b[3]],[b[0],b[3]]
 function tube(a,b,r){const A=new THREE.Vector3(a[0],a[2],-a[1]),B=new THREE.Vector3(b[0],b[2],-b[1]);const len=A.distanceTo(B);const g=new THREE.CylinderGeometry(r,r,len,8);g.translate(0,len/2,0);const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),B.clone().sub(A).normalize());g.applyQuaternion(q);g.translate(A.x,A.y,A.z);return g;}
 
 // ---------- construcción para el visor de Atlampa (sin contexto ni vidrios) ----------
-export const DX = 497.593, DY = 391.726, DZ = 0.32;
+export const DX = 497.9986, DY = 392.0954, DZ = 0.52;   // con los módulos, donde están en Contexto.3dm (2026-10-09)
 export function construye() {
   const P = { losa: [], nucleo: [], acero: [], aro: [], escalera: [], auditorio: [] }, L = { parteluz: [], huella: [], borde: [] };
   P.auditorio.push(walls(D.BOWL, F.zPit, 0), flat(D.BOWL, F.zPit));
@@ -93,15 +93,17 @@ export function construye() {
   // (su aro y sus columnas no van: en el diagrama manda el aro de siempre, más grande)
   for (const m of AC.gridMembers()) P.acero.push(tube(m.a, m.b, m.post ? .17 : .12));
   for (const p of D.par) P.aro.push(boxFrom(p.P, LV.PAR, LV.PAR + .15));
+  // (la azotea no es losa suya: es el aro, que se ensancha sobre ella; sus vigas sí)
   for (const [Q, top] of [[D.N1, LV.N1], [D.N2, LV.N2], [D.RF, LV.RF]]) {
-    P.losa.push(extr(Q, top - LV.slab, top));
+    if (Q !== D.RF) P.losa.push(extr(Q, top - LV.slab, top));
     const b = beamsUnder(Q, top - LV.slab); if (b) P.acero.push(b);
   }
   for (const [E, z0, z1] of [[D.E1, LV.N1, LV.N2 - LV.slab], [D.E2, LV.N2, LV.RF - LV.slab]]) L.parteluz.push(mullions(E, z0, z1, 2.75));
-  for (const [Q, z] of [[D.N1, LV.N1], [D.N2, LV.N2], [D.RF, LV.RF]]) L.borde.push(new THREE.BufferGeometry().setFromPoints(Q.concat([Q[0]]).flatMap((p, i, a) => i ? [new THREE.Vector3(a[i - 1][0], z + 1, -a[i - 1][1]), new THREE.Vector3(p[0], z + 1, -p[1])] : [])));
+  for (const [Q, z] of [[D.N1, LV.N1], [D.N2, LV.N2]]) L.borde.push(new THREE.BufferGeometry().setFromPoints(Q.concat([Q[0]]).flatMap((p, i, a) => i ? [new THREE.Vector3(a[i - 1][0], z + 1, -a[i - 1][1]), new THREE.Vector3(p[0], z + 1, -p[1])] : [])));
   const zOf = { PIT: LV.PIT, PB: 0, N1: LV.N1, N2: LV.N2, RF: LV.RF };
   for (const m of D.mods) { const z0 = zOf[m.lv], h = m.u === 'ban0' ? .45 : LV.mod; (m.u === 'core' ? P.nucleo : P.losa).push(boxFrom(m.P, z0, z0 + h)); }
-  for (const st of D.stairs) {
+  // (la escalera de la azotea, X3, ya no: al aro se sube por la rampa del frente)
+  for (const st of D.stairs.filter(st => st.id !== 'X3')) {
     for (const f of AC.flights(st)) {
       const n = Math.max(10, Math.ceil(Math.abs(f.a1 - f.a0) / 1)), s = [];
       for (let i = 0; i <= n; i++) { const a = f.a0 + (f.a1 - f.a0) * i / n; const q = f.fn(a); s.push({ p: q.p, n: q.n, z: f.z0 + (f.z1 - f.z0) * i / n }); }
@@ -112,6 +114,42 @@ export function construye() {
     for (let i = 0; i <= 6; i++) { const a = am - da + 2 * da * i / 6; const q = mid(a); s2.push({ p: q.p, n: q.n, z: zm }); }
     P.escalera.push(ribbon(s2, hw, .3, 0));
   }
+  /* Rampas por fuera, pegadas a la curva del edificio (su borde, Rc + RW),
+     una junto a la otra, al 8 % como máximo con descansos cada 9 m. Van de
+     norte a sur: arrancan del lado norte de la curva y terminan donde la
+     plataforma da la vuelta (su punta oeste): ahí la rampa se abre
+     y se vuelve parte de la losa, y se entra girando hacia el anfiteatro. 1: de la planta baja al nivel 1, la de adentro; empieza ya
+     en la curva (la que sea necesaria para el 8 %). 2: del nivel 1 al
+     nivel 2, por afuera de la 1, en el mismo tramo: sale de la losa del
+     nivel 1 (pasando sobre el arranque de la 1). Columnas delgadas cada 6 m. */
+  const carril = off => t => { const R = AC.Rc(t) + RW + off; return { p: [C[0] + R * Math.cos(t * deg), C[1] + R * Math.sin(t * deg)], n: [Math.cos(t * deg), Math.sin(t * deg)] }; };
+  const DESC = 1.5, TRAMO = 9, ANCHO = 2.4;
+  function largo(off, t0, t1) { const fn = carril(off), N = Math.ceil(Math.abs(t1 - t0) * 5); let L = 0, a = fn(t0).p; for (let i = 1; i <= N; i++) { const b = fn(t0 + (t1 - t0) * i / N).p; L += Math.hypot(b[0] - a[0], b[1] - a[1]); a = b; } return L; }
+  // lo que mide en planta una rampa de dz al 8 % con sus descansos
+  const necesita = dz => { const c = dz / 0.08; return c + Math.max(0, Math.ceil(c / TRAMO) - 1) * DESC; };
+  function rampa(off, t0, t1, z0, z1) {
+    const fn = carril(off), N = Math.ceil(Math.abs(t1 - t0) * 5), pts = [];
+    let L = 0;
+    for (let i = 0; i <= N; i++) { const t = t0 + (t1 - t0) * i / N, q = fn(t); if (i) L += Math.hypot(q.p[0] - pts[i - 1].p[0], q.p[1] - pts[i - 1].p[1]); pts.push(Object.assign(q, { s: L, t })); }
+    const nd = Math.max(0, Math.ceil(L / (TRAMO + DESC)) - 1), corre = (L - nd * DESC) / (nd + 1);
+    const zEn = s => { if (s <= 0) return z0; if (s >= L) return z1; const k = Math.floor(s / (corre + DESC)), r = s - k * (corre + DESC); return z0 + (z1 - z0) * (k * corre + Math.min(r, corre)) / (L - nd * DESC); };
+    pts.forEach(q => { q.z = zEn(q.s); });
+    P.escalera.push(ribbon(pts, ANCHO / 2, .3, 1));
+    let sig = 3;
+    pts.forEach(q => { if (q.s >= sig) { sig += 6; if (q.z > 0.6) [-0.8, 0.8].forEach(o => { const x = q.p[0] + q.n[0] * o, y = q.p[1] + q.n[1] * o; P.acero.push(tube([x, y, 0], [x, y, q.z - .3], .12)); }); } });
+    return { pend: (z1 - z0) / (L - nd * DESC), L };
+  }
+  // un pedazo de losa curva (de o0 a o1 del borde, de ta a tb grados) a la altura z: donde la rampa se vuelve plataforma
+  const losaCurva = (o0, o1, ta, tb, z) => { const fn = carril((o0 + o1) / 2), n = Math.max(4, Math.ceil(Math.abs(tb - ta) * 3)), sm = []; for (let i = 0; i <= n; i++) { const t = ta + (tb - ta) * i / n, q = fn(t); sm.push({ p: q.p, n: q.n, z }); } P.escalera.push(ribbon(sm, (o1 - o0) / 2, .35, 1, [1])); };
+  const O1 = ANCHO / 2, O2 = ANCHO * 1.5 + 0.1, FIN = 163.5, VUELTA = 166.5;   // carriles; donde acaban y donde da la vuelta la losa
+  // la 1 empieza donde le alcanza para el 8 %
+  let T0 = FIN - 10; while (largo(O1, T0, FIN) < necesita(LV.N1) && T0 > 110) T0 -= 0.25;
+  const R1 = rampa(O1, T0, FIN, 0, LV.N1), R2 = rampa(O2, T0, FIN, LV.N1, LV.N2);
+  losaCurva(-0.6, ANCHO, FIN, VUELTA, LV.N1);               // la 1 se vuelve la losa del nivel 1
+  losaCurva(-0.6, 2 * ANCHO + 0.1, FIN, VUELTA, LV.N2);     // la 2, la del nivel 2
+  losaCurva(-0.6, 2 * ANCHO + 0.1, T0 - 3, T0, LV.N1);      // y la 2 sale de la losa del nivel 1 (sobre el arranque de la 1)
+  console.log('rampas: de ' + T0.toFixed(1) + '° a ' + FIN + '°;', [R1, R2].map(r => (r.pend * 100).toFixed(1) + '% en ' + r.L.toFixed(0) + ' m').join(' · '));
+
   const mallas = {}, lineas = {};
   for (const k in P) if (P[k].length) mallas[k] = mergeGeometries(P[k].map(g => g.index ? g.toNonIndexed() : g).map(g => { for (const a of Object.keys(g.attributes)) if (a !== 'position' && a !== 'normal') g.deleteAttribute(a); return g; }));
   for (const k in L) if (L[k].length) lineas[k] = mergeGeometries(L[k]);
@@ -122,5 +160,5 @@ export function construye() {
   const pisa = [enDiagrama(D.BOWL)].concat(D.mods.filter(m => m.lv === 'PB' || m.lv === 'PIT').map(m => enDiagrama(m.P)));
   // columnas de la retícula, para el mapa Nolli
   const cols = D.cols.map(c => [c.x + DX, c.y + DY]);
-  return { mallas, lineas, pisa, losa1: enDiagrama(D.N1), cols };
+  return { mallas, lineas, pisa, losa1: enDiagrama(D.N1), azotea: enDiagrama(D.RF), cols };
 }

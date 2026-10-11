@@ -11,7 +11,7 @@ esquina y la ficha del apartado. Menús:
              estructura); al picar una se abre su submenú: Inspeccionar (ir a
              su apartado) y Ocultar / Mostrar.
   Capas      Paisaje, Sol y Contexto urbano (éste sólo en la general).
-  Diagramas  Accesos, Personas, Flujos y Árboles.
+  Diagramas  Accesos, Personas, Flujos y Postes.
   Vista      Color, Perspectiva, Mapa Nolli, Estilo y Resaltar (uno a la vez).
   Leyenda    Espuela, Banqueta y Agua.
 Al cambiar de apartado sólo cambian la ruta y la ficha: lo prendido y lo
@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261008t'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261010c'      # versión de los archivos (para que el navegador no use los viejos)
 
 SOTANOS = '''
       <div class="hud-grupo" role="group" aria-label="Sótanos">
@@ -39,7 +39,7 @@ GENERAL_DESC = ('Axonometría del predio de Atlampa entre las calles del Fresno,
                 'niveles, el paisaje de la planta baja (áreas verdes, humedales, estanques y la laguna), el estacionamiento '
                 'en sótanos como un volumen tenue y la espuela de ferrocarril por la calle Heliotropo. Los menús de arriba '
                 'abren o esconden cada parte de lo propuesto, prenden capas y diagramas (contexto urbano, sol, flujos, '
-                'árboles, personas, accesos) y resaltan lo público, lo privado o un programa. Arrastrar orbita la cámara; con el botón derecho se mueve; '
+                'postes, personas, accesos) y resaltan lo público, lo privado o un programa. Arrastrar orbita la cámara; con el botón derecho se mueve; '
                 'la rueda acerca hacia el cursor.')
 
 APARTADOS = {
@@ -62,7 +62,7 @@ APARTADOS = {
     'comercio': {
         'titulo': 'Comercio',
         'desc': 'Las dos naves de comercio, de techos a dos aguas con crujías de 17.97 m, cortadas por el círculo del aro.',
-        'datos': ['Nave sur: 3 crujías', 'Nave norte: 2 crujías', 'Alero +6.00 · cumbrera +9.00'],
+        'datos': ['Nave sur: 3 crujías', 'Nave norte: 2 crujías', 'Alero +6.20 · cumbrera +9.20'],
         'extra': '', 'leyenda': [],
     },
     'industria': {
@@ -79,8 +79,8 @@ APARTADOS = {
     },
     'aro': {
         'titulo': 'Aro',
-        'desc': 'El aro elevado: una losa anular a +9.80 sobre dos filas de columnas, con su barandal.',
-        'datos': ['Losa a +9.80', 'Radio interior 39.5 m · exterior 46.55 m', 'Dos filas de columnas de 0.80 m'],
+        'desc': 'El aro elevado: una losa anular a +10.03 sobre dos filas de columnas, con su barandal.',
+        'datos': ['Losa a +10.03', 'Radio interior 39.5 m · exterior 46.55 m', 'Dos filas de columnas de 0.80 m'],
         'extra': '', 'leyenda': [],
     },
     'paisajismo': {
@@ -106,16 +106,17 @@ def pagina(k):
 CAPAS = [('modulos', 'Módulos', True, ''), ('paisaje', 'Paisaje', True, ''), ('sol', 'Sol', False, ''),
          ('contexto', 'Contexto urbano', False, 'solo-general')]
 DIAGRAMAS = [('accesos', 'Accesos', False, ''), ('personas', 'Personas', False, ''),
-             ('flujos', 'Flujos', False, ''), ('arboles', 'Árboles', False, ''),
-             ('esquema', 'Esquema compositivo', False, '')]
+             ('flujos', 'Flujos', False, ''), ('arboles', 'Postes', False, ''),
+             ('esquema', 'Esquema compositivo', False, ''), ('corte', 'Corte en planta (1.75 m)', False, '')]
 RESALTA = [('', 'Nada'), ('espacio', '<i class="hud-esp hud-esp--pub"></i>Público / <i class="hud-esp hud-esp--pri"></i>privado'), ('modulos', 'Vivienda'),
            ('comercio', 'Comercio'), ('cultura', 'Arte y cultura'), ('industria', 'Industria'),
            ('aro', 'Aro'), ('paisajismo', 'Paisaje')]
 # Propuesto: [clave para ocultar, nombre]. Las que tienen apartado van a él al
 # inspeccionar; la vivienda se resalta y la estructura es una capa (apagada de
 # inicio).
+# (el aro no: siempre está, conecta todo; al inspeccionar cualquier cosa se queda, con su color)
 PROPUESTO = [('vivienda', 'Vivienda'), ('comercio', 'Comercio'), ('industria', 'Industria'), ('cultura', 'Arte y cultura'),
-             ('aro', 'Aro'), ('paisajismo', 'Paisajismo'), ('estacionamiento', 'Estacionamiento'), ('estructura', 'Estructura')]
+             ('paisajismo', 'Paisajismo'), ('estacionamiento', 'Estacionamiento'), ('estructura', 'Estructura')]
 
 # Leyenda: data-l = la capa de la que depende (se oculta si está apagada)
 LEYENDA = '''
@@ -206,12 +207,13 @@ PLANTILLA = '''<!doctype html>
     </div>
   </div>
 
-  <p class="ad-ayuda">Arrastrar (derecho o izquierdo): orbitar · Shift + arrastrar o botón central: mover · rueda: zoom al cursor · doble clic: encuadre · clic en una parte: entrar</p>
+  <p class="ad-ayuda">Arrastrar (derecho o izquierdo): orbitar · Shift + arrastrar o botón central: mover · rueda: zoom al cursor · clic en una parte: entrar · doble clic: aislarla (en el vacío: encuadre)</p>
 </main>
 <script src="atlampa-datos.js?v={v}"></script>
 <script src="atlampa-modulos.js?v={v}"></script>
 <script src="atlampa-estacionamiento.js?v={v}"></script>
 <script src="atlampa-paisaje.js?v={v}"></script>
+<script src="atlampa-mercado.js?v={v}"></script>
 <script src="atlampa-geo.js?v={v}"></script>
 <script src="atlampa-pagina.js?v={v}"></script>
 </body>
@@ -244,9 +246,12 @@ def propuesto():
                  '          <summary class="hud-parte__t">%s</summary>\n'
                  '          <div class="hud-parte__sub">\n'
                  '            <button class="hud-acc" type="button" data-inspecciona="%s">Inspeccionar</button>\n'
+                 '%s'
                  '            <button class="hud-acc" type="button" data-oculta="%s">%s</button>\n'
                  '          </div>\n'
-                 '        </details>' % (k, t, k, k, 'Mostrar' if k == 'estructura' else 'Ocultar'))
+                 '        </details>' % (k, t, k,
+                                       '' if k == 'estructura' else '            <button class="hud-acc" type="button" data-aisla="%s">Aislar</button>\n' % k,
+                                       k, 'Mostrar' if k == 'estructura' else 'Ocultar'))
     return '\n'.join(h)
 
 

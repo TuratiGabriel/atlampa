@@ -265,3 +265,31 @@ body.sin-accesos [data-l="accesos"], body.sin-nolli [data-l="nolli"]{ display:no
 .hud-esp { display: inline-block; width: .6em; height: .6em; border-radius: 50%; margin: 0 .3em 0 0; vertical-align: .05em; }
 .hud-esp--pub { background: #35d0c4; }
 .hud-esp--pri { background: #ff7a3d; margin-left: .15em; }
+
+/* Aislado (doble clic en una parte o Aislar): sólo esa parte, en axonometría.
+   La barra de menús cambia: Partes (ocultar / desplazar), Vista y Salir. */
+body.aislado .hud-barra:not(.hud-barra--aislado){ display:none; }
+.hud-barra--aislado{ animation:hud-abre .25s var(--ease-ui); }
+.hud-panel--partes{ min-width:330px; }
+.hud-fila{ display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:6px; padding:3px 0; }
+.hud-fila__t{ font-family:var(--font-display); font-size:14.5px; letter-spacing:.04em; color:var(--fg); }
+.hud-fila.es-oculta .hud-fila__t{ color:var(--muted); opacity:.6; }
+/* las piezas que se pican: el nombre las selecciona; la seleccionada, en rojo (como en el dibujo) */
+.hud-fila{ grid-template-columns:1fr auto auto auto; }
+.hud-fila__t--sel{ text-align:left; padding:0; border:0; background:none; cursor:pointer; }
+@media (hover:hover){ .hud-fila__t--sel:hover{ text-decoration:underline; text-underline-offset:3px; } }
+.hud-fila__t--sel:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
+.hud-fila.es-sel .hud-fila__t{ color:#ff5a4f; }
+.hud-fila__marca{ font-size:11px; letter-spacing:.06em; color:var(--muted); }
+.hud-acc[aria-pressed="true"]{ color:var(--fg); border-color:rgba(255,255,255,.55); background:rgba(255,255,255,.08); }
+.hud-salir{
+  display:flex; align-items:center; gap:8px; padding:7px 13px 6px;
+  font-family:var(--font-display); font-size:15px; letter-spacing:.05em; color:var(--fg);
+  background:rgba(0,0,0,.62); border:1px solid rgba(255,255,255,.4); border-radius:3px;
+  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); cursor:pointer;
+  transition:border-color .2s var(--ease-ui);
+}
+@media (hover:hover){ .hud-salir:hover{ border-color:var(--fg); } }
+.hud-salir:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
+.hud-ficha__sub{ font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-left:6px; }
+.hud-ficha__nota{ font-size:11px; letter-spacing:.03em; color:rgba(154,154,154,.75); line-height:1.4; }

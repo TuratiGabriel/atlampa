@@ -10,7 +10,9 @@ El plano trae dos dibujos lado a lado: «Planta tipo sotanos» (x 0–111) y
 Fresno a la izquierda y Eulalia Guzmán arriba, como u y v del diagrama: basta
 una traslación. Se calzó la proyección de los edificios de la planta baja
 (capa 'proyeccion') contra las esquinas de los módulos de atlampa-modulos.js:
-(447.52, 322.60), con el 63 % de los vértices a menos de 10 cm.
+(447.52, 322.60), con el 63 % de los vértices a menos de 10 cm. El 2026-10-09
+se corrió con los módulos (+0.4056, +0.3694: van donde están en
+Rhino/Contexto.3dm; ver prepara-modulos.py).
 
 Lo que se guarda (planta tipo, en el marco del diagrama):
   bloques   dos estacionamientos independientes (norte y sur): el contorno
@@ -38,7 +40,7 @@ RAIZ = os.path.dirname(AQUI)
 DWG = os.path.join(RAIZ, '..', 'Sotanos y PB para HTML.dwg')
 SALIDA = os.path.join(RAIZ, 'atlampa-estacionamiento.js')
 ACAD = r'C:\Program Files\Autodesk\AutoCAD 2024\accoreconsole.exe'
-TU, TV = 447.52, 322.60          # plano → diagrama
+TU, TV = 447.9256, 322.9694      # plano → diagrama (calzado con los módulos)
 SOTANOS, ENTREPISO = 4, 3.5
 X_MAX = 200                      # la planta tipo de sótanos (la planta baja está en x > 270)
 

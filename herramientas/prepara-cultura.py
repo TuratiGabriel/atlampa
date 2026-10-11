@@ -11,7 +11,14 @@ Encima va construye(): las mallas y líneas del edificio por papel (losa,
 núcleo, estructura, parasoles, escalera, auditorio) — sin su aro, que en el
 diagrama es el de siempre (más grande) — en su sistema
 local (x, z arriba, −y). Su sistema es el de Rhino: al diagrama se pasa con
-la misma traslación que los módulos (+497.593, +391.726) y +0.32 m.
+la misma traslación que los módulos (su retícula es la de ellos, campo 'lat'):
++497.9986, +392.0954 y +0.52 m (revisado 2026-10-09: los módulos van donde
+están en Rhino/Contexto.3dm, 0.41 y 0.37 m más allá que en nuevos bloques, y
+0.20 más arriba; ver prepara-modulos.py).
+
+OJO (2026-10-09): atlampa-3d-cultura.js trae cambios hechos directamente en
+él que este guion no tiene (la azotea no es losa: es el aro; rampas por fuera
+pegadas a la curva; sin la escalera X3). Correrlo los borra: pasarlos aquí antes.
 """
 import os
 import re
@@ -23,7 +30,7 @@ SALIDA = os.path.join(RAIZ, 'atlampa-3d-cultura.js')
 
 CONSTRUYE = r'''
 // ---------- construcción para el visor de Atlampa (sin contexto ni vidrios) ----------
-export const DX = 497.593, DY = 391.726, DZ = 0.32;
+export const DX = 497.9986, DY = 392.0954, DZ = 0.52;
 export function construye() {
   const P = { losa: [], nucleo: [], acero: [], aro: [], escalera: [], auditorio: [] }, L = { parteluz: [], huella: [], borde: [] };
   P.auditorio.push(walls(D.BOWL, F.zPit, 0), flat(D.BOWL, F.zPit));

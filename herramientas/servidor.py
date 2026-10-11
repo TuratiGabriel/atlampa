@@ -14,6 +14,7 @@ class SinCache(http.server.SimpleHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    puerto = int(sys.argv[1]) if len(sys.argv) > 1 else 8130
+    # el puerto: el que asigne la app (PORT), si no el de la línea de comandos, si no 8130
+    puerto = int(os.environ.get('PORT') or (sys.argv[1] if len(sys.argv) > 1 else 8130))
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     http.server.ThreadingHTTPServer(('127.0.0.1', puerto), functools.partial(SinCache, directory=raiz)).serve_forever()

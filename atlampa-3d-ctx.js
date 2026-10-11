@@ -1,6 +1,6 @@
 /* ============================================================
    ATLAMPA — extras del motor 3D (fase 2)
-   Contexto urbano, árboles de banqueta y postes, flujos (flechas y carros)
+   Contexto urbano, postes de luz, flujos (flechas y carros)
    y rótulos de calles. Interfaz: ver «extras» en atlampa-3d.js.
 
    Todo lo estático va fusionado (una malla / unas LineSegments por tipo);
@@ -62,30 +62,27 @@ export function crea(api) {
     }
   }
 
-  /* ===== 1. Árboles de banqueta y postes (capa 'arboles') ===== */
+  /* ===== 1. Postes de luz en la banqueta del predio (capa 'arboles') =====
+     Los árboles de banqueta (del escaneo) ya no van: con el sitio de Rhino caían
+     dentro del predio (Gabriel, 2026-10-09: «saca los árboles de la banqueta»).
+     Los postes también venían de la banqueta ancha del satélite: se pasan a la
+     de Rhino (anillo de 1.80 m a +0.20), al punto más cercano, a 0.45 m de la
+     guarnición, con el brazo hacia el arroyo. */
   const gArb = pieza('arboles-banqueta', null, 0.3);
   {
-    const Z = 0.15, AR = D.arboles || [], tr = new Lineas(), al = new Lineas();
-    if (AR.length) {
-      // tres portes, como los símbolos del SVG (9, 7.2 y 5.4 m): el árbol de croquis del motor (mira a la cámara)
-      const bb = api.mallaAtlas(AR.length, api.matArbol), T = api.ARBOLES_TEX;
-      AR.forEach((a, i) => {
-        const H = a[2] > 3.6 ? 9 : a[2] > 2.4 ? 7.2 : 5.4, p = W(a[0], a[1], Z);
-        bb.aPos.setXYZ(i, p[0], p[1], p[2]); bb.aEsc.setXY(i, T.ancho * H, T.alto * H); bb.aTile.setX(i, i % 3); bb.aVolt.setX(i, (i % 2) ? 1 : -1);
-        // alcorque
-        const n = 10; for (let k = 0; k < n; k++) { const t0 = k / n * 2 * Math.PI, t1 = (k + 1) / n * 2 * Math.PI; al.seg(W(a[0] + Math.cos(t0) * 0.7, a[1] + Math.sin(t0) * 0.7, Z + 0.01), W(a[0] + Math.cos(t1) * 0.7, a[1] + Math.sin(t1) * 0.7, Z + 0.01)); }
-      });
-      gArb.add(bb.malla);
-      ponLineas(gArb, al, 'sendero-alcorque', 0xffffff);
-    }
-    // postes de luz (8 m): fuste, brazo de 1.6 m hacia el arroyo y luminaria
-    const po = new Lineas();
+    const Z = 0.2, GUP = G.GUP, n = GUP.length, po = new Lineas();
     (D.postes || []).forEach(a => {
-      let hu = a[0] < PB.u0 ? -1 : a[0] > PB.u1 ? 1 : 0, hv = a[1] < PB.v0 ? -1 : a[1] > PB.v1 ? 1 : 0;
-      const l = Math.hypot(hu, hv) || 1; hu /= l; hv /= l;
-      const u1 = a[0] + hu * 1.6, v1 = a[1] + hv * 1.6;
-      po.seg(W(a[0], a[1], Z), W(a[0], a[1], Z + 8));
-      po.seg(W(a[0] - hu * 0.5, a[1] - hv * 0.5, Z + 7.6), W(u1, v1, Z + 7.6));
+      // el lado de la guarnición más cercano (GUP va antihorario: afuera queda a la derecha)
+      let c = null;
+      for (let k = 0; k < n; k++) {
+        const p = GUP[k], q = GUP[(k + 1) % n], du = q[0] - p[0], dv = q[1] - p[1], L = Math.hypot(du, dv);
+        const t = Math.max(0.03, Math.min(0.97, ((a[0] - p[0]) * du + (a[1] - p[1]) * dv) / (L * L)));
+        const x = p[0] + du * t, y = p[1] + dv * t, d = Math.hypot(a[0] - x, a[1] - y);
+        if (!c || d < c.d) c = { d, x, y, hu: dv / L, hv: -du / L };
+      }
+      const { hu, hv } = c, u0 = c.x - hu * 0.45, v0 = c.y - hv * 0.45, u1 = u0 + hu * 1.6, v1 = v0 + hv * 1.6;
+      po.seg(W(u0, v0, Z), W(u0, v0, Z + 8));
+      po.seg(W(u0 - hu * 0.5, v0 - hv * 0.5, Z + 7.6), W(u1, v1, Z + 7.6));
       po.seg(W(u1 - hv * 0.3, v1 + hu * 0.3, Z + 7.5), W(u1 + hv * 0.3, v1 - hu * 0.3, Z + 7.5));
       po.seg(W(u1, v1, Z + 7.6), W(u1, v1, Z + 7.45));
     });
@@ -192,11 +189,19 @@ export function crea(api) {
     pide();
   }
 
-  /* ===== 3. Contexto urbano (sólo la general) ===== */
-  let ctx = null, armando = null, ctxVisible = false, xAct = 0;
+  /* ===== 3. Contexto urbano (sólo la general) =====
+     Se arma en tandas (el suelo y las calles; los edificios de 60 en 60), en
+     cuanto abre la general, así que al prenderlo ya está listo. Se dibuja a
+     mano (el canal 'ctx' del motor) desde el predio hacia afuera mientras la
+     cámara se aleja: primero los trazos, luego se rellenan los edificios. */
+  let ctx = null, armando = null, ctxVisible = false, xAct = 0, vivo = true;
   const gCtx = new THREE.Group(); gCtx.name = 'contexto'; gCtx.visible = false; raizG.add(gCtx);
   const gCtxEd = new THREE.Group(); gCtx.add(gCtxEd);
-  const R = D.rect;
+  const R = D.rect, DC = api.dib;
+  if (DC) {
+    DC.uDib.value.set(0, 0, 1, 0); DC.uDibO.value.set(0, 0, 0);   // (el centro del sitio es el origen del mundo)
+    DC.uDibV.value.set(45, Math.max(...[[R.u0, R.v0], [R.u1, R.v0], [R.u0, R.v1], [R.u1, R.v1]].map(q => Math.hypot(q[0] - CEN[0], q[1] - CEN[1]))), 0);
+  }
   function armaSuelo() {
     // el suelo del bloque menos el del sitio (ese ya está)
     const m = new Malla();
@@ -216,9 +221,9 @@ export function crea(api) {
     fuera(ESPUELA, S).forEach(t => via(tv, t, 0.05, 0.72, 1.3, 1.6));
     ponLineas(gCtx, tv, 'ctxtren', 0xffffff);
   }
-  function armaEdificios() {
+  function armaEdificios(i0, i1) {
     const m = new Malla();
-    D.edificios.forEach(f => prisma(m, pares(f, 1), 0, f[0]));
+    D.edificios.slice(i0, i1).forEach(f => prisma(m, pares(f, 1), 0, f[0]));
     pon(gCtxEd, m, 'contexto', null, 25);
   }
   function preparaContexto(listo) {
@@ -226,27 +231,29 @@ export function crea(api) {
     if (ctx) { if (listo) listo(); return; }
     if (armando) { if (listo) armando.push(listo); return; }
     armando = listo ? [listo] : [];
-    // en dos tandas (suelo y calles; edificios), para no trabar el cuadro
-    requestAnimationFrame(() => {
-      armaSuelo();
-      requestAnimationFrame(() => {
-        armaEdificios();
-        ctx = true;
-        aplicaEstilo();
-        vista(xAct);
-        const av = armando; armando = null; av.forEach(f => f());
-      });
-    });
+    // en tandas, una por cuadro, para no trabar nada
+    const tandas = [armaSuelo];
+    for (let i = 0; i < D.edificios.length; i += 60) { const a = i; tandas.push(() => armaEdificios(a, a + 60)); }
+    (function sigue() {
+      if (!vivo) return;
+      tandas.shift()();
+      if (tandas.length) { requestAnimationFrame(sigue); return; }
+      ctx = true;
+      aplicaEstilo();
+      // un cuadro con todo puesto (sin trazar: no se ve) para que la tarjeta de video lo suba ya
+      gCtx.visible = true; if (api.calienta) api.calienta();
+      vista(xAct);
+      const av = armando; armando = null; av.forEach(f => f());
+    })();
   }
-  // x: 0 sitio → 1 contexto. Se ve de 0.25 en adelante; los edificios crecen del piso
+  // x: 0 sitio → 1 contexto: se traza (radial, desde el predio) mientras la cámara se aleja
   function vista(x) {
     xAct = x;
-    let o = ctx ? Math.max(0, Math.min(1, (x - 0.25) / 0.5)) : 0;
-    o = o * o * (3 - 2 * o);
+    const lin = ctx ? Math.max(0, Math.min(1, (x - 0.03) / 0.62)) : 0, rel = ctx ? Math.max(0, Math.min(1, (x - 0.3) / 0.7)) : 0;
+    if (DC) { DC.uDib.value.x = lin; DC.uDib.value.y = rel; }
     const antes = ctxVisible;
-    ctxVisible = o > 0;
+    ctxVisible = lin > 0;
     gCtx.visible = ctxVisible;
-    gCtxEd.scale.y = Math.max(0.001, o);
     if (flechasCtx) flechasCtx.visible = ctxVisible;
     if (antes !== ctxVisible && capas.flujos) mueveCarros(ultimoMs || performance.now());
     if (!ctxVisible) alSalir();
@@ -430,11 +437,12 @@ export function crea(api) {
   }
   function fluye(ms) { if (capas.flujos) mueveCarros(ms); }
   function destruye() {
+    vivo = false;
     trabajo.removeEventListener('pointermove', alMover); trabajo.removeEventListener('pointerleave', alSalir);
     texturas.forEach(r => r.tex.dispose()); gNom.children.forEach(me => me.material.dispose());
   }
 
   visibles();
   mueveCarros(0);
-  return { capa, vista, fluye, preparaContexto, destruye };
+  return { capa, vista, fluye, preparaContexto, destruye, listo: () => !!ctx };
 }

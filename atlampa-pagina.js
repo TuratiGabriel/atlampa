@@ -29,7 +29,7 @@
                 vivienda se resalta y la estructura se prende) y Ocultar /
                 Mostrar. La estructura empieza oculta.
      Capas      Paisaje, Sol, Contexto urbano.
-     Diagramas  Accesos, Personas, Flujos, Árboles.
+     Diagramas  Accesos, Personas, Flujos, Postes.
      Vista      Color, Perspectiva, Mapa Nolli, Estilo, Resaltar.
      Leyenda    Espuela, Banqueta, Agua.
    Lo prendido y lo oculto no cambian al pasar de un apartado a otro.
@@ -37,10 +37,21 @@
    lo demás del predio queda como referencia tenue. Contexto urbano (sólo en
    la general): la cámara se aleja despacio mientras el contexto se arma en
    tandas, y cuando está listo se va de golpe hasta el contexto entero.
+   Aislar (doble clic en una parte, o Aislar en Propuesto): se queda sólo ese
+   uso (todo lo demás se quita), la vista pasa a axonométrica, se vuelve a
+   dibujar a mano y la barra de menús cambia: Partes (cada una se oculta o se
+   desplaza; despiece completo), Vista (Color, Perspectiva, Estilo) y Salir
+   (o Esc). Un clic en una parte espera un instante por si es doble clic.
+   En Comercio, doble clic sobre la nave norte la abre: sólo quedan ella y el
+   aro, la cubierta sube y los muros bajan para ver el interior; Esc o doble
+   clic en el vacío, todo regresa.
+   Las escenas se dibujan como a mano (atlampa-3d.js): al cambiar de apartado
+   lo viejo se borra hacia el apartado nuevo, la cámara vuela de un encuadre
+   al otro y lo nuevo se traza desde ahí (ya se puede mover mientras).
    Un solo bucle rAF: corre mientras algo se mueve y se detiene solo. Con
    movimiento reducido no hay animaciones: la escena cambia de golpe.
    #contexto, #flujos, #arboles, #personas, #color, #sinmodulos,
-   #resalta=publico, #estructura, #sol, #az=135, #el=20 en la
+   #resalta=publico, #estructura, #sol, #aisla=comercio, #az=135, #el=20 en la
    dirección (para capturas).
    ============================================================ */
 (function () {
@@ -51,7 +62,7 @@
   var PAGINAS = { general: 'index.html', estacionamiento: 'estacionamiento.html', comercio: 'comercio.html',
     industria: 'industria.html', cultura: 'cultura.html', aro: 'aro.html', paisajismo: 'paisajismo.html' };
   var NOMBRES = { estacionamiento: 'Estacionamiento', comercio: 'Comercio', industria: 'Industria', cultura: 'Arte y cultura', aro: 'Aro', paisajismo: 'Paisajismo' };
-  var ARMA = 1100, DESARMA = 650;   // ms de la animación entre apartados
+  var ARMA = 1400, DESARMA = 450;   // ms: dibujar la escena nueva y borrar la vieja
   var ESCENA = document.body.getAttribute('data-escena') || 'general', GENERAL = ESCENA === 'general';
   var quieto = window.matchMedia('(prefers-reduced-motion: reduce)');
   var trabajo = svg.parentNode, pagina = document.querySelector('.ad-pagina');
@@ -62,7 +73,7 @@
   var estiloAct = 'rayado', perspAct = true;
   var antesNolli = null, NORTE_ARRIBA = -9.96;   // azimut con el norte arriba (el modelo está girado 9.96°)
   function creaDibujo() {
-    var d = window.Atlampa3D.crea(svg, { escena: ESCENA });
+    var d = window.Atlampa3D.crea(svg, { escena: ESCENA, az: azMeta, el: elMeta });
     d.estilo(estiloAct); d.perspectiva(perspAct);
     return d;
   }
@@ -147,12 +158,13 @@
   function prendida(n) { var b = boton(n); return !!b && b.getAttribute('aria-pressed') === 'true'; }
   function marca(b, si) {
     if (!b) return;
-    b.setAttribute('aria-pressed', String(si));
-    // la leyenda muestra sólo lo de las capas prendidas
     var n = b.getAttribute('data-capa');
+    // (la barra de aislar repite algunos botones: se marcan todos)
+    [].forEach.call(n ? document.querySelectorAll('[data-capa="' + n + '"]') : [b], function (x) { x.setAttribute('aria-pressed', String(si)); });
+    // la leyenda muestra sólo lo de las capas prendidas
     if (n) document.body.classList.toggle('sin-' + n, !si);
   }
-  // (los árboles y el contexto son independientes: uno no apaga al otro)
+  // (los postes y el contexto son independientes: uno no apaga al otro)
   function ponContexto(si, inmediato) {
     if (!GENERAL) return;
     marca(boton('contexto'), si);
@@ -163,18 +175,19 @@
       if (si && !listo) { recorre([[1, 1, 'suave', function () { return listo; }]]); return; }
       x = si ? 1 : 0; tramos = []; tramo = null; dib.vista(x, az, el); escala(); return;
     }
-    // Ida: despacio mientras se arma el contexto (en tandas); cuando está
-    // listo, de golpe hasta el contexto entero. Vuelta: de un tirón.
-    if (si) recorre([[0.12, 850, 'lenta'], [1, 550, 'golpe', function () { return listo; }]]);
-    else recorre([[0, 900, 'suave']]);
+    // Ida: el contexto ya se armó en ratos libres (si no, se espera tantito
+    // con la cámara arrancando); la cámara se aleja de un tirón suave mientras
+    // el contexto se dibuja del predio hacia afuera. Vuelta: igual, al revés.
+    if (si) recorre(listo ? [[1, 1900, 'suave']] : [[0.05, 450, 'lenta'], [1, 1800, 'suave', function () { return listo; }]]);
+    else recorre([[0, 1400, 'suave']]);
   }
   function ponCapa(nombre, si) {
     marca(boton(nombre), si);
     if (nombre === 'separa') { dib.separa(si); escala(); return; }
     if (nombre === 'perspectiva') { perspAct = si; if (dib.perspectiva) dib.perspectiva(si); return; }
     // Planta y Mapa Nolli: la cámara se va arriba (cenital) con el norte arriba, y al apagar ambos regresa
-    if (nombre === 'nolli' || nombre === 'planta') {
-      var arriba = prendida('nolli') || prendida('planta');
+    if (nombre === 'nolli' || nombre === 'planta' || nombre === 'corte') {
+      var arriba = prendida('nolli') || prendida('planta') || prendida('corte');
       if (arriba && !antesNolli) { antesNolli = { az: azMeta, el: elMeta }; azMeta += ((NORTE_ARRIBA - azMeta) % 360 + 540) % 360 - 180; elMeta = LIM[1]; mano = false; arranca(); }
       else if (!arriba && antesNolli) { azMeta = antesNolli.az; elMeta = antesNolli.el; antesNolli = null; arranca(); }
     }
@@ -207,7 +220,7 @@
   var PARTE_DE = { modulos: 'vivienda' };   // clave de resaltar → clave de ocultar
   function aplicaOculta(ap) {
     var si = !!ocultos[ap];
-    if (ap === 'estructura') dib.capa('estructura', !si);
+    if (ap === 'estructura') { dib.capa('estructura', !si); if (si && dib.inspeccionaEstructura) dib.inspeccionaEstructura(false); }
     else dib.oculta(ap, si);
   }
   function ponOculta(ap, si) {
@@ -226,10 +239,12 @@
     });
     [].forEach.call(document.querySelectorAll('[data-oculta]'), function (b) { b.textContent = ocultos[b.getAttribute('data-oculta')] ? 'Mostrar' : 'Ocultar'; });
   }
+  // (inspeccionar la estructura: lo demás queda en contorno; el aro siempre se ve)
   function inspecciona(ap) {
     if (ocultos[ap]) ponOculta(ap, false);
+    if (ap !== 'estructura' && dib.inspeccionaEstructura) dib.inspeccionaEstructura(false);
     if (ap === 'vivienda') { ponResalta('modulos'); if (!GENERAL) ir('general'); }
-    else if (ap === 'estructura') ponResalta('');
+    else if (ap === 'estructura') { ponResalta(''); if (dib.inspeccionaEstructura) dib.inspeccionaEstructura(true); }
     else ir(ap);
   }
 
@@ -242,12 +257,106 @@
     resAct = v || '';
     if (resAct === 'publico' || resAct === 'privado') resAct = 'espacio';   // (de antes: eran dos botones)
     var esp = resAct === 'espacio';
+    if (resAct && dib.inspeccionaEstructura) dib.inspeccionaEstructura(false);
     // (en este orden: seleccion() borra el espacio)
     dib.seleccion(esp || !resAct ? null : resAct);
     dib.espacio(esp ? 'ambos' : null);
     [].forEach.call(document.querySelectorAll('[data-resalta]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-resalta') === resAct)); });
     var ap = PARTE_DE[resAct] || resAct;
     if (ocultos[ap]) ponOculta(ap, false);
+  }
+
+
+  /* ---------- Aislar un uso ----------
+     dib.aisla(ap) deja sólo ese uso y lo vuelve a dibujar; aquí: la vista
+     axonométrica, la barra de menús propia (Partes · Vista · Salir) y la
+     ficha. Al salir, todo como estaba (perspectiva, resaltado). La vivienda se
+     aísla en la general; lo demás, en su apartado (si no se está ahí, se va y
+     se aísla al llegar). */
+  var aislado = null, antesAislar = null, porAislar = null, fichaAntes = null;
+  var NOMBRE_USO = { vivienda: 'Vivienda', comercio: 'Mercado', 'nave-norte': 'Nave norte', industria: 'Industria', cultura: 'Arte y cultura', aro: 'Aro', paisajismo: 'Paisajismo', estacionamiento: 'Estacionamiento' };
+  function escenaDe(ap) { return ap === 'vivienda' ? 'general' : ap === 'nave-norte' ? 'comercio' : PAGINAS[ap] ? ap : null; }
+  function aislar(ap) {
+    if (!dib || !dib.aisla || yendo) return;
+    var esc = escenaDe(ap);
+    if (!esc) return;
+    if (esc !== ESCENA) { porAislar = ap; ir(esc); return; }
+    if (aislado === ap) return;
+    if (aislado) saleAislado();
+    cierraMenus();
+    antesAislar = { persp: perspAct, resalta: resAct };
+    if (prendida('contexto')) ponContexto(false, true);
+    if (resAct) ponResalta('');
+    if (ocultos[ap]) ponOculta(ap, false);
+    ponCapa('perspectiva', false);   // axonométrica
+    // una altura de axonometría (ni casi de lado ni casi en planta)
+    if (elMeta < 22 || elMeta > 60) { elMeta = 34; mano = false; arranca(); }
+    var partes = dib.aisla(ap);
+    if (!partes) { ponCapa('perspectiva', antesAislar.persp); if (antesAislar.resalta) ponResalta(antesAislar.resalta); antesAislar = null; return; }
+    aislado = ap;
+    document.body.classList.add('aislado');
+    // la nave norte se abre de una vez (cubierta arriba, muros abajo)
+    if (ap === 'nave-norte') partes = dib.despiece(true);
+    barraAislado(ap, partes);
+  }
+  function saleAislado() {
+    if (!aislado) return;
+    cierraMenus();
+    dib.aisla(null);
+    aislado = null;
+    document.body.classList.remove('aislado');
+    var a = antesAislar || {}; antesAislar = null;
+    var b = document.querySelector('.hud-barra--aislado');
+    if (b) b.remove();
+    ponCapa('perspectiva', a.persp !== false);
+    if (a.resalta) ponResalta(a.resalta);
+    var f = document.querySelector('[data-ficha]');
+    if (f && fichaAntes !== null) f.innerHTML = fichaAntes;
+    fichaAntes = null;
+  }
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function filasPartes(partes) {
+    var mueven = partes.filter(function (pt) { return pt.mueve; });
+    var h = mueven.length ? '<button class="hud-op" type="button" data-despiece aria-pressed="' + mueven.every(function (pt) { return pt.desplazado; }) + '">Despiece (todas)</button><p class="hud-panel__t">Cada parte</p>' : '';
+    return h + partes.map(function (pt) {
+      return '<div class="hud-fila' + (pt.oculto ? ' es-oculta' : '') + '">' +
+        '<span class="hud-fila__t">' + esc(pt.nombre) + '</span>' +
+        '<button class="hud-acc" type="button" data-parte-oculta="' + pt.id + '" aria-pressed="' + pt.oculto + '">' + (pt.oculto ? 'Mostrar' : 'Ocultar') + '</button>' +
+        (pt.mueve ? '<button class="hud-acc" type="button" data-parte-mueve="' + pt.id + '" aria-pressed="' + pt.desplazado + '">' + (pt.desplazado ? 'Regresar' : 'Desplazar') + '</button>' : '') + '</div>';
+    }).join('');
+  }
+  function marcaPartesAislado(partes) {
+    var panel = document.querySelector('.hud-panel--partes');
+    if (panel && partes) panel.innerHTML = filasPartes(partes);
+  }
+  // la barra de menús del aislado y la ficha (con los datos del uso, si hay)
+  function barraAislado(ap, partes) {
+    var nav = document.createElement('nav');
+    nav.className = 'hud-barra hud-barra--aislado';
+    nav.setAttribute('aria-label', 'Menús del aislado');
+    var vista = '<button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="' + prendida('color') + '">Color</button>' +
+      '<button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="' + perspAct + '">Perspectiva</button>' +
+      '<p class="hud-panel__t">Estilo</p>' +
+      ['rayado', 'plano'].map(function (e) { return '<button class="hud-op hud-op--radio" type="button" data-estilo="' + e + '" aria-pressed="' + (estiloAct === e) + '">' + (e === 'rayado' ? 'Rayado' : 'Plano') + '</button>'; }).join('');
+    nav.innerHTML = (partes.length ? '<details class="hud-menu" name="hud"><summary class="hud-menu__t">Partes</summary><div class="hud-panel hud-panel--partes">' + filasPartes(partes) + '</div></details>' : '') +
+      '<details class="hud-menu" name="hud"><summary class="hud-menu__t">Vista</summary><div class="hud-panel">' + vista + '</div></details>' +
+      '<button class="hud-salir" type="button" data-aisla-sale>Salir <span aria-hidden="true">✕</span></button>';
+    var barra = document.querySelector('.hud-barra');
+    barra.parentNode.insertBefore(nav, barra.nextSibling);
+    var f = document.querySelector('[data-ficha]');
+    if (f) {
+      fichaAntes = f.innerHTML;
+      var M = window.ATLAMPA_MERCADO, r = M && M.resumen, c = M && M.cinta, datos = [];
+      if ((ap === 'comercio' || ap === 'nave-norte') && r) {
+        datos = [r.puestos + ' puestos de 2.5 × 2 × 3.0 m en ' + Object.keys(r.bloques || {}).length + ' bloques', r.mesas + ' mesas en los comedores',
+          'Plataformas de +1.42 a +2.40 (suben al sur)', 'Jardín ' + Math.round(r.jardin_m2) + ' m² · hoyo ' + Math.round(r.hoyo_m2) + ' m²'];
+        if (c) datos.push('Cinta del aro: ' + Math.round(c.largo) + ' m al ' + Math.max.apply(null, c.pendientes).toFixed(1) + ' %');
+        datos.push('Fachada al aro: vidrio (por definir)');
+      }
+      f.innerHTML = '<h1 class="hud-ficha__t">' + esc(NOMBRE_USO[ap] || ap) + ' <span class="hud-ficha__sub">aislado</span></h1>' +
+        (datos.length ? '<ul class="ad-datos">' + datos.map(function (d) { return '<li>' + esc(d) + '</li>'; }).join('') + '</ul>' : '') +
+        '<p class="hud-ficha__nota">Axonometría · ' + (ap === 'nave-norte' ? 'doble clic en el vacío o Esc: cerrar' : 'doble clic: encuadre · Esc: salir') + '</p>';
+    }
   }
 
   /* ---------- Menús ----------
@@ -258,13 +367,23 @@
     [].forEach.call(document.querySelectorAll('.hud-menu[open]'), function (d) { if (d !== salvo) d.open = false; });
   }
   document.addEventListener('pointerdown', function (ev) { if (!ev.target.closest('.hud-menu')) cierraMenus(); });
-  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') cierraMenus(); });
+  // Esc: cierra el menú; aislado, sale
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    if (document.querySelector('.hud-menu[open]')) cierraMenus();
+    else if (aislado && !yendo) saleAislado();
+  });
   document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-capa], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona]');
+    var b = ev.target.closest('[data-capa], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece]');
     if (!b || !dib) return;
-    if (b.hasAttribute('data-ir')) { ev.preventDefault(); cierraMenus(); ir(b.getAttribute('data-ir')); return; }
+    if (b.hasAttribute('data-ir')) { ev.preventDefault(); cierraMenus(); if (aislado) saleAislado(); ir(b.getAttribute('data-ir')); return; }
     if (yendo) return;
-    if (b.hasAttribute('data-oculta')) { var o = b.getAttribute('data-oculta'); ponOculta(o, !ocultos[o]); }
+    if (b.hasAttribute('data-aisla')) { cierraMenus(); aislar(b.getAttribute('data-aisla')); }
+    else if (b.hasAttribute('data-aisla-sale')) saleAislado();
+    else if (b.hasAttribute('data-parte-oculta')) marcaPartesAislado(dib.ponParte(b.getAttribute('data-parte-oculta'), { oculto: b.getAttribute('aria-pressed') !== 'true' }));
+    else if (b.hasAttribute('data-parte-mueve')) marcaPartesAislado(dib.ponParte(b.getAttribute('data-parte-mueve'), { desplazado: b.getAttribute('aria-pressed') !== 'true' }));
+    else if (b.hasAttribute('data-despiece'))marcaPartesAislado(dib.despiece(b.getAttribute('aria-pressed') !== 'true'));
+    else if (b.hasAttribute('data-oculta')) { var o = b.getAttribute('data-oculta'); ponOculta(o, !ocultos[o]); }
     else if (b.hasAttribute('data-inspecciona')) { cierraMenus(); inspecciona(b.getAttribute('data-inspecciona')); }
     else if (b.hasAttribute('data-capa')) {
       var n = b.getAttribute('data-capa'), si = b.getAttribute('aria-pressed') !== 'true';
@@ -352,6 +471,7 @@
     if (ap === ESCENA) return;
     guarda('atlampa-camara', { az: azMeta, el: elMeta });
     if (quieto.matches || location.protocol === 'file:' || !window.fetch || !window.DOMParser) { salta(ap); return; }
+    if (aislado) saleAislado();
     var de = ESCENA, doc = traePagina(ap), listo = false, hecho = false;
     // el contexto urbano es sólo de la general: se apaga al salir
     if (prendida('contexto')) marca(boton('contexto'), false);
@@ -360,17 +480,21 @@
     function sigue() {
       if (!listo || !hecho) return;
       doc.then(function (d) {
+        var c0 = dib.camara ? dib.camara() : null;
         dib.destruye();
         cambiaDom(d, ap);
         ESCENA = ap; GENERAL = ap === 'general';
         if (!desdeHistoria) history.pushState({ escena: ap }, '', PAGINAS[ap]);
         monta();
         document.body.classList.remove('cambia-pagina');
+        bloquea(false);   // ya se puede mover mientras se dibuja
+        if (porAislar) { var pa = porAislar; porAislar = null; aislar(pa); termina(); return; }
+        if (c0) dib.camara(c0);   // del encuadre de antes al de ahora
         dib.arma(GENERAL ? de : null, ARMA, termina);
       });
     }
     doc.then(function () { listo = true; sigue(); }, function () { salta(ap); });
-    dib.desarma(GENERAL ? ap : null, DESARMA, function () { hecho = true; sigue(); });
+    dib.desarma(ap, DESARMA, function () { hecho = true; sigue(); });
   }
   // sin animación (o sin poder traer la página): se navega como siempre
   function salta(ap) {
@@ -384,6 +508,10 @@
     bloquea(false);
     ocioso();
     arranca();
+    if (GENERAL && dib && dib.preparaContexto) {
+      var arma = function () { if (dib && GENERAL) dib.preparaContexto(); };
+      if (window.requestIdleCallback) requestIdleCallback(arma, { timeout: 2500 }); else setTimeout(arma, 600);
+    }
     // si el navegador cambió de dirección mientras se armaba
     var esc = escenaDeDireccion();
     if (esc && esc !== ESCENA) ir(esc, true);
@@ -479,13 +607,27 @@
     // un clic (sin arrastrar) sobre un apartado lo abre
     if (era && uno && recorrido < 5 && ev.type === 'pointerup' && ev.button === 0 && !yendo) {
       var ap = dib.apartadoEn(ev);
-      if (ap && ap !== ESCENA && PAGINAS[ap]) ir(ap);
+      if (ap && ap !== ESCENA && PAGINAS[ap] && !aislado) {
+        clearTimeout(clicPend);
+        clicPend = setTimeout(function () { clicPend = null; if (!yendo) ir(ap); }, 260);
+      }
     }
   }
   zona.addEventListener('pointerup', suelta);
   zona.addEventListener('pointercancel', suelta);
   zona.addEventListener('pointerleave', function () { if (!Object.keys(dedos).length) tooltip(null); });
-  zona.addEventListener('dblclick', function () { if (yendo || !dib) return; dib.reencuadra(); escala(); zona.classList.remove('con-zoom'); });
+  // doble clic en una parte: aislarla (cuando se inspecciona, el mercado en Comercio; sobre la nave norte, abrirla);
+  // en el vacío o ya aislado: encuadre (con la nave norte abierta, en el vacío la cierra)
+  var clicPend = null;
+  zona.addEventListener('dblclick', function (ev) {
+    if (yendo || !dib) return;
+    if (clicPend) { clearTimeout(clicPend); clicPend = null; }
+    if (aislado === 'nave-norte' && !dib.apartadoEn(ev)) { saleAislado(); return; }
+    if ((!aislado || aislado === 'comercio') && dib.naveNorteEn && dib.naveNorteEn(ev)) { aislar('nave-norte'); return; }
+    var ap = aislado ? null : dib.apartadoEn(ev);
+    if (ap && escenaDe(ap)) { aislar(ap); return; }
+    dib.reencuadra(); escala(); zona.classList.remove('con-zoom');
+  });
   // teclado, con el dibujo enfocado: flechas orbitan, + / − acercan, 0 encuadra
   zona.addEventListener('keydown', function (ev) {
     if (!dib) return;   // el motor 3D todavía carga
@@ -540,7 +682,7 @@
   }
   monta();
   if (h.indexOf('contexto') >= 0) ponContexto(true, true);
-  ['flujos', 'arboles', 'personas', 'color', 'sol', 'esquema'].forEach(function (n) { if (h.indexOf(n) >= 0) ponCapa(n, true); });
+  ['flujos', 'arboles', 'personas', 'color', 'sol', 'esquema', 'corte'].forEach(function (n) { if (h.indexOf(n) >= 0) ponCapa(n, true); });
   if (h.indexOf('estructura') >= 0) ponOculta('estructura', false);
   if (h.indexOf('sinmodulos') >= 0) ponOculta('vivienda', true);
   var th = h.filter(function (s) { return /^resalta=/.test(s); })[0];
@@ -550,7 +692,9 @@
   // Al abrir la página la escena también se arma (si se llega navegando desde
   // otro apartado, la cámara se abre desde él).
   var tr = lee('atlampa-transicion', true);
-  if (quieto.matches || h.indexOf('contexto') >= 0) { termina(); }
+  var aisla0 = h.filter(function (s) { return /^aisla=/.test(s); })[0];
+  if (aisla0) { aislar(aisla0.slice(6)); termina(); }
+  else if (quieto.matches || h.indexOf('contexto') >= 0) { termina(); }
   else {
     bloquea(true);
     dib.arma(tr && tr.a === ESCENA && GENERAL ? tr.de : null, ARMA, termina);

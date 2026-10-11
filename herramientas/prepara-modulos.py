@@ -30,8 +30,15 @@ que cada uno se guarda como centro + nivel + tipo.
    2.5 m libres encima) se quitan; los que quedan junto al paso se abren
    hacia el aro (esa cara no se cierra) y pasan a comercio (tipo 'comercio').
 
-Marco: nuevos bloques.3dm está en el mismo giro que Contexto.3dm, corrido
-(497.59, 391.73) en planta; su suelo está en −6.96.
+Marco (revisado 2026-10-09 contra Rhino/Contexto.3dm, el modelo sobre el que
+se desarrolla): Gabriel pasó los módulos a Contexto.3dm corridos (+0.41, +0.37)
+respecto a nuevos bloques y con los 33 de B1 (y 3 de B3) ya acomodados. Manda
+Contexto: cada módulo de nuevos bloques (que da la identidad: capa y
+departamento) toma la posición de su gemelo en Contexto.3dm (mismo paso que el
+mercado y el sitio: u = x/1000 + 503.255, v = y/1000 + 404.153, z = z/1000 + 0.11).
+La industria también sale de Contexto.3dm (allí está 3.6 m más al norte). Lo
+existente de nuevos bloques (la chimenea) calza con las naves de Contexto con el
+paso de antes (497.59, 391.73); sólo sube 0.20 como todo lo demás.
 """
 import base64
 import json
@@ -49,11 +56,14 @@ from shapely.ops import unary_union
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
 MODELO = os.path.join(RAIZ, '..', 'Rhino', 'nuevos bloques.3dm')
+CONTEXTO = os.path.join(RAIZ, '..', 'Rhino', 'Contexto.3dm')
 SALIDA = os.path.join(RAIZ, 'atlampa-modulos.js')
 DEPTOS = os.path.join(AQUI, 'departamentos.json')   # de herramientas/departamentos.py
 
 CAPAS = ['modulos44', '44SOC', 'modulos66', 'modulos88', 'modulosamenidades', 'modulosextra']   # subcapas de 'Módulos'
-DU, DV, DZ = 497.59, 391.73, 6.96          # nuevos bloques → marco del diagrama
+RX, RY, RZ = 503.255, 404.153, 0.11       # Contexto.3dm (mm) → marco del diagrama (como el mercado y el sitio)
+DU, DV, DZ = 497.9956, 392.0994, 7.16      # nuevos bloques → diagrama: así calza con los módulos de Contexto.3dm
+EU, EV = 497.59, 391.73                    # lo existente de nuevos bloques (chimenea): calza así con las naves de Contexto
 TOL = 0.03
 SECTOR, MARGEN = 10, 3                    # grados
 PX = 0.15                                 # m por píxel en la prueba de visibilidad
@@ -61,15 +71,50 @@ MIN_PX = 3                                # píxeles para contar una caja como v
 ELEVACIONES = [(6, 2), (15, 2), (30, 1), (48, 2), (70, 3)]   # alturas de cámara (°) y paso de azimut
 BANDAS = {'baja': (6, 15, 30), 'alta': (30, 48, 70)}           # el navegador usa 'baja' bajo 30°
 CORTE_BANDA = 30
-ANILLO = (505.75, 409.05, 39.5, 46.55, 9.8)   # u, v, radio interior y exterior, cubierta (como en atlampa-geo.js)
-BULTO = (138, 58, 10 * (39.5 + 46.55) / 2 / 38.27)   # el chipote del concepto de arte y cultura (th °, w °, b m), como en atlampa-geo.js
+ANILLO = (505.75, 409.05, 39.5, 46.55, 10.03)   # u, v, radio interior y exterior, cubierta (como en atlampa-geo.js)
+# el chipote: el borde de adentro del aro sigue la curva del edificio de arte y cultura (como en atlampa-geo.js)
+CULT = ((5.3 + 497.9986, 14.85 + 392.0954), 38.27, 1.8, 138, 58, 10)
+
+
+def _r_cult(t):
+    d = (t - CULT[3] + 540) % 360 - 180
+    return CULT[1] + CULT[2] + (CULT[5] * math.cos(math.pi / 2 * d / CULT[4]) ** 2 if abs(d) < CULT[4] else 0)
+
+
+def _tabla():
+    tb, k = [], 1.5
+    for t in range(360):
+        a, lo, hi = math.radians(t), 20.0, 80.0
+        for _ in range(40):
+            m = (lo + hi) / 2
+            p = (ANILLO[0] + math.cos(a) * m, ANILLO[1] + math.sin(a) * m)
+            tc = math.degrees(math.atan2(p[1] - CULT[0][1], p[0] - CULT[0][0]))
+            if math.hypot(p[0] - CULT[0][0], p[1] - CULT[0][1]) < _r_cult(tc):
+                lo = m
+            else:
+                hi = m
+        x = (lo + hi) / 2 - ANILLO[2]
+        y = x if x >= k else 0 if x <= -k else (x + k) ** 2 / (4 * k)
+        w = 0 if t < 60 else 1 if t <= 172 else 0 if t >= 205 else math.cos(math.pi / 2 * (t - 172) / 33) ** 2
+        tb.append(y * w)
+    return tb
+
+
+TB = _tabla()
 
 
 def bulto(t):
-    d = (t - BULTO[0] + 540) % 360 - 180
-    if abs(d) >= BULTO[1]:
-        return 0
-    return BULTO[2] * math.cos(math.pi / 2 * d / BULTO[1]) ** 2
+    t %= 360
+    i = int(t)
+    f = t - i
+    return TB[i] * (1 - f) + TB[(i + 1) % 360] * f
+
+
+def azotea_cultura():
+    # la azotea de arte y cultura (el aro se ensancha sobre ella), de los datos del concepto
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'atlampa-3d-cultura.js'), encoding='utf-8').read().split('\n')[3]
+    d = json.loads(src[src.index('{'):src.rindex('}') + 1])
+    return Polygon([(p[0] + 497.9986, p[1] + 392.0954) for p in d['RF']]).buffer(0)   # (DX, DY de prepara-cultura.py)
 
 
 def aro_poli(r, n=720):
@@ -104,11 +149,44 @@ def lee():
         ang = (ang + math.pi / 2) % math.pi - math.pi / 2           # dirección del lado largo, en (−90°, 90°]
         cajas.append({'capa': capa, 'c': (cx, cy), 'z0': z0, 'h': z1 - z0, 'ang': ang,
                       'a': math.dist(*largo), 'b': min(math.dist(*l) for l in lados)})
+    gemelos(cajas)
     return cajas
 
 
+def gemelos(cajas):
+    """Cada caja toma la posición de su gemelo en Contexto.3dm (misma capa y
+    nivel, el más cercano a menos de 1.2 m). 'clave' guarda la de nuevos bloques
+    (la de departamentos.json)."""
+    m = rhino3dm.File3dm.Read(CONTEXTO)
+    ctx = defaultdict(list)
+    for o in m.Objects:
+        capa = m.Layers[o.Attributes.LayerIndex].FullPath
+        if not capa.startswith('M') or capa.split('::')[-1] not in CAPAS or not isinstance(o.Geometry, rhino3dm.Mesh):
+            continue
+        b = o.Geometry.GetBoundingBox()
+        # al marco local de nuevos bloques
+        ctx[capa.split('::')[-1]].append(((b.Min.X + b.Max.X) / 2000 + RX - DU, (b.Min.Y + b.Max.Y) / 2000 + RY - DV, b.Min.Z / 1000 + RZ - DZ))
+    usados, movidos = set(), 0
+    for c in cajas:
+        cand = [(math.dist(c['c'], g[:2]), i) for i, g in enumerate(ctx[c['capa']]) if abs(g[2] - c['z0']) < 0.05]
+        d, i = min(cand)
+        if d > 1.2 or (c['capa'], i) in usados:
+            sys.exit('módulo sin gemelo en Contexto.3dm: %s %s' % (c['capa'], c['c']))
+        usados.add((c['capa'], i))
+        g = ctx[c['capa']][i]
+        c['clave'] = c['c']
+        if d > 0.02:
+            movidos += 1
+        c['c'] = g[:2]
+    if len(usados) != sum(len(v) for v in ctx.values()):
+        sys.exit('Contexto.3dm tiene módulos que no están en nuevos bloques')
+    print('gemelos en Contexto.3dm:', len(usados), '· movidos respecto a nuevos bloques:', movidos)
+
+
 def industria():
-    m = rhino3dm.File3dm.Read(MODELO)
+    """La industria de Contexto.3dm (capa 'industry_bake - Copy'): un prisma; su
+    planta (el contorno de la cara de abajo) y sus alturas, ya en el marco del diagrama."""
+    m = rhino3dm.File3dm.Read(CONTEXTO)
     for o in m.Objects:
         if m.Layers[o.Attributes.LayerIndex].FullPath != 'industry_bake - Copy':
             continue
@@ -118,8 +196,8 @@ def industria():
         segs = []
         for e in b.Edges:
             a, c = e.PointAtStart, e.PointAtEnd
-            if abs(a.Z - z0) < 1e-3 and abs(c.Z - z0) < 1e-3:
-                segs.append(((round(a.X, 3), round(a.Y, 3)), (round(c.X, 3), round(c.Y, 3))))
+            if abs(a.Z - z0) < 1 and abs(c.Z - z0) < 1:
+                segs.append(((round(a.X / 1000 + RX, 3), round(a.Y / 1000 + RY, 3)), (round(c.X / 1000 + RX, 3), round(c.Y / 1000 + RY, 3))))
         s = segs.pop()
         lazo = [s[0], s[1]]
         while lazo[-1] != lazo[0]:
@@ -132,8 +210,8 @@ def industria():
                 sys.exit('la planta de la industria no cierra')
         if segs:
             sys.exit('la industria tiene más de un contorno')
-        return {'planta': [round(v, 2) for p in lazo[:-1] for v in (p[0] + DU, p[1] + DV)],
-                'z0': round(z0 + DZ, 2), 'z1': round(bb.Max.Z + DZ, 2)}
+        return {'planta': [round(v, 2) for p in lazo[:-1] for v in p],
+                'z0': round(z0 / 1000 + RZ, 2), 'z1': round(bb.Max.Z / 1000 + RZ, 2)}
     return None
 
 
@@ -152,8 +230,8 @@ def chimenea():
 
         def caja(z):
             q = [p for p in pts if abs(p[2] - z) < 1e-3]
-            return [round(min(p[0] for p in q) + DU, 2), round(min(p[1] for p in q) + DV, 2),
-                    round(max(p[0] for p in q) + DU, 2), round(max(p[1] for p in q) + DV, 2)]
+            return [round(min(p[0] for p in q) + EU, 2), round(min(p[1] for p in q) + EV, 2),
+                    round(max(p[0] for p in q) + EU, 2), round(max(p[1] for p in q) + EV, 2)]
         return {'base': caja(z0), 'remate': caja(z1), 'z0': round(z0 + DZ, 2), 'z1': round(z1 + DZ, 2)}
     return None
 
@@ -188,7 +266,7 @@ def main():
 
     # 0. El aro: quita los que estorban el paso; abre y pasa a comercio los de junto
     AU, AV, RI, RE, AZ = ANILLO
-    banda = Polygon(aro_poli(RE)).difference(Polygon(aro_poli(RI)))   # con el chipote
+    banda = Point(AU, AV).buffer(RE, 256).difference(Point(AU, AV).buffer(RI, 256)).union(azotea_cultura())   # con la azotea de arte y cultura
     ex0, ey0 = (eg, sg), (-sg, eg)
 
     def esquina(c, lx, ly):
@@ -425,7 +503,7 @@ def main():
 
     grupos = defaultdict(list)
     for n, (c, js) in enumerate(zip(shell, cajas_js)):
-        d = deptos['%s|%.1f|%.1f|%d' % (c['capa'], c['c'][0], c['c'][1], c['k'])]
+        d = deptos['%s|%.1f|%.1f|%d' % (c['capa'], c['clave'][0], c['clave'][1], c['k'])]
         for cod, plano, p, q in aristas(c, js):
             grupos[(d, plano)].append((n, cod, p, q, recta(p, q)))
     quita = defaultdict(list)
@@ -463,7 +541,7 @@ def main():
     }
     cuenta = Counter(c['capa'] for c in cajas)
     cab = ('/* Módulos de vivienda. Generado por herramientas/prepara-modulos.py: no editar a mano.\n'
-           '   Fuente: Rhino/nuevos bloques.3dm, capas ' + ', '.join(CAPAS) + '.\n'
+           '   Fuente: Rhino/nuevos bloques.3dm, capas ' + ', '.join(CAPAS) + ' (en la posición de Contexto.3dm); industria de Contexto.3dm.\n'
            '   ' + str(len(cajas)) + ' módulos (' + ', '.join('%s %d' % (k, cuenta[k]) for k in CAPAS) + '); '
            'aquí sólo los ' + str(len(shell)) + ' con alguna cara al exterior, y sólo esas caras.\n'
            '   cajas: [u, v, nivel, tipo, muro −Y, muro +X, muro +Y, muro −X, tapa, juntas(, abiertas)]; muro 1 = completo,\n'

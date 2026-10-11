@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlampa · Arte y cultura</title>
-<link rel="stylesheet" href="atlampa.css?v=20261008t">
-<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261008t">
+<link rel="stylesheet" href="atlampa.css?v=20261010c">
+<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261010c">
 <!-- Three.js del CDN (pendiente: copiarlo a lib/ para presentar sin internet) -->
 <script type="importmap">{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head>
@@ -33,6 +33,7 @@
           <summary class="hud-parte__t">Vivienda</summary>
           <div class="hud-parte__sub">
             <button class="hud-acc" type="button" data-inspecciona="vivienda">Inspeccionar</button>
+            <button class="hud-acc" type="button" data-aisla="vivienda">Aislar</button>
             <button class="hud-acc" type="button" data-oculta="vivienda">Ocultar</button>
           </div>
         </details>
@@ -40,6 +41,7 @@
           <summary class="hud-parte__t">Comercio</summary>
           <div class="hud-parte__sub">
             <button class="hud-acc" type="button" data-inspecciona="comercio">Inspeccionar</button>
+            <button class="hud-acc" type="button" data-aisla="comercio">Aislar</button>
             <button class="hud-acc" type="button" data-oculta="comercio">Ocultar</button>
           </div>
         </details>
@@ -47,6 +49,7 @@
           <summary class="hud-parte__t">Industria</summary>
           <div class="hud-parte__sub">
             <button class="hud-acc" type="button" data-inspecciona="industria">Inspeccionar</button>
+            <button class="hud-acc" type="button" data-aisla="industria">Aislar</button>
             <button class="hud-acc" type="button" data-oculta="industria">Ocultar</button>
           </div>
         </details>
@@ -54,20 +57,15 @@
           <summary class="hud-parte__t">Arte y cultura</summary>
           <div class="hud-parte__sub">
             <button class="hud-acc" type="button" data-inspecciona="cultura">Inspeccionar</button>
+            <button class="hud-acc" type="button" data-aisla="cultura">Aislar</button>
             <button class="hud-acc" type="button" data-oculta="cultura">Ocultar</button>
-          </div>
-        </details>
-        <details class="hud-parte" name="hud-parte" data-parte="aro">
-          <summary class="hud-parte__t">Aro</summary>
-          <div class="hud-parte__sub">
-            <button class="hud-acc" type="button" data-inspecciona="aro">Inspeccionar</button>
-            <button class="hud-acc" type="button" data-oculta="aro">Ocultar</button>
           </div>
         </details>
         <details class="hud-parte" name="hud-parte" data-parte="paisajismo">
           <summary class="hud-parte__t">Paisajismo</summary>
           <div class="hud-parte__sub">
             <button class="hud-acc" type="button" data-inspecciona="paisajismo">Inspeccionar</button>
+            <button class="hud-acc" type="button" data-aisla="paisajismo">Aislar</button>
             <button class="hud-acc" type="button" data-oculta="paisajismo">Ocultar</button>
           </div>
         </details>
@@ -75,6 +73,7 @@
           <summary class="hud-parte__t">Estacionamiento</summary>
           <div class="hud-parte__sub">
             <button class="hud-acc" type="button" data-inspecciona="estacionamiento">Inspeccionar</button>
+            <button class="hud-acc" type="button" data-aisla="estacionamiento">Aislar</button>
             <button class="hud-acc" type="button" data-oculta="estacionamiento">Ocultar</button>
           </div>
         </details>
@@ -102,8 +101,9 @@
         <button class="hud-op" type="button" data-capa="accesos" aria-pressed="false">Accesos</button>
         <button class="hud-op" type="button" data-capa="personas" aria-pressed="false">Personas</button>
         <button class="hud-op" type="button" data-capa="flujos" aria-pressed="false">Flujos</button>
-        <button class="hud-op" type="button" data-capa="arboles" aria-pressed="false">Árboles</button>
+        <button class="hud-op" type="button" data-capa="arboles" aria-pressed="false">Postes</button>
         <button class="hud-op" type="button" data-capa="esquema" aria-pressed="false">Esquema compositivo</button>
+        <button class="hud-op" type="button" data-capa="corte" aria-pressed="false">Corte en planta (1.75 m)</button>
       </div>
     </details>
     <details class="hud-menu" name="hud">
@@ -158,13 +158,14 @@
     </div>
   </div>
 
-  <p class="ad-ayuda">Arrastrar (derecho o izquierdo): orbitar · Shift + arrastrar o botón central: mover · rueda: zoom al cursor · doble clic: encuadre · clic en una parte: entrar</p>
+  <p class="ad-ayuda">Arrastrar (derecho o izquierdo): orbitar · Shift + arrastrar o botón central: mover · rueda: zoom al cursor · clic en una parte: entrar · doble clic: aislarla (en el vacío: encuadre)</p>
 </main>
-<script src="atlampa-datos.js?v=20261008t"></script>
-<script src="atlampa-modulos.js?v=20261008t"></script>
-<script src="atlampa-estacionamiento.js?v=20261008t"></script>
-<script src="atlampa-paisaje.js?v=20261008t"></script>
-<script src="atlampa-geo.js?v=20261008t"></script>
-<script src="atlampa-pagina.js?v=20261008t"></script>
+<script src="atlampa-datos.js?v=20261010c"></script>
+<script src="atlampa-modulos.js?v=20261010c"></script>
+<script src="atlampa-estacionamiento.js?v=20261010c"></script>
+<script src="atlampa-paisaje.js?v=20261010c"></script>
+<script src="atlampa-mercado.js?v=20261010c"></script>
+<script src="atlampa-geo.js?v=20261010c"></script>
+<script src="atlampa-pagina.js?v=20261010c"></script>
 </body>
 </html>

@@ -17,47 +17,104 @@
 
   var D = window.ATLAMPA_DATOS;
 
-  /* ---------- Sitio (m) ---------- */
-  var PB = { u0: 452.7, u1: 554.5, v0: 326.8, v1: 477.3 };      // fachadas del predio
-  var GU = { o: 448.0, e: 559.5, s: 325.0, n: 488.5 };          // guarniciones del lado del predio
-  var GF = { o: 437.5, e: 567.0, s: 317.5, n: 500.5 };          // guarniciones de enfrente
-  var S = { u0: 435.3, u1: 568.8, v0: 311.6, v1: 507.1 };       // fachadas de enfrente: el bloque del sitio
-  var HE = [401, 409];                                          // Calle Heliotropo, dentro del predio
-  var CEN = [(PB.u0 + PB.u1) / 2, (PB.v0 + PB.v1) / 2];
-  // Naves (Contexto.3dm, COMERCIO): crujías de 17.97 m (tres al sur, dos al
-  // norte: la crujía oeste del norte no va), alero +6.00, cumbrera
-  // +9.00, la cumbrera a lo largo de v. En Rhino llegan a las guarniciones; aquí
-  // se recortan a las fachadas del predio.
-  var NAVES = [
-    { u0: 504.6, u1: 558.5, v0: 323.9, v1: 396.4, n: 3, alero: 6, cumbre: 9 },   // sur
-    { u0: 522.57, u1: 558.5, v0: 415.3, v1: 487.8, n: 2, alero: 6, cumbre: 9 }   // norte: sin la crujía oeste
-  ];
-  // Anillo (Contexto.3dm, Diag::ring): losa anular a +9.80 sobre dos filas de
-  // columnas de 0.80 m, con barandal a +0.90. Corta las naves por fuera de sus columnas.
-  var ANILLO = { u: 505.75, v: 409.05, ri: 39.5, re: 46.55, z: 9.8, canto: 0.35, baranda: 0.9 };
-  var CORTE = 47;
-  /* La deformación del aro (el «chipote» del concepto de arte y cultura,
-     ../arte_y_cultura_concepto.html: BULGE th 138°, w 58°, b 10 m sobre R0
-     38.27): el eje del aro se abre hacia afuera con un perfil cos², b metros
-     en th y nada a ±w grados; el ancho de la losa no cambia (se corre en
-     radio). Escalada a este aro: b × (radio medio / 38.27); los ángulos no
-     cambian. */
-  var BULTO = { th: 138, w: 58, b: 10 * ((ANILLO.ri + ANILLO.re) / 2) / 38.27 };
-  function bulto(t) {   // t en grados → cuánto se abre el aro (m)
-    var d = ((t - BULTO.th) % 360 + 540) % 360 - 180;
-    if (Math.abs(d) >= BULTO.w) return 0;
-    var c = Math.cos(Math.PI / 2 * d / BULTO.w);
-    return BULTO.b * c * c;
+  /* ---------- Sitio (m) ----------
+     El predio y su banqueta son los de Gabriel en Rhino (Contexto.3dm, capas
+     site::polygon y site; 2026-10-09: «ese es sobre lo que estamos
+     desarrollando»), con el mismo paso de Rhino al diagrama que el mercado
+     (u = x + 503.255, v = y + 404.153): el predio llega a la guarnición que
+     daba el satélite (el lado sur, un poco inclinado) y la banqueta es un
+     anillo de 1.80 m por fuera, a ras del predio (+0.20). Lo de enfrente se
+     ajusta al predio (Gabriel: «si el predio queda desfasado con respecto al
+     contexto edita el contexto»): los edificios salen exactos de Contexto.3dm
+     con el mismo paso (atlampa-datos.js) y las fachadas de enfrente (S) son
+     las suyas; las guarniciones de enfrente siguen de la imagen satelital
+     (las calles de CADMapper no cuadran con el predio) y Clavel se recorre
+     para seguir midiendo 7.5 m. Heliotropo ya no es calle: dentro
+     del predio queda la espuela, como paso peatonal. */
+  var PRED = [[448.076, 322.228], [558.946, 324.272], [558.946, 488.265], [447.963, 488.265]];   // predio (Rhino, antihorario)
+  var GUP = [[446.277, 320.394], [560.746, 322.506], [560.745, 490.066], [446.161, 490.065]];    // su guarnición: el borde de la banqueta (Rhino)
+  var PB = { u0: 448.02, u1: 558.946, v0: 322.228, v1: 488.265 };   // la caja del predio
+  var GU = { o: 446.22, e: 560.745, s: 320.394, n: 490.065 };       // la caja de su guarnición
+  var GF = { o: 437.5, e: 567.0, s: 313.95, n: 500.5 };             // guarniciones de enfrente
+  var S = { u0: 435.75, u1: 569.17, v0: 311.45, v1: 506.98 };      // fachadas de enfrente (las de los edificios de Contexto.3dm): el bloque del sitio
+  var HE = [401, 409];                                              // Heliotropo, dentro del predio (la espuela, paso peatonal)
+  // el origen del mundo 3D: el centro del predio que daba el satélite (se queda: cámara, sol y minimapa no se mueven)
+  var CEN = [503.6, 402.05];
+  // lo de un rectángulo [u0, v0, u1, v1] (o un polígono) que cae dentro de un polígono convexo (Sutherland–Hodgman)
+  function recortaConvexo(pol, conv) {
+    if (pol.length === 4 && typeof pol[0] === 'number') pol = [[pol[0], pol[1]], [pol[2], pol[1]], [pol[2], pol[3]], [pol[0], pol[3]]];
+    var out = pol;
+    for (var i = 0; i < conv.length && out.length; i++) {
+      var a = conv[i], b = conv[(i + 1) % conv.length], ent = out; out = [];
+      var lado = function (p) { return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]); };
+      for (var k = 0; k < ent.length; k++) {
+        var p = ent[k], q = ent[(k + 1) % ent.length], sp = lado(p), sq = lado(q);
+        if (sp >= 0) out.push(p);
+        if ((sp >= 0) !== (sq >= 0)) { var t = sp / (sp - sq); out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]); }
+      }
+    }
+    return out.length > 2 ? out : null;
   }
-  function aroPunto(t, r) { var R = r + bulto(t), a = t * Math.PI / 180; return [ANILLO.u + Math.cos(a) * R, ANILLO.v + Math.sin(a) * R]; }
+  // Naves (Contexto.3dm, capa COMERCIO::mercado::cubierta, revisadas
+  // 2026-10-09): crujías de 17.98 m (tres al sur, dos al norte: la crujía
+  // oeste del norte no va), alero +6.20 y cumbrera +9.20 (6.00 y 9.00 sobre el
+  // predio), la cumbrera a lo largo de v. Se recortan al predio.
+  var NAVES = [
+    { u0: 504.601, u1: 558.546, v0: 323.872, v1: 396.366, n: 3, alero: 6.2, cumbre: 9.2 },   // sur
+    { u0: 522.782, u1: 558.81, v0: 417.865, v1: 488.333, n: 2, alero: 6.2, cumbre: 9.2 }     // norte: sin la crujía oeste
+  ];
+  // Anillo (Contexto.3dm, Diag::ring): losa anular con el piso a +10.03 (9.92 en
+  // Rhino; 9.83 sobre el predio) sobre dos filas de columnas de 0.80 m (r 39.52
+  // y 46.52), con barandal a +0.90. Corta las naves por fuera de sus columnas.
+  var ANILLO = { u: 505.75, v: 409.05, ri: 39.5, re: 46.55, z: 10.03, canto: 0.35, baranda: 0.9 };
+  var CORTE = 47;
+  /* El aro y arte y cultura son uno: el aro sigue su círculo y, donde está
+     el edificio, se ensancha hasta cubrir su plataforma (la azotea, que deja
+     de ser una losa aparte). ponPlataforma(pol) lo arma con la huella de la
+     azotea (la pasa el 3D, que tiene los datos del edificio): para cada
+     medio grado, hasta dónde llega el borde de afuera (EXT) y el de adentro
+     (INT) para cubrirla. Sin plataforma, el aro es un círculo. */
+  var EXT = null, INT = null, NP = 720, BULTO = { th: 138, b: 0 };
+  function bulto() { return 0; }
+  function ponPlataforma(pol) {
+    EXT = []; INT = [];
+    for (var k = 0; k < NP; k++) {
+      var a = k / NP * 2 * Math.PI, dx = Math.cos(a), dy = Math.sin(a), ds = [];
+      // dónde corta el rayo desde el centro a cada lado de la huella
+      for (var i = 0; i < pol.length; i++) {
+        var p = pol[i], q = pol[(i + 1) % pol.length], ex = q[0] - p[0], ey = q[1] - p[1];
+        var den = dx * ey - dy * ex; if (Math.abs(den) < 1e-12) continue;
+        var wx = p[0] - ANILLO.u, wy = p[1] - ANILLO.v, t = (wx * ey - wy * ex) / den, s = (wx * dy - wy * dx) / den;
+        if (t > 0 && s >= 0 && s < 1) ds.push(t);
+      }
+      ds.sort(function (x, y) { return x - y; });
+      var e = ANILLO.re, n = ANILLO.ri;
+      for (var j = 0; j + 1 < ds.length; j += 2) {   // tramos adentro de la huella que tocan la banda
+        var d0 = ds[j], d1 = ds[j + 1];
+        if (d0 <= ANILLO.re + 0.01 && d1 > e) e = d1;
+        if (d1 >= ANILLO.ri - 0.01 && d0 < n) n = d0;
+      }
+      EXT.push(e); INT.push(n);
+    }
+  }
+  function tabla(T, t) { var x = (((t % 360) + 360) % 360) / 360 * NP, i = Math.floor(x), f = x - i; return T[i % NP] * (1 - f) + T[(i + 1) % NP] * f; }
+  // un punto del aro: t en grados, r radio; los bordes (ri y re, o más allá) siguen a la plataforma
+  function aroPunto(t, r) {
+    var R = r, a = t * Math.PI / 180;
+    if (EXT) {
+      if (r >= ANILLO.re - 1e-6) R = Math.max(r, tabla(EXT, t) + (r - ANILLO.re));
+      else if (r <= ANILLO.ri + 1e-6) R = Math.min(r, tabla(INT, t) + (r - ANILLO.ri));
+    }
+    return [ANILLO.u + Math.cos(a) * R, ANILLO.v + Math.sin(a) * R];
+  }
   function aroPoli(r, n) { var p = []; for (var i = 0; i < n; i++) p.push(aroPunto(i / n * 360, r)); return p; }
-  // el radio «sin chipote» de un punto: se compara con ri / re como si el aro fuera un círculo
-  function radioAro(u, v) { var t = Math.atan2(v - ANILLO.v, u - ANILLO.u) * 180 / Math.PI; return Math.hypot(u - ANILLO.u, v - ANILLO.v) - bulto(t); }
+  // el radio de un punto, para compararlo con ri / re (el aro es un círculo)
+  function radioAro(u, v) { return Math.hypot(u - ANILLO.u, v - ANILLO.v); }
   var COLUMNAS = pares([532.1, 379.6, 539.9, 389.2, 541.9, 425.0, 469.6, 393.1, 476.3, 382.7, 485.9, 374.9, 497.4, 370.4, 509.7, 369.7,
     521.7, 372.9, 535.2, 435.4, 525.6, 443.2, 514.1, 447.7, 489.8, 445.2, 479.4, 438.5, 471.6, 428.9, 467.1, 417.4,
     536.8, 374.4, 545.9, 385.7, 548.3, 427.9, 463.2, 390.3, 471.1, 378.0, 482.4, 368.8, 495.9, 363.6, 510.5, 362.8,
     524.5, 366.5, 540.4, 440.1, 529.1, 449.3, 515.5, 454.5, 501.0, 455.3, 486.9, 451.6, 474.7, 443.7, 465.5, 432.4, 460.3, 418.9])
-    .map(function (c) { var t = Math.atan2(c[1] - ANILLO.v, c[0] - ANILLO.u) * 180 / Math.PI; return aroPunto(t, Math.hypot(c[0] - ANILLO.u, c[1] - ANILLO.v)); });   // siguen al chipote
+;
   // Espuela (satélite): sale de las vías al sur, sube junto a Calle Cedro, da la
   // vuelta y entra al predio por Heliotropo, donde termina.
   var ESPUELA = [[524, 126], [423, 127], [398, 127], [382, 129], [372, 134], [358, 142], [348, 151], [339, 162], [333, 173], [330.5, 184],
@@ -397,7 +454,7 @@
     function poli(pts, clase) { el('path', { class: clase, d: pts.map(function (r, i) { var a = aMini(r[0], r[1]); return (i ? 'L' : 'M') + a[0].toFixed(1) + ' ' + a[1].toFixed(1); }).join('') + 'Z' }, m); }
     el('circle', { class: 'ad-mini-orbita', cx: C, cy: C, r: R }, m);
     poli(rect(S.u0, S.v0, S.u1, S.v1), 'ad-mini-bloque');
-    poli(rect(PB.u0, PB.v0, PB.u1, PB.v1), 'ad-mini-predio');
+    poli(PRED, 'ad-mini-predio');
     NAVES.forEach(function (nv) { poli(rect(nv.L.u0, nv.L.v0, nv.L.u1, nv.L.v1), 'ad-mini-nave'); });
     // la huella de los módulos (una vez por columna)
     if (MOD) {
@@ -455,7 +512,7 @@
     return pon;
   }
 
-  window.AtlampaGeo = { D: D, PB: PB, GU: GU, GF: GF, S: S, HE: HE, CEN: CEN, NAVES: NAVES, PIEZAS: PIEZAS, ANILLO: ANILLO, CORTE: CORTE, COLUMNAS: COLUMNAS, BULTO: BULTO, bulto: bulto, aroPunto: aroPunto, aroPoli: aroPoli, radioAro: radioAro,
+  window.AtlampaGeo = { D: D, PB: PB, PRED: PRED, GUP: GUP, recortaConvexo: recortaConvexo, GU: GU, GF: GF, S: S, HE: HE, CEN: CEN, NAVES: NAVES, PIEZAS: PIEZAS, ANILLO: ANILLO, CORTE: CORTE, COLUMNAS: COLUMNAS, BULTO: BULTO, bulto: bulto, aroPunto: aroPunto, aroPoli: aroPoli, ponPlataforma: ponPlataforma, radioAro: radioAro,
     ESPUELA: ESPUELA, ESP_FIN: ESP_FIN, CULTURA: CULTURA, PLAZA_C: PLAZA_C, GIRO: GIRO, MOD: MOD, EST: EST, PAI: PAI, MEX: MEX, MEY: MEY, LUZ: LUZ,
     pares: pares, rect: rect, minimapa: minimapa, orilla: orilla, circulo: circulo, antihorario: antihorario, cortaU: cortaU, menosCirculo: menosCirculo,
     dentro: dentro, enEdificio: enEdificio, plantasDe: plantasDe, arbolesPai: arbolesPai, laguna: laguna, solEn: solEn, diaDelAno: diaDelAno, aleatorio: aleatorio };

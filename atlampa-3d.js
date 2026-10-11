@@ -33,21 +33,32 @@ const EXTRAS = await import('./atlampa-3d-ctx.js' + (VER ? '?' + VER : '')).then
 // va en todas las escenas, en lugar de los pabellones simples.
 const CULTURA_DET = await import('./atlampa-3d-cultura.js' + (VER ? '?' + VER : '')).then(m => m, e => { console.warn('Sin arte y cultura detallado:', e); return null; });
 const { PB, GU, GF, S, HE, CEN, PIEZAS, ANILLO, CORTE, COLUMNAS, ESPUELA, ESP_FIN, CULTURA, PLAZA_C, GIRO, MOD, EST, PAI, MEX, MEY } = G;
+// El mercado de Gabriel (Rhino, por herramientas/prepara-mercado.py): sólo en el apartado Comercio
+const MERC = window.ATLAMPA_MERCADO || null;
 const RAD = Math.PI / 180;
+// caja [u0, v0, u1, v1] menos otra caja: las (hasta 4) cajas que quedan
+function menosCaja(c, h) {
+  if (h[0] >= c[2] || h[2] <= c[0] || h[1] >= c[3] || h[3] <= c[1]) return [c];
+  const r = [], v0 = Math.max(c[1], h[1]), v1 = Math.min(c[3], h[3]);
+  if (h[1] > c[1]) r.push([c[0], c[1], c[2], h[1]]);
+  if (h[3] < c[3]) r.push([c[0], h[3], c[2], c[3]]);
+  if (h[0] > c[0]) r.push([c[0], v0, h[0], v1]);
+  if (h[2] < c[2]) r.push([h[2], v0, c[2], v1]);
+  return r.filter(q => q[2] - q[0] > 1e-3 && q[3] - q[1] > 1e-3);
+}
 
 /* ---------- Coordenadas ---------- */
 const W = (u, v, z) => [u - CEN[0], z, -(v - CEN[1])];
 
 /* ---------- Estilos ---------- */
-const PAPELES = ['suelo', 'calle', 'banqueta', 'predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'proyecto', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'arbusto', 'copa', 'est', 'rampa'];
+const PAPELES = ['suelo', 'calle', 'banqueta', 'predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'proyecto', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'arbusto', 'copa', 'est', 'rampa', 'vidrio'];
 const ESTILOS = {
   rayado: {
     // Croquis + rayado (lo que escogió Gabriel): los volúmenes sólo con sus
     // aristas a mano (un trazo delgado que se pasa de las esquinas), las caras
     // negras sin relleno; el piso con el rayado horizontal, tenue; el blanco,
     // bajado (blanco: lo que pesan las aristas).
-    // cielo: blanco apagado (ni puro ni brillante), detrás del piso negro
-    fondo: '#000000', cielo: '#c4c4bf', perspectiva: true, blanco: 0.72,
+    fondo: '#000000', perspectiva: true, blanco: 0.72,
     papel: {
       suelo: { tono: 0.13, paso: 2.6, arista: 0.2 }, calle: { tono: 0.06, paso: 3.4, arista: 0.25 }, banqueta: { tono: 0.18, paso: 2.2, arista: 0.4 },
       predio: { tono: 0.18, paso: 2.4, arista: 0.7 }, plaza: { tono: 0.25, paso: 2, arista: 0.5 }, verde: { tono: 0.16, paso: 2.6, arista: 0 },
@@ -55,41 +66,120 @@ const ESTILOS = {
       nave: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 }, industria: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 },
       cultura: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 }, aro: { modo: 2, tono: 0, gris: 0.025, arista: 0.95 },
       modulo: { modo: 2, tono: 0, gris: 0.02, arista: 0.8 }, modcom: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 }, arbusto: { tono: 0.5, paso: 2.2, grueso: 0.35, arista: 0 },
-      copa: { tono: 0.5, paso: 2.4, grueso: 0.35, arista: 0 }, est: { tono: 0.1, paso: 6, arista: 0.4 }, rampa: { tono: 0.3, paso: 2.2, arista: 0 }, proyecto: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 }
+      copa: { tono: 0.5, paso: 2.4, grueso: 0.35, arista: 0 }, est: { tono: 0.1, paso: 6, arista: 0.4 }, rampa: { tono: 0.3, paso: 2.2, arista: 0 }, proyecto: { modo: 2, tono: 0, gris: 0.02, arista: 0.9 },
+      vidrio: { modo: 3, gris: 0.07, arista: 0.55 }
     },
-    lineas: { pasto: 0.36, flor: 0.85, junco: 0.34, tronco: 0.45, sendero: 0.3, rayo: 0.14, columna: 0.4, est: 0.3, rampa: 0.75, sol: 0.45 }
+    lineas: { pasto: 0.36, flor: 0.85, junco: 0.34, tronco: 0.45, sendero: 0.3, rayo: 0.14, columna: 0.4, est: 0.3, rampa: 0.75, sol: 0.45, vidrio: 0.5 }
   },
   plano: {
-    fondo: '#000000', cielo: '#c4c4bf', perspectiva: false,
+    fondo: '#000000', perspectiva: false,
     // modo 1: relleno gris con luz
     papel: {
       suelo: { gris: 0.045, arista: 0.15 }, calle: { gris: 0.02, arista: 0.2 }, banqueta: { gris: 0.075, arista: 0.32 }, predio: { gris: 0.065, arista: 0.75 },
       plaza: { gris: 0.1, arista: 0.4 }, verde: { gris: 0.07, arista: 0 }, tezontle: { gris: 0.1, arista: 0 }, agua: { gris: 0.04, arista: 0.5 },
       filtro: { gris: 0.09, arista: 0.35 }, nave: { gris: 0.17, arista: 0.95 }, industria: { modo: 2, tono: 0.7, paso: 2.4, gris: 0.04, arista: 0.85 }, cultura: { gris: 0.18, arista: 0.95 },
       aro: { gris: 0.24, arista: 1 }, modulo: { gris: 0.55, arista: 0.6 }, modcom: { gris: 0.17, arista: 0.95 }, arbusto: { gris: 0.12, arista: 0 }, copa: { gris: 0.1, arista: 0 },
-      est: { gris: 0.05, arista: 0.4 }, rampa: { gris: 0.12, arista: 0 }, proyecto: { gris: 0.17, arista: 1 }
+      est: { gris: 0.05, arista: 0.4 }, rampa: { gris: 0.12, arista: 0 }, proyecto: { gris: 0.17, arista: 1 }, vidrio: { modo: 3, gris: 0.09, arista: 0.6 }
     },
-    lineas: { pasto: 0.32, flor: 0.85, junco: 0.3, tronco: 0.4, sendero: 0.3, rayo: 0.15, columna: 0.4, est: 0.3, rampa: 0.75, sol: 0.45 }
+    lineas: { pasto: 0.32, flor: 0.85, junco: 0.3, tronco: 0.4, sendero: 0.3, rayo: 0.15, columna: 0.4, est: 0.3, rampa: 0.75, sol: 0.45, vidrio: 0.5 }
   }
 };
 // colores del programa (lámina de usos), para el modo Color
 // (en tonos claros: sobre el fondo negro tienen que leerse)
-const PROGRAMA = { vivienda: '#ff5cb0', comercio: '#8a98ff', industria: '#d2d4d8', publico: '#ff6f63', cultura: '#c9a6ff', verde: '#a8e063', agua: '#8fd0ff', tez: '#ff9a6b', est: '#d2d4d8' };
+const PROGRAMA = { vivienda: '#ff5cb0', comercio: '#8a98ff', industria: '#d2d4d8', publico: '#ff6f63', cultura: '#c9a6ff', verde: '#a8e063', agua: '#8fd0ff', tez: '#ff9a6b', est: '#d2d4d8', aro: '#f2c14e' };
 // qué programa / espacio es cada papel
-const PROG_DE = { nave: 'comercio', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', modcom: 'comercio', aro: 'publico', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est', rampa: 'est' };
+const PROG_DE = { nave: 'comercio', vidrio: 'comercio', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', modcom: 'comercio', aro: 'aro', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est', rampa: 'est' };
 // Público / privado (un solo botón, dos colores): privado, los volúmenes de
 // vivienda y la industria; lo demás del proyecto, público (también los módulos
 // que se abren al aro, que son comercio). Lo que no es del proyecto (calles,
 // contexto, estacionamiento) no se colorea.
 const ESPACIO_DE = { modulo: 'privado', industria: 'privado' };
 const ESPACIO_COLOR = { publico: '#35d0c4', privado: '#ff7a3d' };
-const DEL_PROYECTO = ['predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'banqueta', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'arbusto', 'copa', 'proyecto'];
+const DEL_PROYECTO = ['predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'banqueta', 'nave', 'vidrio', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'arbusto', 'copa', 'proyecto'];
 const espacioDe = papel => DEL_PROYECTO.indexOf(papel) >= 0 ? (ESPACIO_DE[papel] || 'publico') : null;
 // qué papeles resalta cada opción de Resaltar (y las líneas de plantas van con el paisaje)
-const RESALTA_PAPELES = { modulos: ['modulo'], comercio: ['nave', 'modcom'], cultura: ['cultura', 'plaza'], industria: ['industria'], aro: ['aro'],
+const RESALTA_PAPELES = { modulos: ['modulo'], comercio: ['nave', 'modcom', 'vidrio'], cultura: ['cultura', 'plaza'], industria: ['industria'], aro: ['aro'],
   paisajismo: ['verde', 'tezontle', 'agua', 'filtro', 'arbusto', 'copa'], estacionamiento: ['est', 'rampa'] };
 const LINEAS_PAISAJE = ['pasto', 'flor', 'junco', 'tronco', 'sendero', 'rayo'];
+// los árboles que se plantan con el proyecto son jóvenes (Gabriel: «no tienen tanto tiempo ahí»): 60 % del porte
+// de antes; los de banqueta (existentes) no cambian
+const ARBOL_JOVEN = 0.6;
 
+/* Corte en planta: un plano horizontal a CORTE_ALTO m (la planta baja, a la
+   altura de la vista). Lo de arriba se descarta; donde el corte abre un sólido
+   se ve su interior (las caras de atrás) en un gris liso, y el contorno del
+   corte (donde el plano cruza cada cara) en blanco, como una sección; las
+   columnas que lo cruzan, un cuadrito. Las líneas se recortan con el plano
+   de la cámara (clippingPlanes). */
+const CORTE_ALTO = 1.75;
+const CORTE_Y = { value: 1e5 };   // altura del corte (m, y del mundo; enorme = sin corte)
+
+/* Dibujar como a mano (las transiciones): cada arista se traza desde una de
+   sus puntas, en un orden que mezcla un barrido (desde un punto, radial, o en
+   una dirección), el largo (primero los trazos largos, como al encajar un
+   croquis) y un poco de azar; después las caras se rellenan con el mismo
+   barrido: al frente del relleno va una banda de rayado, como si se sombreara.
+   Mientras las caras no se rellenan, se ve a través: primero el croquis en
+   alambre, luego tapa lo de atrás. Todo en la tarjeta de video (uniforms):
+     uDib  x: avance de las líneas (0…1) · y: del relleno · z: 0 dirección, 1 radial
+     uDibO origen del barrido (mundo) · uDibV dirección / largo (o r0, r1 si es radial)
+   Hay un canal para el sitio ('base') y otro para el contexto urbano ('ctx'). */
+const DIB_GLSL = /* glsl */`
+  uniform vec4 uDib; uniform vec3 uDibO; uniform vec3 uDibV;
+  float dibBarrido(vec3 p) {
+    if (uDib.z > 0.5) return clamp((length(p.xz - uDibO.xz) - uDibV.x) / max(1.0, uDibV.y - uDibV.x), 0.0, 1.0);
+    return clamp(dot(p - uDibO, uDibV), 0.0, 1.0);
+  }
+  float dibAzar(vec3 p) { return fract(sin(dot(p.xz + p.y * 0.37, vec2(12.9898, 78.233))) * 43758.5453); }
+  // cuándo empieza (0…0.9) y cuánto dura el trazo de largo L con centro en m
+  float dibInicio(vec3 m, float L) { return (0.62 * dibBarrido(m) + 0.24 * (1.0 - smoothstep(0.5, 14.0, L)) + 0.14 * dibAzar(m)) * 0.9; }
+  float dibDura(float L) { return 0.1 * clamp(L / 18.0, 0.2, 1.0); }`;
+// las líneas: el extremo que no es el de inicio corre hacia su lugar (aOtro: la
+// otra punta del segmento; aLado: 1 inicio, 2 final; sin ellos, la línea va entera)
+const DIB_LINEA = /* glsl */`
+  vec3 transformed = vec3(position);
+  if (uDib.x < 0.999 && aLado > 0.5) {
+    vec3 dS = aLado < 1.5 ? position : aOtro, dE = aLado < 1.5 ? aOtro : position;
+    vec3 dM = (modelMatrix * vec4((dS + dE) * 0.5, 1.0)).xyz;
+    float dL = length((modelMatrix * vec4(dE - dS, 0.0)).xyz);
+    float dk = clamp((uDib.x - dibInicio(dM, dL)) / dibDura(dL), 0.0, 1.0);
+    transformed = aLado < 1.5 ? dS : mix(dS, dE, dk);
+  }`;
+function dibujable(mat, U) {   // un LineBasicMaterial que se dibuja con el canal U
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aOtro; attribute float aLado;' + DIB_GLSL)
+      .replace('#include <begin_vertex>', DIB_LINEA);
+  };
+  mat.customProgramCacheKey = () => 'dib';
+  return mat;
+}
+function canalDib() { return { uDib: { value: new THREE.Vector4(1, 1, 1, 0) }, uDibO: { value: new THREE.Vector3() }, uDibV: { value: new THREE.Vector3(0, 300, 0) } }; }
+// a cada segmento, su pareja: la otra punta y cuál es (para dibujarlo)
+function pareja(g) {
+  if (g.attributes.aOtro) return g;
+  const p = g.attributes.position.array, n = p.length / 3, o = new Float32Array(p.length), l = new Float32Array(n);
+  for (let i = 0; i + 1 < n; i += 2) {
+    o[i * 3] = p[i * 3 + 3]; o[i * 3 + 1] = p[i * 3 + 4]; o[i * 3 + 2] = p[i * 3 + 5];
+    o[i * 3 + 3] = p[i * 3]; o[i * 3 + 4] = p[i * 3 + 1]; o[i * 3 + 5] = p[i * 3 + 2];
+    l[i] = 1; l[i + 1] = 2;
+  }
+  g.setAttribute('aOtro', new THREE.BufferAttribute(o, 3)); g.setAttribute('aLado', new THREE.BufferAttribute(l, 1));
+  return g;
+}
+
+/* Un solo lienzo y un solo renderer para todas las escenas: cambiar de
+   apartado no crea otro contexto WebGL ni recompila los shaders. Y lo que no
+   depende de la escena (el aro, arte y cultura, los módulos, el mercado) se
+   arma una vez por sesión: CACHE (clave → geometrías; no se liberan al destruir). */
+let RENDERER = null, LIENZO = null;
+const CACHE = new Map();
+function fijas(c) {   // marca (en todo lo que contenga) las geometrías de la CACHE
+  if (!c || typeof c !== 'object' || ArrayBuffer.isView(c)) return c;
+  if (c.isBufferGeometry) c.userData.fija = true;
+  else if (!c.isObject3D) Object.values(c).forEach(fijas);
+  return c;
+}
 const VERT = /* glsl */`
   varying vec3 vN; varying vec3 vW;
   void main() {
@@ -103,8 +193,8 @@ const VERT = /* glsl */`
   }`;
 const FRAG = /* glsl */`
   uniform vec3 uFondo; uniform vec3 uTinta; uniform float uModo; uniform float uTono; uniform float uPaso; uniform float uMundo;
-  uniform float uGris; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso;
-  varying vec3 vN; varying vec3 vW;
+  uniform float uGris; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform float uCorte;
+  varying vec3 vN; varying vec3 vW;` + DIB_GLSL + `
   // una raya cada periodo de c (antialias con fwidth; si es muy denso, el promedio)
   float raya(float c, float grueso) {
     float w = fwidth(c);
@@ -113,11 +203,29 @@ const FRAG = /* glsl */`
     return mix(r, grueso * 1.4, smoothstep(0.25, 0.6, w));
   }
   void main() {
+    if (vW.y > uCorte) discard;
+    // dibujándose: lo que no se ha rellenado no tapa; al frente del relleno, una banda de rayado
+    if (uDib.y < 0.999) {
+      float s = dibBarrido(vW) * 0.82 + 0.18 * dibAzar(floor(vW * 0.6));
+      if (s > uDib.y) discard;
+      if (s > uDib.y - 0.12) {
+        if (raya((gl_FragCoord.x - gl_FragCoord.y) / (4.5 * uPx), 0.3) < 0.4) discard;
+        gl_FragColor = vec4(mix(uFondo, uTinta, 0.42 * uBrillo), uOpacidad); return;
+      }
+    }
+    // lo cortado: el interior del sólido, liso (poché)
+    if (uCorte < 1e4 && !gl_FrontFacing) { gl_FragColor = vec4(uTinta * 0.2 * uBrillo, uOpacidad); return; }
     // normal plana de la cara (de las derivadas): el rayado no hace anillos en las esferas
     vec3 n = normalize(cross(dFdx(vW), dFdy(vW)));
     if (dot(n, vN) < 0.0) n = -n;
     float lam = clamp(dot(n, normalize(uLuz)) * 0.5 + 0.5, 0.0, 1.0);
     vec3 col;
+    // vidrio: se ve a través (lo único transparente); más reflejo de canto
+    if (uModo > 2.5) {
+      vec3 ver = normalize(cameraPosition - vW);
+      float f = pow(1.0 - abs(dot(n, ver)), 2.0);
+      gl_FragColor = vec4(uTinta * (0.55 + 0.45 * f) * uBrillo, (uGris + 0.22 * f) * uOpacidad); return;
+    }
     if (uModo < 0.5) {
       // más luz, más rayas: el periodo se cierra en las caras iluminadas
       float k = mix(1.7, 0.75, lam);
@@ -165,6 +273,13 @@ function tapa(m, pol, z, zf, abajo) {
   const P = q => W(q[0], q[1], zf ? zf(q[0], q[1]) : z);
   tris.forEach(t => { const a = P(pol[t[0]]), b = P(pol[t[1]]), c = P(pol[t[2]]); if (abajo) m.tri(a, c, b); else m.tri(a, b, c); });
 }
+// tapa con un hueco (el hueco, todo adentro del polígono)
+function tapaHueco(m, pol, hueco, z) {
+  pol = ccw(pol); hueco = ccw(hueco).reverse();
+  const todos = pol.concat(hueco);
+  THREE.ShapeUtils.triangulateShape(pol.map(q => new THREE.Vector2(q[0], q[1])), [hueco.map(q => new THREE.Vector2(q[0], q[1]))])
+    .forEach(t => m.tri(...t.map(k => W(todos[k][0], todos[k][1], z))));
+}
 // muros de un polígono de z0 a z1 (o hasta zf(u, v)); filtro(a, b): qué lados
 function muros(m, pol, z0, z1, zf, filtro) {
   pol = ccw(pol);
@@ -186,22 +301,27 @@ const R_SOL = 150, CICLO_SOL = 24000;
    Un atlas de cols × filas cuadros; cada instancia: su base (aPos), tamaño en
    m (aEsc), columna (aTile), fila (aPose) y si se voltea (aVolt). Quedan
    derechas en pantalla y se tapan con lo que tengan delante (depth). */
-function matAtlas(tex, cols, filas) {
+// (U: canal de dibujo; dibujándose, cada figura aparece de abajo hacia arriba)
+function matAtlas(tex, cols, filas, U) {
   return new THREE.ShaderMaterial({
-    uniforms: { uMapa: { value: tex }, uN: { value: cols }, uP: { value: filas }, uTinta: { value: new THREE.Color(1, 1, 1) }, uOpacidad: { value: 1 } },
+    uniforms: Object.assign({ uMapa: { value: tex }, uN: { value: cols }, uP: { value: filas }, uTinta: { value: new THREE.Color(1, 1, 1) }, uOpacidad: { value: 1 }, uCorte: CORTE_Y }, U || canalDib()),
     vertexShader: /* glsl */`
       attribute vec3 aPos; attribute vec2 aEsc; attribute float aTile; attribute float aVolt; attribute float aPose;
-      uniform float uN; uniform float uP; varying vec2 vUv;
+      uniform float uN; uniform float uP; varying vec2 vUv; varying float vY; varying float vK; varying float vAlto;` + DIB_GLSL + `
       void main() {
+        vY = aPos.y + position.y * aEsc.y;
         vec4 c = viewMatrix * vec4(aPos, 1.0);
         c.xy += position.xy * aEsc;
         gl_Position = projectionMatrix * c;
         float u = aVolt < 0.0 ? 1.0 - uv.x : uv.x;
         vUv = vec2((aTile + u) / uN, (uP - 1.0 - aPose + uv.y) / uP);
+        vAlto = uv.y;
+        vK = uDib.x < 0.999 ? clamp((uDib.x - dibInicio(aPos, 6.0)) / 0.09, 0.0, 1.0) : 1.0;
       }`,
     fragmentShader: /* glsl */`
-      uniform sampler2D uMapa; uniform vec3 uTinta; uniform float uOpacidad; varying vec2 vUv;
+      uniform sampler2D uMapa; uniform vec3 uTinta; uniform float uOpacidad; uniform float uCorte; varying vec2 vUv; varying float vY; varying float vK; varying float vAlto;
       void main() {
+        if (vY > uCorte || vAlto > vK) discard;
         vec4 t = texture2D(uMapa, vUv);
         if (t.a < 0.5) discard;
         gl_FragColor = vec4(t.rgb * uTinta, uOpacidad);
@@ -304,11 +424,23 @@ const ARBOLES_TEX = (() => {
 function crea(svg, op) {
   op = op || {};
   const ESC = op.escena || 'general', GENERAL = ESC === 'general';
+  const MERCADO = ESC === 'comercio' ? MERC : null;   // el mercado de Rhino, sólo inspeccionando Comercio
   const trabajo = svg.parentNode;
   svg.style.display = 'none';
-  const lienzo = document.createElement('canvas');
-  lienzo.className = 'ad-3d';
-  trabajo.insertBefore(lienzo, svg);
+  // el lienzo y el renderer son de la sesión (ver RENDERER): la escena vieja se
+  // queda pintada hasta que la nueva pinta su primer cuadro
+  if (!RENDERER) {
+    LIENZO = document.createElement('canvas');
+    LIENZO.className = 'ad-3d';
+    RENDERER = new THREE.WebGLRenderer({ canvas: LIENZO, antialias: true, alpha: false, powerPreference: 'high-performance' });
+    RENDERER.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  }
+  const lienzo = LIENZO, renderer = RENDERER;
+  if (lienzo.parentNode !== trabajo) trabajo.insertBefore(lienzo, svg);
+  renderer.clippingPlanes = [];
+  // los canales del dibujo a mano (ver DIB_GLSL): el sitio y el contexto urbano
+  const DIB = { base: canalDib(), ctx: canalDib() };
+  const canalDe = n => /^(ctx|contexto|carro|flecha-ctx)/.test(n) ? DIB.ctx : DIB.base;
   const capaRot = document.createElement('div');
   capaRot.className = 'ad-3d-rotulos';
   trabajo.insertBefore(capaRot, svg);
@@ -316,8 +448,6 @@ function crea(svg, op) {
   lienzoEsq.className = 'ad-3d-esquema';
   trabajo.insertBefore(lienzoEsq, svg);
 
-  const renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true, alpha: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   const escena = new THREE.Scene();
   let estilo = ESTILOS.rayado;
   escena.background = new THREE.Color(estilo.cielo || estilo.fondo);
@@ -333,32 +463,42 @@ function crea(svg, op) {
   let conColor = false, resalta = null, espacioAct = null, conEsquema = false, matPersEsq = null;
   // con el esquema compositivo, el modelo entero queda muy tenue (pero se lee: no se va a negro)
   const TENUE_ESQ = 0.32;
+  // Inspeccionando la estructura (no sólo mostrándola): de lo demás sólo
+  // quedan los contornos (las aristas; las caras no se dibujan, no tapan), y
+  // la estructura se ve entera por dentro de los volúmenes. El aro, con su
+  // color, se queda siempre que se inspecciona algo: todo se conecta con él.
+  let enEstr = false;
+  let aisl = null;   // lo aislado (ver aisla): { ap, grupos, partes, caja }
+  const conAro = () => enEstr || !!resalta || !GENERAL;
   const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   function material(papel) {
     if (MATS[papel]) return MATS[papel];
     const m = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide,
       polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
-      uniforms: { uFondo: { value: new THREE.Color(0, 0, 0) }, uTinta: { value: new THREE.Color(1, 1, 1) }, uModo: { value: 0 }, uTono: { value: 0.5 },
+      uniforms: Object.assign({ uFondo: { value: new THREE.Color(0, 0, 0) }, uTinta: { value: new THREE.Color(1, 1, 1) }, uModo: { value: 0 }, uTono: { value: 0.5 },
         uPaso: { value: 3 }, uMundo: { value: 0 }, uGris: { value: 0.1 }, uOpacidad: { value: 1 }, uLuz: { value: luz }, uPx: { value: renderer.getPixelRatio() },
-        uBrillo: { value: 1 }, uGrueso: { value: 0.22 } }
+        uBrillo: { value: 1 }, uGrueso: { value: 0.22 }, uCorte: CORTE_Y }, canalDe(papel))
     });
     m.userData.papel = papel;
     return (MATS[papel] = m);
   }
   function arista(papel) {
     if (ARISTAS[papel]) return ARISTAS[papel];
-    return (ARISTAS[papel] = Object.assign(new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true }), { userData: { papel } }));
+    return (ARISTAS[papel] = Object.assign(dibujable(new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true }), canalDe(papel)), { userData: { papel } }));
   }
   function linea(nombre, color) {
     if (LINEAS[nombre]) return LINEAS[nombre];
-    const m = new THREE.LineBasicMaterial({ color: color || 0xffffff, transparent: true });
+    const m = dibujable(new THREE.LineBasicMaterial({ color: color || 0xffffff, transparent: true }), canalDe(nombre));
     m.userData = { nombre, color: color || 0xffffff };
     return (LINEAS[nombre] = m);
   }
   const blanco = new THREE.Color(1, 1, 1);
   function tinta(papel) {
+    // el vidrio, siempre un poco azul (con Color, más)
+    if (papel === 'vidrio' && !espacioAct) return new THREE.Color(conColor ? PROGRAMA.agua : '#cfeaff');
     if (espacioAct) { const e = espacioDe(papel); return e ? new THREE.Color(ESPACIO_COLOR[e]) : blanco; }
+    if (papel === 'aro' && conAro()) return new THREE.Color(PROGRAMA.aro);
     const pr = PROG_DE[papel];
     if (!conColor || !pr) return blanco;
     return new THREE.Color(PROGRAMA[pr]).lerp(blanco, 0.15);
@@ -366,7 +506,7 @@ function crea(svg, op) {
   // ¿queda opaco con lo que está resaltado? (programa o espacio)
   // con algo resaltado (un programa, lo público o lo privado), todo lo demás baja al 15 %
   function apagado(papel) {
-    if (!resalta || espacioAct) return false;
+    if (!resalta || espacioAct || papel === 'aro') return false;
     return (RESALTA_PAPELES[resalta] || []).indexOf(papel) < 0;
   }
   function apagadaLinea(base) {
@@ -382,6 +522,7 @@ function crea(svg, op) {
   // Inspeccionando un apartado, lo demás casi desaparece (REF)
   const REF = 0.1;
   function enfasis(papel, ref) {
+    if (aisl) return 1;   // aislado: lo que queda se ve entero
     if (ref) return REF;
     if (apagado(papel)) return 1;
     if (!resalta && !espacioAct) {
@@ -405,19 +546,26 @@ function crea(svg, op) {
         else u.uTono.value = Math.min(1, u.uTono.value * 2.2);
       }
       u.uBrillo.value = enfasis(m.userData.papel, m.userData.ref) * (conEsquema ? TENUE_ESQ : 1);
-      const ap = apagado(m.userData.papel);
-      u.uOpacidad.value = ap ? TENUE : 1; m.transparent = ap; m.depthWrite = !ap; m.needsUpdate = true;
+      const ap = apagado(m.userData.papel), vid = m.userData.papel === 'vidrio';
+      u.uOpacidad.value = ap ? TENUE : 1; m.transparent = ap || vid; m.depthWrite = !ap && !vid;
+      // inspeccionando la estructura: de lo demás, sólo el contorno (menos el aro)
+      m.visible = !(enEstr && !m.userData.estr && m.userData.papel !== 'aro');
+      if (enEstr && m.userData.estr) { u.uBrillo.value = 1; u.uModo.value = 0; u.uGris.value = 0.5; }
+      m.needsUpdate = true;
     });
     Object.keys(ARISTAS).forEach(k => {
       const m = ARISTAS[k], e = estilo.papel[m.userData.papel] || estilo.papel.proyecto;
       m.color.copy(tinta(m.userData.papel));
       m.opacity = Math.min(1, (e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1);
+      if (enEstr && m.userData.papel !== 'aro' && m.opacity > 0.001) m.opacity = 0.42;
       m.visible = m.opacity > 0.001;
     });
     Object.keys(LINEAS).forEach(k => {
       const m = LINEAS[k], base = m.userData.nombre.split('-')[0];
       const pb = nada && ['pasto', 'flor', 'junco', 'tronco', 'sendero', 'rayo'].indexOf(base) >= 0 ? 1.3 : 1;
       m.opacity = Math.min(1, (estilo.lineas[base] !== undefined ? estilo.lineas[base] : 0.4) * (m.userData.ref ? REF : pb)) * (apagadaLinea(base) ? TENUE : 1) * (conEsquema ? TENUE_ESQ : 1);
+      if (enEstr) { const est = m.userData.nombre === 'columna'; m.opacity = est ? 1 : m.opacity * 0.6; m.depthTest = !est; m.renderOrder = est ? 5 : 0; }
+      else { m.depthTest = true; m.renderOrder = 0; }
       if (espacioAct && LINEAS_PAISAJE.indexOf(base) >= 0) m.color.set(ESPACIO_COLOR.publico);
       else if (conColor && m.userData.colorColor) m.color.set(m.userData.colorColor); else m.color.set(m.userData.color);
     });
@@ -426,6 +574,7 @@ function crea(svg, op) {
     matArbol.uniforms.uTinta.value.set(espacioAct ? ESPACIO_COLOR.publico : conColor ? '#c6ec8f' : '#ffffff').multiplyScalar((refArb ? REF : 1) * (conEsquema ? TENUE_ESQ : 1));
     if (matPersEsq) matPersEsq.uniforms.uTinta.value.setScalar(conEsquema ? TENUE_ESQ : 1);
     matArbol.uniforms.uOpacidad.value = apArb ? TENUE : 1; matArbol.transparent = apArb; matArbol.depthWrite = !apArb;
+    if (enEstr) { matArbol.uniforms.uOpacidad.value = 0.35; matArbol.transparent = true; matArbol.depthWrite = false; }
     pide();
   }
 
@@ -440,9 +589,16 @@ function crea(svg, op) {
     piezas.push({ g, z: orden || 0, ap });
     return g;
   }
+  /* Partes de cada uso, para aislarlo (ver aisla): cada una se oculta sola y,
+     si tiene hacia dónde, se desplaza (despiece). objs: los grupos que mueve;
+     dir: [x, y, z] en m (mundo) o, por grupo, en su userData.dir. */
+  const PARTES = {};
+  function parte(ap, id, nombre, objs, dir, oculta) {
+    (PARTES[ap] = PARTES[ap] || []).push({ id, nombre, objs, dir: dir || null, oculta: !!oculta, oculto: !!oculta, desplazado: false, k: 0 });
+  }
   // Aristas de croquis: cada arista en dos trazos a mano (un poco chuecos, con
   // un quiebre a la mitad) que se pasan de las esquinas, como en un dibujo.
-  const CROQUIS = ['nave', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'proyecto'];
+  const CROQUIS = ['nave', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'proyecto', 'vidrio'];
   function aristasCroquis(eg) {
     const p = eg.attributes.position.array, l = new Lineas(), azar = G.aleatorio(31);
     const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
@@ -460,75 +616,130 @@ function crea(svg, op) {
     }
     return l.geo();
   }
-  // malla + sus aristas (las que doblan más de umbral grados)
-  function pon(grupo, malla, papel, ap, umbral, extraAristas) {
-    const ref = !GENERAL && ap !== ESC;   // inspeccionando: todo lo ajeno, hasta el piso
-    const clave = papel + (ref ? '-ref' : '');
-    const mat = material(clave); mat.userData.papel = papel; mat.userData.ref = ref;
-    const g = malla.geo ? malla.geo() : malla;
-    const me = new THREE.Mesh(g, mat);
-    me.userData.ap = ap;
-    grupo.add(me);
-    if (ap) picables.push(me);
+  /* malla + sus aristas (las que doblan más de umbral grados). geos(): las
+     geometrías (la malla, sus aristas y las extra), que no dependen de la
+     escena; ponGeos(): las pone con los materiales de esta escena. pon() hace
+     las dos; con fija(clave, …) las geometrías se arman una vez por sesión. */
+  function geos(malla, papel, umbral, extraAristas) {
+    const g = malla.geo ? malla.geo() : malla, c = { g };
     if (umbral !== false) {
       let eg = new THREE.EdgesGeometry(g, umbral || 25);
       if (CROQUIS.indexOf(papel) >= 0) eg = aristasCroquis(eg);
-      const am = arista(clave); am.userData.papel = papel; am.userData.ref = ref;
-      grupo.add(new THREE.LineSegments(eg, am));
+      c.eg = pareja(eg);
     }
     if (extraAristas) {
-      const am = arista(clave); am.userData.papel = papel; am.userData.ref = ref;
-      const eg = extraAristas.geo();
-      grupo.add(new THREE.LineSegments(CROQUIS.indexOf(papel) >= 0 ? aristasCroquis(eg) : eg, am));
+      const eg = extraAristas.isBufferGeometry ? extraAristas : extraAristas.geo();
+      c.ex = pareja(CROQUIS.indexOf(papel) >= 0 ? aristasCroquis(eg) : eg);
     }
+    return c;
+  }
+  // arma(): las geometrías (geos o {g, eg, ex}); sólo corre si no están en la CACHE
+  function fija(clave, arma) {
+    if (!CACHE.has(clave)) CACHE.set(clave, fijas(arma()));
+    return CACHE.get(clave);
+  }
+  function ponGeos(grupo, c, papel, ap, estr) {
+    const ref = !GENERAL && ap !== ESC && ap !== 'aro';   // inspeccionando: todo lo ajeno, hasta el piso (el aro no: siempre se ve)
+    const clave = papel + (ref ? '-ref' : '') + (estr ? '-estr' : '');
+    const mat = material(clave); mat.userData.papel = papel; mat.userData.ref = ref; mat.userData.estr = !!estr;
+    const me = new THREE.Mesh(c.g, mat);
+    me.userData.ap = ap; me.userData.estr = !!estr;
+    grupo.add(me);
+    if (ap) picables.push(me);
+    [c.eg, c.ex].forEach(eg => {
+      if (!eg) return;
+      const am = arista(clave); am.userData.papel = papel; am.userData.ref = ref;
+      grupo.add(new THREE.LineSegments(eg, am));
+    });
     return me;
   }
+  function pon(grupo, malla, papel, ap, umbral, extraAristas, estr) { return ponGeos(grupo, geos(malla, papel, umbral, extraAristas), papel, ap, estr); }
+  // lin: Lineas o una BufferGeometry de segmentos
   function ponLineas(grupo, lin, nombre, color, colorColor, ap, extra) {
-    if (!lin.p.length) return null;
-    const ref = !GENERAL && ap !== ESC && nombre.indexOf('sol') !== 0;   // (el sol no se apaga)
+    if (lin.isBufferGeometry ? !lin.attributes.position.count : !lin.p.length) return null;
+    const ref = !GENERAL && ap !== ESC && ap !== 'aro' && nombre.indexOf('sol') !== 0;   // (el sol no se apaga)
     const m = linea(nombre + (ref ? '-ref' : ''), color);
     m.userData.ref = ref; if (colorColor) m.userData.colorColor = colorColor;
     Object.assign(m, extra || {});
-    const l = new THREE.LineSegments(lin.geo(), m);
+    const l = new THREE.LineSegments(pareja(lin.isBufferGeometry ? lin : lin.geo()), m);
     grupo.add(l);
     return l;
   }
 
-  const matArbol = matAtlas(ARBOLES_TEX.tex, ARBOLES_TEX.N, 1);
+  const matArbol = matAtlas(ARBOLES_TEX.tex, ARBOLES_TEX.N, 1, DIB.base);
   // Arte y cultura detallado: el paisaje sólo se quita donde estorba de verdad
   // (el foso del auditorio, los módulos de planta baja); los árboles, además,
   // bajo la losa del nivel 1. Lo demás del suelo sigue debajo del edificio.
-  const CD = CULTURA_DET ? CULTURA_DET.construye() : null;
+  // (se arma una vez: ya trasladado al diagrama y con sus aristas)
+  const CD = CULTURA_DET ? fija('cultura', () => {
+    const cd = CULTURA_DET.construye(), d = [CULTURA_DET.DX - CEN[0], CULTURA_DET.DZ, -(CULTURA_DET.DY - CEN[1])], r = { cd };
+    Object.keys(cd.mallas).forEach(k => { const g = cd.mallas[k]; g.translate(d[0], d[1], d[2]); g.computeVertexNormals(); r['m-' + k] = geos(g, 'cultura', k === 'acero' ? false : 20); });
+    Object.keys(cd.lineas).forEach(k => { r['l-' + k] = pareja(cd.lineas[k].translate(d[0], d[1], d[2])); });
+    Object.values(r).forEach(x => { if (x.g) fijas(x); });
+    return r;
+  }).cd : null;
+  const CDG = CD ? CACHE.get('cultura') : null;
+  // el aro se ensancha sobre la azotea de arte y cultura (son uno)
+  if (CD) G.ponPlataforma(CD.azotea);
   const pisado = (u, v) => !!CD && CD.pisa.some(q => G.dentro(u, v, q));
   const bajoLosa = (u, v) => !!CD && G.dentro(u, v, CD.losa1);
+  // Comercio: la huella de la nave norte trae su propio piso (con la zanja y el
+  // jardín hundidos), así que el suelo y el predio se recortan ahí
+  const CAJA_N = MERCADO && MERCADO.paso3 ? MERCADO.cajaN : null;
+  function conHuecoN(c, z, m, recorte) {
+    menosCaja(c, CAJA_N).forEach(q => {
+      const r = recorte ? G.recortaConvexo(q, recorte) : rect(q[0], q[1], q[2], q[3]), F = CD && CD.pisa[0];
+      if (!r) return;
+      if (F && F.every(p => p[0] > q[0] && p[0] < q[2] && p[1] > q[1] && p[1] < q[3])) tapaHueco(m, r, F, z);
+      else tapa(m, r, z);
+    });
+  }
 
-  /* ===== 1. Sitio ===== */
+  /* ===== 1. Sitio =====
+     El predio y su banqueta son los de Gabriel en Rhino (atlampa-geo.js: PRED,
+     GUP): la banqueta es un anillo de 1.80 m a ras del predio (+0.20), con la
+     guarnición inclinada al sur; las calles van de ahí a las guarniciones de
+     enfrente (GF), y las banquetas de enfrente como antes. */
   const gSitio = pieza('sitio', null, 0);
+  const PRED = G.PRED, GUP = G.GUP;
+  // un lado de la guarnición del predio, prolongado (eje 1: u en función de v; eje 0: v en función de u)
+  const enLinea = (a, b, t, eje) => a[1 - eje] + (b[1 - eje] - a[1 - eje]) * (t - a[eje]) / (b[eje] - a[eje]);
   {
     // el suelo del bloque; en el estacionamiento, con el hueco del predio (se ve la excavación)
     const m = new Malla();
-    if (ESC === 'estacionamiento') [rect(S.u0, S.v0, S.u1, PB.v0), rect(S.u0, PB.v1, S.u1, S.v1), rect(S.u0, PB.v0, PB.u0, PB.v1), rect(PB.u1, PB.v0, S.u1, PB.v1)].forEach(r => tapa(m, r, 0));
+    if (ESC === 'estacionamiento') tapaHueco(m, rect(S.u0, S.v0, S.u1, S.v1), PRED, 0);
+    else if (CAJA_N) conHuecoN([S.u0, S.v0, S.u1, S.v1], 0, m);   // Comercio: sin suelo bajo la nave norte (zanja y jardín hundidos)
+    else if (CD) tapaHueco(m, rect(S.u0, S.v0, S.u1, S.v1), CD.pisa[0], 0);   // con el foso del auditorio abierto
     else tapa(m, rect(S.u0, S.v0, S.u1, S.v1), 0);
     suelos.push(pon(gSitio, m, 'suelo', null));
+    const [SW, SE, NE, NW] = GUP;
+    const uO = v => enLinea(SW, NW, v, 1), uE = v => enLinea(SE, NE, v, 1), vS = u => enLinea(SW, SE, u, 0), vN = u => enLinea(NW, NE, u, 0);
+    // calles: Fresno, Sabino, Clavel y Eulalia Guzmán (de lado a lado del bloque)
     const ar = new Malla();
-    [rect(GF.o, S.v0, GU.o, S.v1), rect(GU.e, S.v0, GF.e, S.v1), rect(S.u0, GF.s, S.u1, GU.s), rect(S.u0, GU.n, S.u1, GF.n)].forEach(r => tapa(ar, r, 0.02));
+    [[[GF.o, S.v0], [uO(S.v0), S.v0], [uO(S.v1), S.v1], [GF.o, S.v1]],
+      [[uE(S.v0), S.v0], [GF.e, S.v0], [GF.e, S.v1], [uE(S.v1), S.v1]],
+      [[S.u0, GF.s], [S.u1, GF.s], [S.u1, vS(S.u1)], [S.u0, vS(S.u0)]],
+      [[S.u0, vN(S.u0)], [S.u1, vN(S.u1)], [S.u1, GF.n], [S.u0, GF.n]]].forEach(q => tapa(ar, q, 0.02));
     pon(gSitio, ar, 'calle', null, false);
+    // banquetas de enfrente (y las esquinas)
     const bq = new Malla();
-    [rect(S.u0, GU.s, GF.o, GU.n), rect(GF.e, GU.s, S.u1, GU.n), rect(GU.o, S.v0, GU.e, GF.s), rect(GU.o, GF.n, GU.e, S.v1),
+    [[[S.u0, vS(S.u0)], [GF.o, vS(GF.o)], [GF.o, vN(GF.o)], [S.u0, vN(S.u0)]],
+      [[GF.e, vS(GF.e)], [S.u1, vS(S.u1)], [S.u1, vN(S.u1)], [GF.e, vN(GF.e)]],
+      [[uO(S.v0), S.v0], [uE(S.v0), S.v0], [uE(GF.s), GF.s], [uO(GF.s), GF.s]],
+      [[uO(GF.n), GF.n], [uE(GF.n), GF.n], [uE(S.v1), S.v1], [uO(S.v1), S.v1]],
       rect(S.u0, S.v0, GF.o, GF.s), rect(GF.e, S.v0, S.u1, GF.s), rect(S.u0, GF.n, GF.o, S.v1), rect(GF.e, GF.n, S.u1, S.v1)].forEach(r => prisma(bq, r, 0, 0.15));
-    // la banqueta del predio: un marco (de la guarnición a la fachada)
-    [rect(GU.o, GU.s, GU.e, PB.v0), rect(GU.o, PB.v1, GU.e, GU.n), rect(GU.o, PB.v0, PB.u0, PB.v1), rect(PB.u1, PB.v0, GU.e, PB.v1)].forEach(r => prisma(bq, r, 0, 0.15));
+    // la banqueta del predio (Rhino): el anillo entre su guarnición y el predio, a ras (+0.20)
+    tapaHueco(bq, GUP, PRED, 0.2);
+    muros(bq, GUP, 0, 0.2);
     pon(gSitio, bq, 'banqueta', null, 30);
   }
-  // predio, área verde, plaza y Heliotropo
+  // predio, área verde, plaza y la espuela (Heliotropo ya no es calle: es predio)
   const gPredio = pieza('predio', null, 0.02);
   {
     const m = new Malla();
-    if (CD) {   // con el hueco del foso del auditorio
-      const hueco = ccw(CD.pisa[0]).reverse(), pol = ccw(rect(PB.u0, PB.v0, PB.u1, PB.v1)), todos = pol.concat(hueco);
-      THREE.ShapeUtils.triangulateShape(pol.map(q => new THREE.Vector2(q[0], q[1])), [hueco.map(q => new THREE.Vector2(q[0], q[1]))])
-        .forEach(t => m.tri(...t.map(k => W(todos[k][0], todos[k][1], 0.2))));
-    } else tapa(m, rect(PB.u0, PB.v0, PB.u1, PB.v1), 0.2);
+    if (CAJA_N) conHuecoN([PB.u0, PB.v0, PB.u1, PB.v1], 0.2, m, PRED);   // Comercio: la nave norte trae su propio piso
+    else if (CD) tapaHueco(m, PRED, CD.pisa[0], 0.2);   // con el hueco del foso del auditorio
+    else tapa(m, PRED, 0.2);
     // el área verde es del paisaje (se queda en su apartado) pero no se pica: picar el piso no abre nada
     const verde = pon(gPredio, m, PAI ? 'verde' : 'predio', PAI ? 'paisajismo' : null, 1);
     picables.splice(picables.indexOf(verde), 1);
@@ -541,12 +752,57 @@ function crea(svg, op) {
     for (let i = 0; i <= 60; i++) pl.push(borde(aN + (aS - aN) * i / 60));
     pl.push([P.u0, P.v0]);
     const mp = new Malla(); tapa(mp, pl, 0.22); pon(gPredio, mp, 'plaza', 'cultura', 1);
-    const mh = new Malla(); tapa(mh, rect(GU.o, HE[0], GU.e, HE[1]), 0.23); pon(gPredio, mh, 'calle', null, 1);
-    // espuela por Heliotropo
-    const VH = (HE[0] + HE[1]) / 2, le = new Lineas();
-    le.seg(W(S.u0, VH - 0.72, 0.27), W(ESP_FIN, VH - 0.72, 0.27)); le.seg(W(S.u0, VH + 0.72, 0.27), W(ESP_FIN, VH + 0.72, 0.27));
-    for (let u = S.u0 + 0.8; u < ESP_FIN - 0.5; u += 1.6) le.seg(W(u, VH - 1.3, 0.26), W(u, VH + 1.3, 0.26));
+    {
+    /* La espuela por Heliotropo ya no lleva tren: es un paso peatonal (Gabriel,
+       2026-10-09) de 4 m sobre el que se siguen viendo los rieles y los
+       durmientes. Donde cruza la laguna sube a un puente (+1.45, ≈ 1.2 m sobre el
+       agua) por rampas al ≤ 8 % con descansos de 1.20 a cada 6 m (NTC 2.2.2.4) y
+       barandal de 0.90 donde el vacío pasa de 0.30. */
+    const VH = (HE[0] + HE[1]) / 2, Z0 = 0.27, ZP = 1.45, MED = 2.0, u0 = GU.o;
+    const perfil = [[u0, Z0]];
+    const LG = PAI && PAI.laguna, dv = LG ? VH - LG.c[1] : 0;
+    if (LG && Math.abs(dv) < LG.borde) {
+      const x = Math.sqrt(LG.borde * LG.borde - dv * dv), p0 = LG.c[0] - x - 1, p1 = LG.c[0] + x + 1;
+      const nr = Math.ceil((ZP - Z0) / 0.48 - 1e-9), dz = (ZP - Z0) / nr, LR = nr * 6 + (nr - 1) * 1.2;
+      const rampa = (ua, sentido) => {   // de ua, subiendo hacia el puente (sentido +1: hacia +u)
+        let u = ua, z = Z0;
+        for (let k = 0; k < nr; k++) { u += 6 * sentido; z += dz; perfil.push([u, z]); if (k < nr - 1) { u += 1.2 * sentido; perfil.push([u, z]); } }
+      };
+      perfil.push([p0 - LR, Z0]); rampa(p0 - LR, 1);
+      perfil.push([p1, ZP]);
+      const baja = []; { let u = p1, z = ZP; for (let k = 0; k < nr; k++) { u += 6; z -= dz; baja.push([u, z]); if (k < nr - 1) { u += 1.2; baja.push([u, z]); } } }
+      perfil.push(...baja);
+    }
+    perfil.push([ESP_FIN, Z0]);
+    const zEn = u => { for (let i = 1; i < perfil.length; i++) if (u <= perfil[i][0]) { const a = perfil[i - 1], b = perfil[i]; return a[1] + (b[1] - a[1]) * (u - a[0]) / ((b[0] - a[0]) || 1); } return Z0; };
+    const m = new Malla(), le = new Lineas();
+    const caja = (ua, ub, va, vb, za0, za1, zb0, zb1) => {   // caja inclinada a lo largo de u (z en ua y en ub)
+      const P = [[ua, va, za0], [ub, va, zb0], [ub, vb, zb0], [ua, vb, za0], [ua, va, za1], [ub, va, zb1], [ub, vb, zb1], [ua, vb, za1]].map(q => W(q[0], q[1], q[2]));
+      [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]].forEach(f => m.quad(P[f[0]], P[f[1]], P[f[2]], P[f[3]]));
+    };
+    for (let i = 1; i < perfil.length; i++) {
+      const [ua, za] = perfil[i - 1], [ub, zb] = perfil[i];
+      if (ub - ua < 1e-3) continue;
+      const alto = Math.max(za, zb) - Z0 > 0.05;
+      caja(ua, ub, VH - MED, VH + MED, za - (alto ? 0.3 : 0.03), za, zb - (alto ? 0.3 : 0.03), zb);   // la losa del paso
+      // los rieles (sobre los durmientes)
+      [-0.72, 0.72].forEach(o => caja(ua, ub, VH + o - 0.035, VH + o + 0.035, za + 0.08, za + 0.2, zb + 0.08, zb + 0.2));
+      // barandal donde el paso va en alto
+      if (alto) [-MED, MED].forEach(o => {
+        [0.1, 0.5, 0.9].forEach(h => le.seg(W(ua, VH + o, za + h), W(ub, VH + o, zb + h)));
+        for (let u = ua; u < ub; u += 0.3) le.seg(W(u, VH + o, zEn(u)), W(u, VH + o, zEn(u) + 0.9));
+      });
+    }
+    // durmientes a cada metro
+    for (let u = u0 + 0.5; u < ESP_FIN - 0.3; u += 1.0) { const z = zEn(u); caja(u - 0.11, u + 0.11, VH - 1.3, VH + 1.3, z, z + 0.08, z, z + 0.08); }
+    // pilas bajo el puente y las rampas, a cada 6 m
+    for (let u = perfil[1] ? perfil[1][0] + 3 : u0; u < ESP_FIN; u += 6) {
+      const z = zEn(u);
+      if (z - Z0 > 0.5) [-1.5, 1.5].forEach(o => caja(u - 0.15, u + 0.15, VH + o - 0.15, VH + o + 0.15, 0.2, z - 0.3, 0.2, z - 0.3));
+    }
+    pon(gPredio, m, 'proyecto', null, 30);
     ponLineas(gPredio, le, 'columna-espuela', 0xffffff);
+    }
   }
 
   /* ===== 2. Paisaje ===== */
@@ -627,20 +883,213 @@ function crea(svg, op) {
     if (ar.length) {
       const b = mallaAtlas(ar.length, matArbol);
       ar.forEach((t, i) => {
-        const p = W(t[0], t[1], Z), H = t[2] + t[3] * 0.25, tile = t[4] ? 3 : Math.floor(((t[0] * 13.7 + t[1] * 7.1) % 3 + 3) % 3);
+        const p = W(t[0], t[1], Z), H = (t[2] + t[3] * 0.25) * ARBOL_JOVEN, tile = t[4] ? 3 : Math.floor(((t[0] * 13.7 + t[1] * 7.1) % 3 + 3) % 3);
         b.aPos.setXYZ(i, p[0], p[1], p[2]); b.aEsc.setXY(i, ARBOLES_TEX.ancho * H, ARBOLES_TEX.alto * H); b.aTile.setX(i, tile); b.aVolt.setX(i, (i % 2) ? 1 : -1);
       });
       gPlantas.add(b.malla);
     }
   }
 
-  /* ===== 3. Naves (cortadas por el aro) ===== */
-  NAVESG: {
+  /* ===== 3. Naves (cortadas por el aro) =====
+     Inspeccionando Comercio van las de Gabriel en Rhino (perímetro y
+     cubiertas, atlampa-mercado.js) en lugar de las naves simples. */
+  if (MERCADO) {
+    // las geometrías, una vez por sesión (ver CACHE)
+    const MG = fija('mercado', () => {
+      const geo = a => {
+        const p = new Float32Array(a.length);
+        for (let i = 0; i < a.length; i += 3) { const w = W(a[i], a[i + 1], a[i + 2]); p[i] = w[0]; p[i + 1] = w[1]; p[i + 2] = w[2]; }
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.computeVertexNormals();
+        return g;
+      };
+      // las aristas vienen de la malla original de Rhino (sin las costuras del recorte por el aro)
+      const lineas = a => { const l = new Lineas(); for (let i = 0; i < a.length; i += 3) l.p.push(...W(a[i], a[i + 1], a[i + 2])); return l; };
+      // reparte triángulos (n = 9) o segmentos (n = 6) según dónde cae su centro (u, v)
+      const reparte = (a, n, clave) => {
+        const r = {}, k = n / 3;
+        for (let i = 0; i < a.length; i += n) {
+          let u = 0, v = 0;
+          for (let j = 0; j < n; j += 3) { u += a[i + j] / k; v += a[i + j + 1] / k; }
+          const c = clave(u, v);
+          (r[c] = r[c] || []).push(...a.slice(i, i + n));
+        }
+        return r;
+      };
+      const r = {};
+      /* muros perimetrales, por nave y por lado (cada uno se pica, se mueve y se
+         oculta solo): en el despiece cada lado sale hacia afuera (dir en el mundo: x = u, z = −v) */
+      const LADO = { o: [-1, 0, 0], e: [1, 0, 0], n: [0, 0, -1], s: [0, 0, 1] };
+      const LADO_N = { o: 'oeste', e: 'este', n: 'norte', s: 'sur' }, NAVE_N = { n: 'nave norte', s: 'nave sur' };
+      const naveDe = v => v > HE[1] - 4 ? 'n' : 's';
+      const ladoDe = (u, v) => naveDe(v) + (naveDe(v) === 'n'
+        ? (u < 523.5 ? 'o' : u > 557.5 ? 'e' : v > 487 ? 'n' : 's')       // nave norte
+        : (u > 557.5 ? 'e' : v > 396 ? 'n' : u < 505.5 ? 'o' : 's'));     // nave sur (su muro norte da a Heliotropo)
+      const mt = reparte(MERCADO.perimetro, 9, ladoDe), ml = reparte(MERCADO.perimetroL, 6, ladoDe);
+      r.muros = Object.keys(mt).sort().map(k => ({ id: 'muro-' + k, nombre: 'Muro ' + LADO_N[k[1]] + ' · ' + NAVE_N[k[0]], dir: LADO[k[1]], c: geos(geo(mt[k]), 'nave', false, ml[k] ? lineas(ml[k]) : null) }));
+      /* cubiertas, por nave y por faldón: los faldones se leen de la geometría.
+         Las cumbreras corren a lo largo de v; donde la pendiente cambia de lado
+         (la normal pasa de −u a +u o al revés) hay una cumbrera o un valle. Cada
+         triángulo (y cada arista) va al faldón en el que cae su centro. */
+      const C = MERCADO.cubierta, faldon = {};
+      ['n', 's'].forEach(nv => {
+        const inclinados = [];   // [u del centro, lado (−1 cae al oeste, +1 al este), área]
+        for (let i = 0; i < C.length; i += 9) {
+          if (naveDe((C[i + 1] + C[i + 4] + C[i + 7]) / 3) !== nv) continue;
+          const a = [C[i + 3] - C[i], C[i + 4] - C[i + 1], C[i + 5] - C[i + 2]], b = [C[i + 6] - C[i], C[i + 7] - C[i + 1], C[i + 8] - C[i + 2]];
+          const n = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], L = Math.hypot(n[0], n[1], n[2]);
+          if (!L) continue;
+          const nu = n[0] / L * Math.sign(n[2] || 1);   // la normal hacia arriba
+          if (Math.abs(nu) > 0.15 && Math.abs(nu) < 0.6) inclinados.push([(C[i] + C[i + 3] + C[i + 6]) / 3, nu > 0 ? 1 : -1, L / 2]);
+        }
+        // por franjas de 1 m: de qué lado cae la mayor parte; los cortes, donde cambia
+        const franja = {};
+        inclinados.forEach(([u, s, A]) => { const k = Math.floor(u); franja[k] = (franja[k] || 0) + s * A; });
+        const ks = Object.keys(franja).map(Number).filter(k => Math.abs(franja[k]) > 0.5).sort((x, y) => x - y), cortes = [], lados = [];
+        ks.forEach((k, j) => {
+          const s = Math.sign(franja[k]);
+          if (!j) { lados.push(s); return; }
+          if (s === lados[lados.length - 1]) return;
+          // el corte fino: entre el último centro del lado que acaba y el primero del que empieza
+          const k0 = ks[j - 1], de = inclinados.filter(t => t[0] >= k0 && t[0] < k + 1);
+          const fin = Math.max(...de.filter(t => t[1] !== s).map(t => t[0])), ini = Math.min(...de.filter(t => t[1] === s).map(t => t[0]));
+          cortes.push(isFinite(fin) && isFinite(ini) && ini > fin ? (fin + ini) / 2 : k);
+          lados.push(s);
+        });
+        faldon[nv] = { cortes, lados };
+      });
+      const faldonDe = (u, v) => { const nv = naveDe(v), f = faldon[nv]; let j = 0; while (j < f.cortes.length && u >= f.cortes[j]) j++; return nv + j; };
+      const ct = reparte(C, 9, faldonDe), cl = reparte(MERCADO.cubiertaL, 6, faldonDe);
+      r.cubiertas = Object.keys(ct).sort().map(k => {
+        const j = +k.slice(1), s = faldon[k[0]].lados[j];
+        return { id: 'cubierta-' + k, nombre: 'Cubierta · ' + NAVE_N[k[0]] + ' · faldón ' + (j + 1) + (s ? ' (cae al ' + (s < 0 ? 'oeste' : 'este') + ')' : ''), c: geos(geo(ct[k]), 'nave', false, cl[k] ? lineas(cl[k]) : null) };
+      });
+      if (MERCADO.acero) r.acero = geos(geo(MERCADO.acero), 'nave', false, lineas(MERCADO.aceroL));
+      if (MERCADO.vivienda && MERCADO.vivienda.length) r.vivienda = geos(geo(MERCADO.vivienda), 'modulo', false, lineas(MERCADO.viviendaL));
+      // la planta alta de la nave sur (Rhino): ahí llega el descanso de la cinta del aro
+      if (MERCADO.pa && MERCADO.pa.length) r.pa = geos(geo(MERCADO.pa), 'nave', false, lineas(MERCADO.paL));
+      // la cara curva del corte del aro (vidrio): un arco por nave; en el despiece se va hacia el centro del aro
+      if (MERCADO.vidrio) {
+        const nave = (u, v) => v > HE[0] ? 'n' : 's';
+        const vt = reparte(MERCADO.vidrio, 9, nave), vl = reparte(MERCADO.vidrioL, 6, nave), vr = reparte(MERCADO.vidrioR || [], 6, nave);
+        r.vidrio = Object.keys(vt).map(k => {
+          const a = vt[k]; let u = 0, v = 0;
+          for (let i = 0; i < a.length; i += 3) { u += a[i]; v += a[i + 1]; }
+          u /= a.length / 3; v /= a.length / 3;
+          const du = ANILLO.u - u, dv = ANILLO.v - v, L = Math.hypot(du, dv);
+          return { dir: [du / L, 0, -dv / L], c: geos(geo(a), 'vidrio', false, vl[k] ? lineas(vl[k]) : null), r: vr[k] ? lineas(vr[k]).geo() : null };
+        });
+      }
+      // paso 3: el piso (con la zanja, el canal y el jardín inundable hundidos), las
+      // plataformas de lámina (con parches de rejilla), locales, baños, escaleras y la vegetación
+      const P3 = MERCADO.paso3;
+      if (P3) {
+        r.p3 = {};
+        [['piso', 'predio', 30], ['resto', 'predio', 30], ['zanja', 'filtro', 30], ['jardin', 'tezontle', 30], ['agua', 'agua', 1],
+          ['plataforma', 'nave', 30], ['escalera', 'nave', 30], ['local', 'modcom', 30], ['mesa', 'nave', 30]].forEach(([k, papel, umbral]) => {
+          if (P3[k]) r.p3[k] = geos(geo(P3[k]), papel, P3[k + 'L'] ? false : umbral, P3[k + 'L'] ? lineas(P3[k + 'L']) : null);
+        });
+        ['lamina', 'baranda', 'junco', 'pasto'].forEach(k => { if (P3[k + 'L']) r.p3[k] = lineas(P3[k + 'L']).geo(); });
+      }
+      return r;
+    });
+    const sub = (padre, dir) => { const g = new THREE.Group(); g.userData.dir = dir; padre.add(g); return g; };
+    // (userData.norte: es de la nave norte, ver naveNorteEn)
+    const gMur = pieza('mercado-perimetro', 'comercio', 0.35);
+    const murosG = MG.muros.map(m => { const g = sub(gMur, m.dir.map(x => x * 7)); g.userData.norte = m.id[5] === 'n'; ponGeos(g, m.c, 'nave', 'comercio'); return g; });
+    const gCub = pieza('mercado-cubierta', 'comercio', 0.4);
+    const cubG = MG.cubiertas.map(m => { const g = sub(gCub, [0, 9, 0]); g.userData.norte = m.id[9] === 'n'; ponGeos(g, m.c, 'nave', 'comercio'); return g; });
+    // la retícula de acero que rigidiza la nave norte (y sobre la que va la cubierta)
+    const gAce = MG.acero ? pieza('mercado-acero', 'comercio', 0.38) : null;
+    if (gAce) ponGeos(gAce, MG.acero, 'nave', 'comercio', true);
+    // las columnas de la vivienda que cruzan el mercado (independientes: de referencia)
+    const gViv = MG.vivienda ? pieza('mercado-vivienda', 'vivienda', 0.37) : null;
+    if (gViv) ponGeos(gViv, MG.vivienda, 'modulo', 'vivienda');
+    const gPA = MG.pa ? pieza('mercado-pa', 'comercio', 0.34) : null;
+    if (gPA) ponGeos(gPA, MG.pa, 'nave', 'comercio');
+    // la fachada al aro: vidrio (por ahora), con sus parteluces y el reflejo
+    const gVid = MG.vidrio ? pieza('mercado-vidrio', 'comercio', 0.36) : null;
+    const vidG = gVid ? MG.vidrio.map(v => {
+      const g = sub(gVid, v.dir.map(x => x * 7));
+      ponGeos(g, v.c, 'vidrio', 'comercio');
+      if (v.r) ponLineas(g, v.r, 'vidrio-reflejo', 0xffffff, PROGRAMA.agua, 'comercio');
+      return g;
+    }) : [];
+    let gP = null, gA = null, gL = null, gV = null;
+    if (MG.p3) {
+      const Q = MG.p3;
+      gP = pieza('mercado-piso', 'comercio', 0.05); gA = pieza('mercado-plataformas', 'comercio', 0.3); gL = pieza('mercado-locales', 'comercio', 0.33); gV = pieza('mercado-verde', 'comercio', 0.5);
+      const pone = (g, k, papel, ap) => Q[k] ? ponGeos(g, Q[k], papel, ap) : null;
+      const piso = pone(gP, 'piso', 'predio', 'comercio'); if (piso) suelos.push(piso);
+      pone(gP, 'resto', 'predio', null);   // lo de la huella que cae dentro del aro (patios, pendiente)
+      pone(gP, 'zanja', 'filtro', 'comercio');
+      pone(gP, 'jardin', 'tezontle', 'comercio');
+      pone(gP, 'agua', 'agua', 'comercio');
+      pone(gA, 'plataforma', 'nave', 'comercio');
+      pone(gA, 'escalera', 'nave', 'comercio');   // (las contrahuellas)
+      pone(gL, 'local', 'modcom', 'comercio');     // puestos y baños
+      pone(gL, 'mesa', 'nave', 'comercio');        // comedores
+      const pl = (k, nombre, color, colorColor, g) => { if (Q[k]) ponLineas(g, Q[k], nombre, color, colorColor, 'comercio'); };
+      pl('lamina', 'rayo-lamina', 0xffffff, null, gA);
+      pl('baranda', 'columna-baranda', 0xffffff, null, gA);
+      pl('junco', 'junco', 0xffffff, PROGRAMA.agua, gV);
+      pl('pasto', 'pasto', 0xffffff, PROGRAMA.verde, gA);   // (al pie de los escalones: van con las plataformas)
+      // árboles: los de la hoja de árboles (su propio material: no se apagan como
+      // los del paisaje); los del jardín y los de maceta (van con las plataformas)
+      const A = MERCADO.arboles || [];
+      [[gV, A.filter(t => t[2] < 0.3)], [gA, A.filter(t => t[2] >= 0.3)]].forEach(([g, lista]) => {
+        if (!lista.length) return;
+        const b = mallaAtlas(lista.length, matAtlas(ARBOLES_TEX.tex, ARBOLES_TEX.N, 1, DIB.base));
+        lista.forEach((t, i) => {
+          const p = W(t[0], t[1], t[2]);
+          b.aPos.setXYZ(i, p[0], p[1], p[2]); b.aEsc.setXY(i, ARBOLES_TEX.ancho * t[3] * 0.8, ARBOLES_TEX.alto * t[3]);
+          b.aTile.setX(i, i % 3); b.aVolt.setX(i, i % 2 ? 1 : -1);
+        });
+        g.add(b.malla);
+      });
+    }
+    // aislando el mercado: sus partes (las que se desplazan, hacia dónde)
+    // cada cubierta (por nave y faldón) y cada muro (por nave y lado), sueltos
+    MG.cubiertas.forEach((m, i) => parte('comercio', m.id, m.nombre, [cubG[i]]));
+    MG.muros.forEach((m, i) => parte('comercio', m.id, m.nombre, [murosG[i]]));
+    if (vidG.length) parte('comercio', 'vidrio', 'Fachada al aro (vidrio)', vidG);
+    if (gAce) parte('comercio', 'acero', 'Estructura de acero', [gAce], [0, 4.5, 0]);
+    if (gA) parte('comercio', 'plataformas', 'Plataformas, escaleras y barandales', [gA], [0, 2.2, 0]);
+    if (gL) parte('comercio', 'puestos', 'Puestos, comedores y baños', [gL], [0, 2.2, 0]);
+    if (gPA) parte('comercio', 'pa', 'Planta alta de la nave sur', [gPA]);
+    if (gP) parte('comercio', 'piso', 'Piso, zanja y jardín', [gP]);
+    if (gV) parte('comercio', 'verde', 'Vegetación', [gV]);
+    if (gViv) parte('comercio', 'vivienda', 'Columnas de la vivienda', [gViv], null, true);
+
+    /* abriendo la nave norte (doble clic sobre ella, ver aisla('nave-norte')):
+       sólo quedan ella y el aro; la cubierta sube y los muros bajan hasta
+       dejar un antepecho, para ver el interior. Lo de la nave sur, oculto. */
+    const SUBE_CUBIERTA = 8;     // m que sube la cubierta
+    const ANTEPECHO = 0.9;       // m de muro que quedan sobre su desplante
+    [gAce, gA, gL, gV, gP].forEach(g => { if (g) g.userData.norte = true; });   // (paso 3 y acero: todo de la nave norte)
+    vidG.forEach(g => { g.userData.norte = g.userData.dir[2] > 0; });          // (el vidrio norte se va hacia el sur, al centro del aro: +z)
+    const caja3 = new THREE.Box3();
+    MG.cubiertas.forEach((m, i) => { if (cubG[i].userData.norte) parte('nave-norte', m.id, m.nombre, [cubG[i]], [0, SUBE_CUBIERTA, 0]); });
+    MG.muros.forEach((m, i) => {
+      if (!murosG[i].userData.norte) return;
+      caja3.setFromObject(murosG[i]);
+      parte('nave-norte', m.id, m.nombre, [murosG[i]], [0, -Math.max(0, caja3.max.y - caja3.min.y - ANTEPECHO), 0]);
+    });
+    const vidN = vidG.filter(g => g.userData.norte);
+    if (vidN.length) parte('nave-norte', 'vidrio', 'Fachada al aro (vidrio)', vidN, [0, -Math.max(0, caja3.setFromObject(vidN[0]).max.y - caja3.min.y - ANTEPECHO), 0]);
+    if (gAce) parte('nave-norte', 'acero', 'Estructura de acero', [gAce]);
+    if (gA) parte('nave-norte', 'plataformas', 'Plataformas, escaleras y barandales', [gA]);
+    if (gL) parte('nave-norte', 'puestos', 'Puestos, comedores y baños', [gL]);
+    if (gP) parte('nave-norte', 'piso', 'Piso, zanja y jardín', [gP]);
+    if (gV) parte('nave-norte', 'verde', 'Vegetación', [gV]);
+    const sur = murosG.filter(g => !g.userData.norte).concat(cubG.filter(g => !g.userData.norte), vidG.filter(g => !g.userData.norte));
+    if (sur.length) parte('nave-norte', 'nave-sur', 'Nave sur', sur, null, true);
+  } else NAVESG: {
+    // la cara curva del corte del aro no es muro: va de vidrio (por ahora), con un parteluz en cada quiebre
     const porNave = new Map();
     PIEZAS.forEach(pz => {
       const nv = pz.nv, L = pz.L;
-      if (!porNave.has(nv)) porNave.set(nv, new Malla());
-      const m = porNave.get(nv);
+      if (!porNave.has(nv)) porNave.set(nv, { m: new Malla(), vid: new Malla(), lv: new Lineas() });
+      const { m, vid, lv } = porNave.get(nv);
       const zf = (u) => nv.alero + (nv.cumbre - nv.alero) * Math.max(0, 1 - Math.abs(u - pz.um) / pz.run);
       [true, false].forEach(izq => {
         const h = G.cortaU(pz.pol, pz.um, izq);
@@ -649,11 +1098,18 @@ function crea(svg, op) {
         const e = 1e-3;
         muros(m, h, 0, 0, (u) => zf(u), (a, b) =>
           (Math.abs(a[0] - L.u0) < e && Math.abs(b[0] - L.u0) < e) || (Math.abs(a[0] - L.u1) < e && Math.abs(b[0] - L.u1) < e) ||
-          (Math.abs(a[1] - L.v0) < e && Math.abs(b[1] - L.v0) < e) || (Math.abs(a[1] - L.v1) < e && Math.abs(b[1] - L.v1) < e) || (a[2] && b[2]));
+          (Math.abs(a[1] - L.v0) < e && Math.abs(b[1] - L.v0) < e) || (Math.abs(a[1] - L.v1) < e && Math.abs(b[1] - L.v1) < e));
+        const corte = (a, b) => a[2] && b[2];
+        muros(vid, h, 0, 0, (u) => zf(u) - 0.02, corte);
+        ccw(h).forEach((a, k, q) => { const b = q[(k + 1) % q.length]; if (corte(a, b)) { lv.seg(W(a[0], a[1], 0), W(a[0], a[1], zf(a[0]))); lv.seg(W(b[0], b[1], 0), W(b[0], b[1], zf(b[0]))); } });
       });
     });
     let i = 0;
-    porNave.forEach((m, nv) => { const g = pieza('nave' + i, 'comercio', 0.35 + 0.05 * i++); pon(g, m, 'nave', 'comercio', 12); });
+    porNave.forEach((q, nv) => {
+      const g = pieza('nave' + i, 'comercio', 0.35 + 0.05 * i++);
+      pon(g, q.m, 'nave', 'comercio', 12);
+      if (q.vid.p.length) pon(g, q.vid, 'vidrio', 'comercio', 12, q.lv);
+    });
   }
 
   /* ===== 4. Industria (la chimenea existente ya no va) ===== */
@@ -677,34 +1133,87 @@ function crea(svg, op) {
     pon(g, m, 'cultura', 'cultura', 20, ln);
   }
 
-  /* ===== 6. Aro ===== */
+  /* ===== 6. Aro =====
+     Con la cinta (atlampa-mercado.js, cinta): una franja de 2 m del borde de
+     afuera se desprende y baja de +10.03 a la planta alta de la nave sur (+4.28)
+     y a las plataformas de la norte (+2.40). Entre th0 y th1 el aro queda
+     2 m más angosto (de ahí salió la cinta), con su barandal en el borde nuevo;
+     las columnas de afuera de ese tramo cargan la cinta (llegan a su lecho). */
+  const CINTA = MERC && MERC.cinta ? MERC.cinta : null;
+  const enCinta = t => { if (!CINTA) return false; const d = ((t - CINTA.th0) % 360 + 360) % 360; return d < CINTA.th1 - CINTA.th0; };
+  const zCinta = t => {   // la altura de la cinta en el ángulo t (°)
+    const P = CINTA.perfil, d = ((t - CINTA.th0) % 360 + 360) % 360 + CINTA.th0;
+    for (let i = 1; i < P.length; i++) if (d <= P[i][0]) { const a = P[i - 1], b = P[i]; return b[0] > a[0] ? a[1] + (b[1] - a[1]) * (d - a[0]) / (b[0] - a[0]) : b[1]; }
+    return P[P.length - 1][1];
+  };
   {
-    const g = pieza('aro', 'aro', 0.6), m = new Malla(), n = 160, z1 = ANILLO.z, z0 = z1 - ANILLO.canto;
-    // con el chipote hacia la plaza cultural (G.bulto)
-    const ext = G.aroPoli(ANILLO.re, n), int = G.aroPoli(ANILLO.ri, n);
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n, A = ext[i], B = ext[j], a = int[i], b = int[j];
+    const g = pieza('aro', 'aro', 0.6), n = 720, z1 = ANILLO.z, z0 = z1 - ANILLO.canto;
+    ponGeos(g, fija('aro', () => {
+    const m = new Malla(), ln = new Lineas(), zb = z1 + ANILLO.baranda;
+    // ángulos: cada medio grado y, si hay cinta, justo donde empieza y donde acaba
+    const ts = Array.from({ length: n }, (_, i) => i / n * 360);
+    if (CINTA) ts.push(((CINTA.th0 % 360) + 360) % 360, ((CINTA.th1 % 360) + 360) % 360);
+    ts.sort((a, b) => a - b);
+    const R = t => [G.aroPunto(t, ANILLO.ri), G.aroPunto(t, ANILLO.re)];
+    const P = (t, r) => [ANILLO.u + Math.cos(t * RAD) * r, ANILLO.v + Math.sin(t * RAD) * r];
+    let antes = null;
+    ts.forEach((t, k) => {
+      const t2 = k + 1 < ts.length ? ts[k + 1] : ts[0] + 360;
+      if (t2 - t < 1e-6) return;
+      const cin = enCinta((t + t2) / 2);   // este tramo, ¿angosto?
+      const [a, A0] = R(t), [b, B0] = R(t2), A = cin ? P(t, CINTA.ri) : A0, B = cin ? P(t2, CINTA.ri) : B0;
       m.quad(W(a[0], a[1], z1), W(b[0], b[1], z1), W(B[0], B[1], z1), W(A[0], A[1], z1));
       m.quad(W(a[0], a[1], z0), W(A[0], A[1], z0), W(B[0], B[1], z0), W(b[0], b[1], z0));
       m.quad(W(A[0], A[1], z0), W(A[0], A[1], z1), W(B[0], B[1], z1), W(B[0], B[1], z0));
       m.quad(W(a[0], a[1], z0), W(b[0], b[1], z0), W(b[0], b[1], z1), W(a[0], a[1], z1));
-    }
-    // barandal: pasamanos y balaustres cada 2.4 m
-    const ln = new Lineas(), zb = z1 + ANILLO.baranda;
-    [ANILLO.ri, ANILLO.re].forEach(r => {
-      const pts = G.aroPoli(r, n).map(q => W(q[0], q[1], zb));
-      ln.poli(pts, true);
-      // balaustres cada 2.4 m a lo largo del borde (el chipote lo alarga)
-      const fino = G.aroPoli(r, 720);
-      let d = 0;
-      fino.forEach((q, i) => { const p = fino[(i + 1) % fino.length]; if (d <= 0) { ln.seg(W(q[0], q[1], z1), W(q[0], q[1], zb)); d += 2.4; } d -= Math.hypot(p[0] - q[0], p[1] - q[1]); });
+      // donde cambia el ancho: la cara de la orilla (de un radio al otro), con su barandal
+      if (antes !== null && antes !== cin) {
+        const q0 = P(t, CINTA.ri), q1 = A0;
+        m.quad(W(q0[0], q0[1], z0), W(q1[0], q1[1], z0), W(q1[0], q1[1], z1), W(q0[0], q0[1], z1));
+        if (Math.abs(zCinta(t) - z1) > 0.3) ln.seg(W(q0[0], q0[1], zb), W(q1[0], q1[1], zb));
+      }
+      antes = cin;
+      // barandal (pasamanos) por los dos bordes; en el tramo angosto, en el borde nuevo
+      // sólo donde la cinta ya bajó más de 0.30 (antes es el mismo piso)
+      ln.seg(W(a[0], a[1], zb), W(b[0], b[1], zb));
+      if (!cin || z1 - zCinta((t + t2) / 2) > 0.3) ln.seg(W(A[0], A[1], zb), W(B[0], B[1], zb));
     });
-    pon(g, m, 'aro', 'aro', 30, ln);
-    // columnas (las que no caen dentro de un pabellón)
-    const col = new THREE.CylinderGeometry(0.4, 0.4, z0, 10, 1), cs = COLUMNAS.filter(c => !G.enEdificio(c[0], c[1]));
-    const im = new THREE.InstancedMesh(col, material('aro'), cs.length), M = new THREE.Matrix4();
-    cs.forEach((c, i) => { const p = W(c[0], c[1], z0 / 2); M.makeTranslation(p[0], p[1], p[2]); im.setMatrixAt(i, M); });
-    im.userData.ap = 'aro'; g.add(im); picables.push(im);
+    // balaustres cada 2.4 m a lo largo de cada borde
+    [r => R(r)[0], r => R(r)[1]].forEach((borde, lado) => {
+      let d = 0, q = null;
+      for (let i = 0; i <= 1440; i++) {
+        const t = i / 4, cin = lado === 1 && enCinta(t), p = cin ? P(t, CINTA.ri) : borde(t);
+        if (q) d -= Math.hypot(p[0] - q[0], p[1] - q[1]);
+        if (d <= 0 && (!cin || z1 - zCinta(t) > 0.3)) { ln.seg(W(p[0], p[1], z1), W(p[0], p[1], zb)); d += 2.4; }
+        q = p;
+      }
+    });
+    return geos(m, 'aro', 30, ln);
+    }), 'aro', 'aro');
+    // columnas (las que no caen dentro de un pabellón); las de afuera en el tramo
+    // de la cinta llegan a su lecho (la cargan)
+    const col = new THREE.CylinderGeometry(0.4, 0.4, 1, 10, 1).translate(0, 0.5, 0), cs = COLUMNAS.filter(c => !G.enEdificio(c[0], c[1]));
+    const mcol = material('aro-estr'); mcol.userData.papel = 'aro'; mcol.userData.estr = true;
+    const im = new THREE.InstancedMesh(col, mcol, cs.length), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Vector3(), V = new THREE.Vector3();
+    cs.forEach((c, i) => {
+      const t = Math.atan2(c[1] - ANILLO.v, c[0] - ANILLO.u) / RAD, r = Math.hypot(c[0] - ANILLO.u, c[1] - ANILLO.v);
+      const h = CINTA && r > CINTA.ri && enCinta(t) ? zCinta(t) - CINTA.canto : z0, p = W(c[0], c[1], 0);
+      M.compose(V.set(p[0], p[1], p[2]), Q, E.set(1, h, 1)); im.setMatrixAt(i, M);
+    });
+    im.userData.ap = 'aro'; im.userData.estr = true; g.add(im); picables.push(im);
+  }
+  // la cinta: el mismo objeto que el aro (mismo canto, mismo barandal)
+  if (CINTA && CINTA.tris) {
+    const gC = pieza('cinta', 'aro', 0.62);
+    ponGeos(gC, fija('cinta', () => {
+      const a = CINTA.tris, p = new Float32Array(a.length);
+      for (let i = 0; i < a.length; i += 3) { const w = W(a[i], a[i + 1], a[i + 2]); p[i] = w[0]; p[i + 1] = w[1]; p[i + 2] = w[2]; }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.computeVertexNormals();
+      const l = new Lineas(), b = CINTA.lineas;
+      for (let i = 0; i < b.length; i += 3) l.p.push(...W(b[i], b[i + 1], b[i + 2]));
+      return geos(g, 'aro', false, l);
+    }), 'aro', 'aro');
+    if (MERCADO) parte('comercio', 'cinta', 'Cinta del aro', [gC]);
   }
 
   /* ===== 6b. Arte y cultura (el concepto detallado) =====
@@ -715,22 +1224,27 @@ function crea(svg, op) {
      no se dibujan (nada transparente): la fachada se lee por sus parteluces. */
   if (CD) {
     piezas.forEach(p => { if (p.g.name === 'cultura') p.g.userData.oculto = true; });
-    const g = pieza('cultura-detalle', 'cultura', 0.45), d = [CULTURA_DET.DX - CEN[0], CULTURA_DET.DZ, -(CULTURA_DET.DY - CEN[1])];
-    const papel = { losa: 'cultura', nucleo: 'cultura', auditorio: 'cultura', aro: 'cultura', escalera: 'cultura', acero: 'cultura' };
-    Object.keys(CD.mallas).forEach(k => {
-      const geo = CD.mallas[k]; geo.translate(d[0], d[1], d[2]); geo.computeVertexNormals();
-      pon(g, geo, papel[k] || 'cultura', 'cultura', k === 'acero' ? false : 20);
-    });
-    Object.keys(CD.lineas).forEach(k => {
-      const geo = CD.lineas[k]; geo.translate(d[0], d[1], d[2]);
-      const lin = new Lineas(); lin.p = Array.from(geo.attributes.position.array);
-      ponLineas(g, lin, 'columna-' + k, 0xffffff, PROGRAMA.cultura, 'cultura');
+    // por partes (para aislarlo: cada una se oculta sola)
+    const g = pieza('cultura-detalle', 'cultura', 0.45);
+    const PARTES_CD = [['losa', 'Losas y módulos', ['m-losa', 'l-borde']], ['nucleo', 'Núcleos', ['m-nucleo']], ['acero', 'Estructura de acero', ['m-acero']],
+      ['escalera', 'Escaleras y rampas', ['m-escalera', 'l-huella']], ['auditorio', 'Auditorio', ['m-auditorio']], ['aro', 'Parasoles', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]];
+    PARTES_CD.forEach(([id, nombre, ks]) => {
+      const sg = new THREE.Group(); sg.name = 'cultura-' + id; g.add(sg);
+      ks.forEach(k => {
+        const c = CDG[k];
+        if (!c) return;
+        if (c.isBufferGeometry) ponLineas(sg, c, 'columna-' + k.slice(2), 0xffffff, PROGRAMA.cultura, 'cultura');
+        else ponGeos(sg, c, 'cultura', 'cultura', k === 'm-acero');
+      });
+      if (sg.children.length) parte('cultura', id, nombre, [sg]);
     });
   }
 
   /* ===== 7. Módulos de vivienda ===== */
   const gMods = [];
   if (MOD) {
+    // (las geometrías, una vez por sesión: por nivel, y aparte los de comercio)
+    const NIVELES = fija('modulos', () => {
     const A = MOD.a / 2, Bm = MOD.b / 2, porNivel = {}, COM = MOD.tipos.indexOf('comercio');
     MOD.cajas.forEach(r => {
       const nivel = r[2], z0 = MOD.z0 + nivel * MOD.alto, z1 = z0 + MOD.alto, com = r[3] === COM, clave = (com ? 'c' : '') + nivel;
@@ -783,17 +1297,23 @@ function crea(svg, op) {
       // fondo de la caja (se ve desde abajo y en los volados)
       m.quad(P(-A, -Bm, z0), P(-A, Bm, z0), P(A, Bm, z0), P(A, -Bm, z0));
     });
-    Object.keys(porNivel).sort((a, b) => porNivel[a].nivel - porNivel[b].nivel).forEach(k => {
-      const p = porNivel[k], n = p.nivel;
+    const r = {};
+    Object.keys(porNivel).forEach(k => { const p = porNivel[k]; r[k] = { com: p.com, nivel: p.nivel, c: fijas(geos(p.m, p.com ? 'modcom' : 'modulo', false, p.l)) }; });
+    return r;
+    });
+    Object.values(NIVELES).sort((a, b) => a.nivel - b.nivel).forEach(p => {
+      const n = p.nivel;
       if (p.com) {   // comercio: se queda aunque se apaguen los módulos (es parte del comercio)
         const g = pieza('modcomercio' + n, 'comercio', 0.62 + n * 0.05);
-        pon(g, p.m, 'modcom', 'comercio', false, p.l);
+        ponGeos(g, p.c, 'modcom', 'comercio');
         return;
       }
       const g = pieza('modulos' + n, 'vivienda', 0.6 + n * 0.05);
       g.userData.capa = 'modulos';
-      pon(g, p.m, 'modulo', 'vivienda', false, p.l);
+      ponGeos(g, p.c, 'modulo', 'vivienda');
       gMods.push(g);
+      // aislando la vivienda: cada nivel se oculta solo, y el despiece los separa
+      parte('vivienda', 'n' + n, 'Nivel ' + (n + 1), [g], [0, n * 2.4, 0]);
     });
   }
 
@@ -1118,8 +1638,9 @@ function crea(svg, op) {
       ruta(pts, Math.round(L * dens));
     });
     // el resto: el doble que antes (16 → 32) en las banquetas y los senderos
-    const m = 2;
-    ruta([[PB.u0 - m, PB.v0 - m], [PB.u1 + m, PB.v0 - m], [PB.u1 + m, PB.v1 + m], [PB.u0 - m, PB.v1 + m], [PB.u0 - m, PB.v0 - m]], 22, 1.3);
+    // (por la mitad de la banqueta del predio)
+    const mitad = G.PRED.map((q, i) => [(q[0] + G.GUP[i][0]) / 2, (q[1] + G.GUP[i][1]) / 2]);
+    ruta(mitad.concat([mitad[0]]), 22, 1.3);
     if (PAI) PAI.senderos.forEach((s, i) => { if (i % 2 === 0) ruta([[s[0], s[1]], [s[2], s[3]]], 1, 0.9); });
     // grupos quietos en los accesos peatonales (lámina 1: x 76–210, y 115–316) y en la plaza
     const R1 = [76, 115, 210, 316];
@@ -1186,11 +1707,12 @@ function crea(svg, op) {
     // vehiculares: la lámina corregida (marco x 26–160, y 76–277): norte, oriente (junto a la esquina sur) y sur
     const veh = [[49, 60, 0, -1], [168, 261, -1, 0], [84, 291, 0, 1]].map(a => [img([26, 76, 160, 277], a[0], a[1]), a[2], a[3]]);
     function flechas(lista, color) {
-      const m = new Malla(), l = new Lineas(), z0 = 0.3, z1 = 0.9, L = 5.5, A = 2.6;
+      const m = new Malla(), l = new Lineas(), z0 = 0.3, z1 = 0.9, L = 3.6, A = 2.2;
       lista.forEach(([q, du, dv]) => {
         // la punta toca la fachada; la base, sobre la banqueta
         const u = Math.max(PB.u0, Math.min(PB.u1, q[0])), v = Math.max(PB.v0, Math.min(PB.v1, q[1]));
-        const pu = du ? (du > 0 ? PB.u0 : PB.u1) : u, pv = dv ? (dv > 0 ? PB.v0 : PB.v1) : v;
+        const sur = G.PRED[0][1] + (G.PRED[1][1] - G.PRED[0][1]) * (u - G.PRED[0][0]) / (G.PRED[1][0] - G.PRED[0][0]);
+        const pu = du ? (du > 0 ? PB.u0 : PB.u1) : u, pv = dv ? (dv > 0 ? sur : PB.v1) : v;
         const tri = [[pu, pv], [pu - du * L - dv * A, pv - dv * L + du * A], [pu - du * L + dv * A, pv - dv * L - du * A]];
         prisma(m, tri, z0, z1);
         l.poli(tri.map(p => W(p[0], p[1], z1 + 0.01)), true);
@@ -1283,12 +1805,12 @@ function crea(svg, op) {
     gNolli.add(new THREE.Mesh(ed.geo(), negro));
     // lo de arriba, punteado: el aro (sus dos bordes) y la losa de arte y cultura; y el límite del predio
     const l = new Lineas();
-    [ANILLO.ri, ANILLO.re].forEach(r => l.poli(G.aroPoli(r, 240).map(q => W(q[0], q[1], 0.08)), true));
+    [ANILLO.ri, ANILLO.re].forEach(r => l.poli(G.aroPoli(r, 720).map(q => W(q[0], q[1], 0.08)), true));
     if (CD) l.poli(CD.losa1.map(q => W(q[0], q[1], 0.08)), true);
     const lineas = new THREE.LineSegments(l.geo(), new THREE.LineDashedMaterial({ color: 0x555555, dashSize: 1.2, gapSize: 0.9 }));
     lineas.computeLineDistances();
     gNolli.add(lineas);
-    const lp = new Lineas(); lp.poli(rect(PB.u0, PB.v0, PB.u1, PB.v1).map(q => W(q[0], q[1], 0.08)), true);
+    const lp = new Lineas(); lp.poli(G.PRED.map(q => W(q[0], q[1], 0.08)), true);
     gNolli.add(new THREE.LineSegments(lp.geo(), new THREE.LineBasicMaterial({ color: 0x777777 })));
   }
 
@@ -1310,7 +1832,7 @@ function crea(svg, op) {
      chipote (hacia la plaza cultural).
      Se dibuja en 2D sobre la imagen (el mismo grueso en pantalla, encima de
      todo), proyectando los puntos 3D: al orbitar se mueve con el modelo. Los
-     ejes y los centros, en el plano del aro (+9.8): ahí las relaciones son
+     ejes y los centros, en el plano del aro (+10.03): ahí las relaciones son
      exactas y una recta en 3D sigue siendo recta en la imagen. */
   const ESQ = (() => {
     const zc = ANILLO.z, masas = [];
@@ -1379,8 +1901,6 @@ function crea(svg, op) {
       ejes: ejes.map(e => ({ a: P3(e.a[0], e.a[1], zc), b: P3(e.b[0], e.b[1], zc), acento: e.acento })),
       orbita: giro.map(c => P3(c[0], c[1], zc)),
       circulo: G.aroPoli((ANILLO.ri + ANILLO.re) / 2, 240).map(q => P3(q[0], q[1], zc)),
-      base: circ([ANILLO.u, ANILLO.v], (ANILLO.ri + ANILLO.re) / 2, 160).map(q => P3(q[0], q[1], zc)),
-      chipote: [P3(ANILLO.u, ANILLO.v, zc), P3(...G.aroPunto(G.BULTO.th, (ANILLO.ri + ANILLO.re) / 2 + 6), zc)],
       centro: P3(ANILLO.u, ANILLO.v, zc)
     };
   })();
@@ -1426,9 +1946,8 @@ function crea(svg, op) {
       const e = envolvente(p);
       x.beginPath(); e.forEach((q, i) => i ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1])); x.closePath(); x.stroke();
     });
-    // el aro: el círculo generador (punteado) y su chipote hacia la plaza cultural, con su eje
+    // el aro: el círculo generador
     const curva = (pts, cierra) => { x.beginPath(); let ab = false; (cierra ? pts.concat([pts[0]]) : pts).forEach(p => { const q = S(p); if (!q) { ab = false; return; } if (ab) x.lineTo(q[0], q[1]); else { x.moveTo(q[0], q[1]); ab = true; } }); x.stroke(); };
-    x.lineWidth = 0.9; x.setLineDash([3, 4]); curva(ESQ.base, true); curva(ESQ.chipote, false); x.setLineDash([]);
     x.lineWidth = 1.4; curva(ESQ.circulo, true);
     // la órbita: el polígono de los centros de las masas
     const o = ESQ.orbita.map(S);
@@ -1452,7 +1971,7 @@ function crea(svg, op) {
   }
 
   /* ----- capas ----- */
-  const capas = { modulos: !!MOD, paisaje: !!PAI, estructura: false, sol: false, flujos: false, arboles: false, personas: false, accesos: false, nolli: false, planta: false, esquema: false };
+  const capas = { modulos: !!MOD, paisaje: !!PAI, estructura: false, sol: false, flujos: false, arboles: false, personas: false, accesos: false, nolli: false, planta: false, corte: false, esquema: false };
   function visibles() {
     // Nolli: sólo la figura y fondo (más los accesos y las personas, si están)
     const n = capas.nolli;
@@ -1473,6 +1992,19 @@ function crea(svg, op) {
     capaRot.classList.toggle('con-sol', capas.sol && !n);
     // sin paisaje, el predio es predio (no área verde)
     if (MATS.verde) MATS.verde.userData.papel = capas.paisaje ? 'verde' : 'predio';
+    // inspeccionando cualquier cosa, el aro no se oculta
+    if (conAro()) piezas.forEach(p => { if (p.ap === 'aro') p.g.visible = !n; });
+    aislaVisibles();
+    if (capas.corte && !enCorte) { enCorte = true; armaCorte(); enCorte = false; }   // el contorno sigue lo que se ve
+  }
+  let enCorte = false;
+  // aislado: sólo queda lo aislado (con sus partes, ocultas o no); lo demás se quita
+  function aislaVisibles() {
+    if (!aisl) return;
+    raizG.children.forEach(o => { o.visible = aisl.grupos.has(o); });
+    aisl.partes.forEach(pt => pt.objs.forEach(o => { o.visible = !pt.oculto; }));
+    [gSol, gPers, gAcc, gEstAcc, gNolli, gCorte].forEach(g => { g.visible = false; });
+    capaRot.classList.remove('con-sol');
   }
 
   /* ===== Cámara =====
@@ -1483,9 +2015,11 @@ function crea(svg, op) {
      El encuadre de la caja (encuadra) sólo se usa al abrir, con doble clic y
      al prender el sol. */
   const EL_MIN = 2, EL_MAX = 89, H_MIN = 1.5, H_MAX = 3000;
-  let AZ = 20, EL = 30, X = -1, ASP = 1;
+  // (la cámara arranca con la altura y el giro del tablero: el primer encuadre ya es el bueno)
+  let AZ = typeof op.az === 'number' ? ((op.az % 360) + 360) % 360 : 20, EL = typeof op.el === 'number' ? Math.max(2, Math.min(89, op.el)) : 30, X = -1, ASP = 1;
   let base = { c: new THREE.Vector3(), h: 100 };
   function caja() {   // [u0, u1, v0, v1, z0, z1] de lo que se encuadra
+    if (aisl) return aisl.caja;
     if (capas.nolli) return [S.u0 - 110, S.u1 + 110, S.v0 - 90, S.v1 + 90, 0, 1];
     if (capas.sol) return [CEN[0] - R_SOL, CEN[0] + R_SOL, CEN[1] - R_SOL, CEN[1] + R_SOL, 0, R_SOL];
     if (GENERAL) return [S.u0, S.u1, S.v0, S.v1, 0, MOD ? MOD.z0 + 8 * MOD.alto : 14];
@@ -1495,7 +2029,7 @@ function crea(svg, op) {
     const us = [], vs = []; let z0 = 0, z1 = 10;
     const mete = q => { us.push(q[0]); vs.push(q[1]); };
     if (ap === 'estacionamiento' && EST) { EST.bloques.forEach(b => G.pares(b.planta).forEach(mete)); z0 = -EST.sotanos * EST.entrepiso; z1 = 0; }
-    else if (ap === 'comercio') { G.NAVES.forEach(nv => { mete([nv.L.u0, nv.L.v0]); mete([nv.L.u1, nv.L.v1]); }); z1 = 9; }
+    else if (ap === 'comercio') { G.NAVES.forEach(nv => { mete([nv.L.u0, nv.L.v0]); mete([nv.L.u1, nv.L.v1]); }); if (MERC) MERC.naves.forEach(h => { mete([h[0], h[1]]); mete([h[2], h[3]]); }); z1 = 9; }
     else if (ap === 'industria' && MOD && MOD.industria) { G.pares(MOD.industria.planta).forEach(mete); z1 = MOD.industria.z1; }
     else if (ap === 'cultura') { [[PLAZA_C.u0, PLAZA_C.v0], [PLAZA_C.u1, PLAZA_C.v1]].forEach(mete); mete([ANILLO.u - ANILLO.re, ANILLO.v - ANILLO.re]); z1 = ANILLO.z; }
     else if (ap === 'aro') { G.aroPoli(ANILLO.re, 72).forEach(mete); z1 = ANILLO.z + 1; }
@@ -1595,11 +2129,13 @@ function crea(svg, op) {
     if (k === 1) return;
     // el punto bajo el cursor se queda quieto: la cámara y lo que mira se le acercan
     const P = puntoEn(fx, fy);
+    vueloTok++;   // la mano manda: se corta el vuelo
     base.c.sub(P).multiplyScalar(k).add(P);
     base.h = h;
     ponCamara();
   }
   function mueve(dfx, dfy) {
+    vueloTok++;
     const d = direccion(), r = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize(), u = new THREE.Vector3().crossVectors(r, d).normalize();
     base.c.addScaledVector(r, -dfx * 2 * base.h * ASP).addScaledVector(u, dfy * 2 * base.h);
     ponCamara();
@@ -1612,6 +2148,13 @@ function crea(svg, op) {
     capas[nombre] = !!si;
     if (nombre === 'color') { conColor = !!si; aplicaEstilo(); return; }
     if (nombre === 'esquema') { conEsquema = !!si; aplicaEstilo(); return; }
+    if (nombre === 'estructura' && !si && enEstr) { enEstr = false; aplicaEstilo(); }
+    if (nombre === 'corte') {
+      CORTE_Y.value = si ? CORTE_ALTO : 1e5;
+      renderer.clippingPlanes = si ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), CORTE_ALTO)] : [];
+      camaraSegun(); if (era !== capas.corte) vuelaA();
+      visibles(); gCorte.visible = !!si; if (si) armaCorte(); pide(); return;
+    }
     visibles();
     if (nombre === 'paisaje') aplicaEstilo();
     if (nombre === 'sol' && era !== capas.sol) { solea(ultimoMs || performance.now()); vuelaA(); }
@@ -1620,21 +2163,81 @@ function crea(svg, op) {
     // Planta: la misma escena, vista desde arriba en ortográfica (la página pone la cámara cenital, norte arriba)
     if (nombre === 'planta' && era !== capas.planta) { camaraSegun(); vuelaA(); }
     if (ext.capa) ext.capa(nombre, !!si);
+    aislaVisibles();
     pide();
   }
+  // el contorno del corte: donde el plano y = CORTE_ALTO cruza cada triángulo de lo que se ve
+  const gCorte = new THREE.Group(); gCorte.visible = false; escena.add(gCorte);
+  function armaCorte() {
+    while (gCorte.children.length) { const o = gCorte.children.pop(); o.geometry.dispose(); o.material.dispose(); }
+    const h = CORTE_ALTO, y = h - 0.02, seg = [], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), M = new THREE.Matrix4(), P = [];
+    const corta = (p, q, r) => {
+      const v = [p, q, r], pts = [];
+      for (let i = 0; i < 3; i++) {
+        const u = v[i], w = v[(i + 1) % 3];
+        if ((u.y - h) * (w.y - h) < 0) { const t = (h - u.y) / (w.y - u.y); pts.push(u.x + (w.x - u.x) * t, u.z + (w.z - u.z) * t); }
+      }
+      if (pts.length === 4) seg.push(pts[0], y, pts[1], pts[2], y, pts[3]);
+    };
+    escena.updateMatrixWorld(true);
+    escena.traverse(o => {
+      if (!o.isMesh || !o.material.uniforms || !o.material.uniforms.uCorte || o.geometry.isInstancedBufferGeometry) return;
+      for (let p = o; p; p = p.parent) if (!p.visible || p === gCorte || p === gNolli) return;
+      const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count;
+      const n0 = o.isInstancedMesh ? o.count : 1;
+      for (let k = 0; k < n0; k++) {
+        if (o.isInstancedMesh) { o.getMatrixAt(k, M); M.premultiply(o.matrixWorld); } else M.copy(o.matrixWorld);
+        for (let i = 0; i < n; i += 3) {
+          const i0 = idx ? idx.getX(i) : i, i1 = idx ? idx.getX(i + 1) : i + 1, i2 = idx ? idx.getX(i + 2) : i + 2;
+          a.fromBufferAttribute(pos, i0).applyMatrix4(M); b.fromBufferAttribute(pos, i1).applyMatrix4(M); c.fromBufferAttribute(pos, i2).applyMatrix4(M);
+          if (Math.min(a.y, b.y, c.y) < h && Math.max(a.y, b.y, c.y) > h) corta(a, b, c);
+        }
+      }
+    });
+    // columnas (líneas verticales que cruzan el plano): un cuadrito de 0.5 m
+    gCol.traverse(o => {
+      if (!o.isLineSegments) return;
+      const pos = o.geometry.attributes.position;
+      for (let i = 0; i + 1 < pos.count; i += 2) {
+        a.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); b.fromBufferAttribute(pos, i + 1).applyMatrix4(o.matrixWorld);
+        if (Math.hypot(a.x - b.x, a.z - b.z) < 0.01 && Math.min(a.y, b.y) < h && Math.max(a.y, b.y) > h) {
+          const q = 0.25, s4 = [[-q, -q], [q, -q], [q, q], [-q, q]];
+          for (let j = 0; j < 4; j++) { const u = s4[j], w = s4[(j + 1) % 4]; seg.push(a.x + u[0], y, a.z + u[1], a.x + w[0], y, a.z + w[1]); }
+        }
+      }
+    });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3));
+    const m = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true }));
+    m.renderOrder = 6; m.frustumCulled = false; gCorte.add(m);
+  }
   // la cámara se va al encuadre nuevo (sol prendido o apagado) en 0.9 s
-  function vuelaA() {
+  /* La cámara vuela al encuadre (de la caja que toque) en dur ms. El zoom va
+     en escala logarítmica (parejo a la vista) y, si el centro se mueve lejos
+     para lo que se ve, la cámara sube un poco a medio camino (se ve de dónde
+     viene y a dónde va). Zoom o mover con la mano cortan el vuelo. */
+  let vueloTok = 0;
+  function vuelaA(dur) {
     const de = { c: base.c.clone(), h: base.h };
     encuadra();
-    const a = { c: base.c.clone(), h: base.h }, t0 = performance.now(), dur = 900;
+    const a = { c: base.c.clone(), h: base.h }, t0 = performance.now(), tok = ++vueloTok;
+    dur = dur || 900;
+    const salto = Math.min(0.9, de.c.distanceTo(a.c) / (2.5 * Math.max(de.h, a.h)));
     const suave = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    base = { c: de.c.clone(), h: de.h };
     (function paso(ms) {
-      if (muerto) return;
+      if (muerto || tok !== vueloTok) return;
       const t = Math.min(1, (ms - t0) / dur), k = suave(t);
-      base = { c: de.c.clone().lerp(a.c, k), h: de.h * Math.pow(a.h / de.h, k) };
+      base = { c: de.c.clone().lerp(a.c, k), h: de.h * Math.pow(a.h / de.h, k) * (1 + salto * Math.sin(Math.PI * k)) };
       ponCamara();
       if (t < 1) requestAnimationFrame(paso); else { base = a; ponCamara(); }
     })(t0);
+  }
+  // la cámara de otra escena (al cambiar de apartado): se arranca de ella y se vuela al encuadre
+  function camara(c) {
+    if (!c) return { c: base.c.toArray(), h: base.h };
+    base = { c: new THREE.Vector3().fromArray(c.c), h: c.h };
+    ponCamara();
+    vuelaA(1300);
   }
   // Ocultar una parte de lo propuesto ('vivienda', 'comercio', 'industria',
   // 'cultura', 'aro', 'paisajismo', 'estacionamiento'); oculta(ap) sin si: ¿está oculta?
@@ -1644,7 +2247,9 @@ function crea(svg, op) {
     if (si) ocultos.add(ap); else ocultos.delete(ap);
     visibles(); pide();
   }
-  function seleccion(t) { resalta = t; espacioAct = null; aplicaEstilo(); }
+  function seleccion(t) { resalta = t; espacioAct = null; aplicaEstilo(); visibles(); }
+  // inspeccionar la estructura: lo demás en contorno (mostrarla nada más no cambia lo demás)
+  function inspeccionaEstructura(si) { enEstr = !!si; aplicaEstilo(); visibles(); pide(); }
   function espacio(e) { espacioAct = e; if (e) resalta = null; aplicaEstilo(); }
   function solea(ms) {
     ultimoMs = ms;
@@ -1679,41 +2284,169 @@ function crea(svg, op) {
     return hit ? hit.object.userData.ap : null;
   }
 
-  /* ----- armar y desarmar (como un video: las piezas crecen del piso) ----- */
+  /* ----- armar y desarmar: se dibuja como a mano (ver DIB_GLSL) -----
+     Una animación a la vez (la nueva corta a la anterior). arma: las líneas se
+     trazan y luego las caras se rellenan, en un barrido radial que empieza en
+     el apartado (o de donde se viene); desarma: al revés, de lo lejano hacia
+     el apartado al que se va. */
+  let animTok = 0;
   function anima(dur, f, listo) {
+    const tok = ++animTok;
+    // con la pestaña oculta no hay cuadros (requestAnimationFrame se detiene): se termina de una vez
+    if (document.hidden) { f(1); pide(); if (listo) listo(); return; }
     const t0 = performance.now();
     (function paso(ms) {
-      if (muerto) return;
+      if (muerto || tok !== animTok) return;
       const t = Math.min(1, Math.max(0, (ms - t0) / dur));
       f(t); pide();
       if (t < 1) requestAnimationFrame(paso); else if (listo) listo();
     })(t0);
   }
-  const salida = t => 1 - Math.pow(1 - t, 3), entrada = t => t * t * t;
-  function arma(desde, dur, listo) {
-    dur = dur || 1100;
-    piezas.forEach(p => { p.g.scale.y = 0.001; });
-    anima(dur, t => piezas.forEach(p => {
-      const k = Math.min(1, Math.max(0, (t - p.z * 0.55) / 0.45));
-      p.g.scale.y = Math.max(0.001, salida(k));
-    }), () => { piezas.forEach(p => { p.g.scale.y = 1; }); if (listo) listo(); });
+  // barrido: { radial, O (mundo), V } → el canal U; luego se traza (o se borra) en dur ms
+  function dibuja(U, b, dur, listo, borra) {
+    U.uDib.value.z = b.radial ? 1 : 0; U.uDibO.value.copy(b.O); U.uDibV.value.copy(b.V);
+    const avance = a => { U.uDib.value.x = Math.min(1, a / 0.7); U.uDib.value.y = Math.max(0, Math.min(1, (a - 0.32) / 0.68)); };
+    avance(borra ? 1 : 0);
+    anima(dur, t => avance(borra ? 1 - t : t), () => { avance(borra ? 0 : 1); if (listo) listo(); });
   }
-  function desarma(ap, dur, listo) {
-    dur = dur || 650;
-    anima(dur, t => piezas.forEach(p => {
-      if (p.ap && p.ap === ap) return;
-      const k = Math.min(1, Math.max(0, (t - (1 - p.z) * 0.4) / 0.6));
-      p.g.scale.y = Math.max(0.001, 1 - entrada(k));
-    }), listo);
+  // radial desde el centro de la caja k [u0, u1, v0, v1, …] hasta la esquina más lejana del bloque
+  function barridoDesde(k) {
+    const cu = (k[0] + k[1]) / 2, cv = (k[2] + k[3]) / 2;
+    const r1 = Math.max(...[[S.u0, S.v0], [S.u1, S.v0], [S.u0, S.v1], [S.u1, S.v1]].map(q => Math.hypot(q[0] - cu, q[1] - cv)));
+    return { radial: true, O: new THREE.Vector3(...W(cu, cv, 0)), V: new THREE.Vector3(Math.min(r1 * 0.12, 12), r1, 0) };
+  }
+  // de abajo hacia arriba (y un poco en diagonal) sobre la caja k: como se dibuja una axonometría
+  function barridoSube(k) {
+    const O = new THREE.Vector3(k[0] - CEN[0], k[4], -(k[3] - CEN[1])), t = new THREE.Vector3(k[1] - k[0], k[5] - k[4], k[3] - k[2]);
+    const w = new THREE.Vector3(0.3, 1, 0.3);
+    return { radial: false, O, V: w.multiplyScalar(1 / Math.max(1, w.dot(t))) };
+  }
+  function arma(desde, dur, listo) { dibuja(DIB.base, barridoDesde(desde ? cajaAp(desde) : caja()), dur || 1400, listo); }
+  function desarma(ap, dur, listo) { dibuja(DIB.base, barridoDesde(ap ? cajaAp(ap) : caja()), dur || 450, listo, true); }
+
+  /* ----- aislar un uso -----
+     aisla(ap): se queda sólo ese uso (todo lo demás se quita), la cámara vuela
+     a encuadrarlo y se dibuja de nuevo, de abajo hacia arriba. Sus partes
+     (PARTES[ap]) se ocultan o se desplazan (despiece) por separado.
+     aisla(null): todo regresa y se vuelve a dibujar desde lo que estaba aislado.
+     (La página pone la axonometría: perspectiva(false).) */
+  function gruposDe(ap) {
+    if (ap === 'comercio' && MERCADO) return piezas.filter(p => /^mercado-|^cinta$/.test(p.g.name)).map(p => p.g);
+    // la nave norte abierta: el mercado sin la planta alta de la sur ni las columnas de la vivienda, y el aro (sin la cinta)
+    if (ap === 'nave-norte' && MERCADO) return piezas.filter(p => (/^mercado-/.test(p.g.name) && !/^mercado-(pa|vivienda)$/.test(p.g.name)) || (p.ap === 'aro' && p.g.name !== 'cinta')).map(p => p.g);
+    if (ap === 'vivienda') return gMods.slice();
+    if (ap === 'paisajismo') return [gPai, gPlantas];
+    if (ap === 'estacionamiento') return [gEst];
+    return piezas.filter(p => p.ap === ap && !p.g.userData.oculto).map(p => p.g);
+  }
+  const mueve3 = pt => !!(pt.dir || pt.objs.some(o => o.userData.dir));
+  // (la de la parte manda: un mismo grupo se mueve distinto en el mercado y en la nave norte abierta)
+  function dirDe(pt, o) { return pt.dir || o.userData.dir || [0, 0, 0]; }
+  // dónde va cada grupo de una parte: el despiece (dir · k)
+  function coloca(pt, o, k) { const d = dirDe(pt, o); o.position.set(d[0] * k, d[1] * k, d[2] * k); }
+  // la caja (u, v, z) de lo que se ve de lo aislado (con las partes donde estén o donde van a quedar)
+  function cajaAislado(final) {
+    const b = new THREE.Box3(), bb = new THREE.Box3(), guarda = [];
+    if (final) aisl.partes.forEach(pt => pt.objs.forEach(o => { guarda.push([o, o.position.clone()]); coloca(pt, o, pt.desplazado ? 1 : 0); }));
+    aisl.grupos.forEach(g => {
+      g.updateMatrixWorld(true);
+      g.traverse(o => {
+        if (!o.geometry || o.geometry.isInstancedBufferGeometry || o.isInstancedMesh) return;
+        for (let p = o; p && p !== raizG; p = p.parent) if (!p.visible) return;
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        b.union(bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld));
+      });
+    });
+    guarda.forEach(([o, p]) => { o.position.copy(p); o.updateMatrixWorld(true); });
+    if (b.isEmpty()) return cajaAp(aisl.ap);
+    return [b.min.x + CEN[0], b.max.x + CEN[0], CEN[1] - b.max.z, CEN[1] - b.min.z, b.min.y, b.max.y];
+  }
+  function partes() {
+    return aisl ? aisl.partes.map(pt => ({ id: pt.id, nombre: pt.nombre, oculto: pt.oculto, desplazado: pt.desplazado, mueve: mueve3(pt) })) : null;
+  }
+  // todo a su lugar (sin despiece)
+  function reiniciaPartes(ocultas) {
+    aisl.partes.forEach(pt => { pt.desplazado = false; pt.k = 0; pt.oculto = ocultas ? pt.oculta : false; pt.objs.forEach(o => o.position.set(0, 0, 0)); });
+  }
+  function aisla(ap) {
+    if (!ap) {
+      if (!aisl) return null;
+      const k = aisl.caja;
+      reiniciaPartes(false);
+      aisl = null; despTok++;
+      aplicaEstilo(); visibles();
+      vuelaA(1100);
+      dibuja(DIB.base, barridoDesde(k), 1400);
+      return null;
+    }
+    const grupos = gruposDe(ap);
+    if (!grupos.length) return null;
+    if (aisl) reiniciaPartes(false);   // (de un aislado a otro: lo movido regresa)
+    aisl = { ap, grupos: new Set(grupos), partes: PARTES[ap] || [] };
+    reiniciaPartes(true);
+    aplicaEstilo(); visibles();
+    aisl.caja = cajaAislado();
+    vuelaA(1000);
+    dibuja(DIB.base, barridoSube(aisl.caja), 1700);
+    return partes();
+  }
+  /* una parte: { oculto, desplazado }; despiece(si): todas las que se mueven.
+     El desplazamiento se anima (750 ms); con el despiece completo la cámara
+     se abre para que quepa todo. */
+  let despTok = 0;
+  function despliega(encuadrar) {
+    if (!aisl) return;
+    const tok = ++despTok, t0 = performance.now(), de = aisl.partes.map(pt => pt.k);
+    if (encuadrar) { aisl.caja = cajaAislado(true); vuelaA(800); }
+    (function paso(ms) {
+      if (muerto || tok !== despTok || !aisl) return;
+      const t = Math.min(1, (ms - t0) / 750), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      aisl.partes.forEach((pt, i) => {
+        pt.k = de[i] + ((pt.desplazado ? 1 : 0) - de[i]) * e;
+        pt.objs.forEach(o => coloca(pt, o, pt.k));
+      });
+      pide();
+      if (t < 1) requestAnimationFrame(paso);
+      else if (!encuadrar) aisl.caja = cajaAislado();
+    })(t0);
+  }
+  function ponParte(id, c) {
+    const pt = aisl && aisl.partes.find(p => p.id === id);
+    if (!pt) return partes();
+    if (c.oculto !== undefined) { pt.oculto = !!c.oculto; visibles(); pide(); }
+    if (c.desplazado !== undefined && mueve3(pt)) { pt.desplazado = !!c.desplazado; despliega(false); }
+    return partes();
+  }
+  function despiece(si) {
+    if (!aisl) return null;
+    aisl.partes.forEach(pt => { if (mueve3(pt)) pt.desplazado = !!si; });
+    despliega(true);
+    return partes();
+  }
+
+  /* ----- la nave norte bajo el cursor -----
+     ¿El rayo toca primero algo de la nave norte del mercado (userData.norte en
+     él o en sus grupos)? El doble clic la abre (aisla('nave-norte')). */
+  function naveNorteEn(ev) {
+    if (!MERCADO || !ev || ev.clientX === undefined) return false;
+    const r = lienzo.getBoundingClientRect();
+    ndc.set((ev.clientX - r.left) / r.width * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, cam);
+    const hit = ray.intersectObjects(visiblesPicables(), false)[0];
+    for (let o = hit ? hit.object : null; o; o = o.parent) if (o.userData.norte) return true;
+    return false;
   }
   function destruye() {
     muerto = true;
     if (ext.destruye) ext.destruye();
-    escena.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    // (las geometrías de la CACHE se quedan para la próxima escena; el lienzo y el renderer, también)
+    escena.traverse(o => {
+      if (o.geometry && !o.geometry.userData.fija) o.geometry.dispose();
+      if (o.material) [].concat(o.material).forEach(m => m.dispose());
+    });
     Object.values(MATS).forEach(m => m.dispose()); Object.values(ARISTAS).forEach(m => m.dispose()); Object.values(LINEAS).forEach(m => m.dispose());
-    renderer.dispose();
-    lienzo.remove(); capaRot.remove(); lienzoEsq.remove();
-    svg.style.display = '';
+    renderer.renderLists.dispose();
+    capaRot.remove(); lienzoEsq.remove();
   }
   function cambiaEstilo(n) {
     if (!ESTILOS[n]) return;
@@ -1722,18 +2455,21 @@ function crea(svg, op) {
   }
   let persp = true;
   // en planta y en el Nolli, siempre ortográfica
-  function camaraSegun() { cam = capas.nolli || capas.planta ? camO : persp ? camP : camO; }
+  function camaraSegun() { cam = capas.nolli || capas.planta || capas.corte ? camO : persp ? camP : camO; }
   function perspectiva(si) { persp = !!si; camaraSegun(); ponCamara(); }
 
   /* ----- extras (atlampa-3d-ctx.js) -----
      ext = EXTRAS.crea(api): lo que el motor les presta (herramientas de
-     geometría, piezas, materiales, capas, cámara). Devuelve, si quiere:
+     geometría, piezas, materiales, capas, cámara, el canal de dibujo del
+     contexto). Devuelve, si quiere:
        capa(nombre, si)  · vista(x) (0 sitio → 1 contexto) · fluye(ms)
-       preparaContexto(listo) · pinta(cam) (rótulos HTML) · destruye() */
+       preparaContexto(listo) · listo() · pinta(cam) (rótulos HTML) · destruye() */
   const ext = EXTRAS && EXTRAS.crea ? EXTRAS.crea({
     THREE, G, W, rect, circ, ccw, Malla, Lineas, tapa, muros, prisma, pieza, pon, ponLineas, material, arista, linea,
     escena, raizG, capaRot, trabajo, capas, pide, aplicaEstilo, ESTILOS, PROGRAMA, GENERAL, ESC,
-    matAtlas, mallaAtlas, ARBOLES_TEX, matArbol,
+    matAtlas, mallaAtlas, ARBOLES_TEX, matArbol, dib: DIB.ctx,
+    // pinta un cuadro ya (para que la tarjeta de video suba lo recién armado antes de usarlo)
+    calienta: () => { if (!muerto) renderer.render(escena, cam); },
     camara: () => cam, X: () => X
   }) || {} : {};
 
@@ -1744,9 +2480,12 @@ function crea(svg, op) {
   vista(0, AZ, EL);
 
   return {
-    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio,
+    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura,
+    aisla, partes, ponParte, despiece, aislado: () => aisl ? aisl.ap : null, camara,
+    naveNorteEn,
     depura: () => ({ escena, capas }),   // para revisar desde la consola
-    preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); }, separa,
+    preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); },
+    contextoListo: () => !ext.listo || ext.listo(), separa,
     fluye(ms) { if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
     minimapa: G.minimapa, limitesElevacion: [EL_MIN, EL_MAX], escena: ESC, tipos: MOD ? MOD.tipos : [],
     aumento: () => 1, azimut: () => AZ, elevacion: () => EL, estilo: cambiaEstilo, perspectiva, estilos: Object.keys(ESTILOS), motor: '3d'
