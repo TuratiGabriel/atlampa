@@ -51,7 +51,7 @@ function menosCaja(c, h) {
 const W = (u, v, z) => [u - CEN[0], z, -(v - CEN[1])];
 
 /* ---------- Estilos ---------- */
-const PAPELES = ['suelo', 'calle', 'banqueta', 'predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'proyecto', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'arbusto', 'copa', 'est', 'rampa', 'vidrio'];
+const PAPELES = ['suelo', 'calle', 'banqueta', 'predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'proyecto', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'arbusto', 'copa', 'est', 'rampa', 'vidrio'];
 const ESTILOS = {
   rayado: {
     // Croquis + rayado (lo que escogió Gabriel): los volúmenes sólo con sus
@@ -86,19 +86,19 @@ const ESTILOS = {
 };
 // colores del programa (lámina de usos), para el modo Color
 // (en tonos claros: sobre el fondo negro tienen que leerse)
-const PROGRAMA = { vivienda: '#ff5cb0', comercio: '#8a98ff', industria: '#d2d4d8', publico: '#ff6f63', cultura: '#c9a6ff', verde: '#a8e063', agua: '#8fd0ff', tez: '#ff9a6b', est: '#d2d4d8', aro: '#f2c14e' };
+const PROGRAMA = { vivienda: '#ff5cb0', comercio: '#8a98ff', industria: '#d2d4d8', publico: '#ff6f63', cultura: '#c9a6ff', verde: '#a8e063', agua: '#8fd0ff', tez: '#ff9a6b', est: '#d2d4d8', aro: '#f2c14e', social: '#e8ff5a' };
 // qué programa / espacio es cada papel
-const PROG_DE = { nave: 'comercio', vidrio: 'comercio', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', modcom: 'comercio', aro: 'aro', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est', rampa: 'est' };
+const PROG_DE = { social: 'social', nave: 'comercio', vidrio: 'comercio', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', modcom: 'comercio', social: 'social', aro: 'aro', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est', rampa: 'est' };
 // Público / privado (un solo botón, dos colores): privado, los volúmenes de
 // vivienda y la industria; lo demás del proyecto, público (también los módulos
 // que se abren al aro, que son comercio). Lo que no es del proyecto (calles,
 // contexto, estacionamiento) no se colorea.
 const ESPACIO_DE = { modulo: 'privado', industria: 'privado' };
 const ESPACIO_COLOR = { publico: '#35d0c4', privado: '#ff7a3d' };
-const DEL_PROYECTO = ['predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'banqueta', 'nave', 'vidrio', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'arbusto', 'copa', 'proyecto'];
+const DEL_PROYECTO = ['predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'banqueta', 'nave', 'vidrio', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'arbusto', 'copa', 'proyecto'];
 const espacioDe = papel => DEL_PROYECTO.indexOf(papel) >= 0 ? (ESPACIO_DE[papel] || 'publico') : null;
 // qué papeles resalta cada opción de Resaltar (y las líneas de plantas van con el paisaje)
-const RESALTA_PAPELES = { modulos: ['modulo'], comercio: ['nave', 'modcom', 'vidrio'], cultura: ['cultura', 'plaza'], industria: ['industria'], aro: ['aro'],
+const RESALTA_PAPELES = { modulos: ['modulo', 'social'], comercio: ['nave', 'modcom', 'vidrio'], cultura: ['cultura', 'plaza'], industria: ['industria'], aro: ['aro'],
   paisajismo: ['verde', 'tezontle', 'agua', 'filtro', 'arbusto', 'copa'], estacionamiento: ['est', 'rampa'] };
 const LINEAS_PAISAJE = ['pasto', 'flor', 'junco', 'tronco', 'sendero', 'rayo'];
 // los árboles que se plantan con el proyecto son jóvenes (Gabriel: «no tienen tanto tiempo ahí»): 60 % del porte
@@ -424,7 +424,17 @@ const ARBOLES_TEX = (() => {
 function crea(svg, op) {
   op = op || {};
   const ESC = op.escena || 'general', GENERAL = ESC === 'general';
-  const MERCADO = ESC === 'comercio' ? MERC : null;   // el mercado de Rhino, sólo inspeccionando Comercio
+  /* El mercado de Rhino: completo inspeccionando Comercio; en la vista general,
+     ligero, como fachada de papel (2026-10-12, Gabriel: «que ya se note un poco más
+     del detalle, no todo»): lo exterior y los cambios (muros, cubiertas con el hoyo,
+     vidrio, cinta, patios del aro y la planta alta de la nave sur, que ya no tiene
+     cubierta), sin el acero ni el interior de la nave norte. */
+  const subconj = (o, ks) => { if (!o) return null; const r = {}; ks.forEach(k => { if (o[k]) r[k] = o[k]; if (o[k + 'L']) r[k + 'L'] = o[k + 'L']; }); return r; };
+  const LIGERO = GENERAL && MERC;
+  const MERCADO = ESC === 'comercio' ? MERC : LIGERO ? Object.assign({}, MERC, {
+    acero: null, vivienda: null, paso3: subconj(MERC.paso3, ['banca', 'humedal', 'agua_p']),
+    sur: subconj(MERC.sur, ['pa', 'local', 'muro', 'tarima', 'maceta']), arboles: (MERC.arboles || []).filter(t => t[2] > 3)
+  }) : null;
   const trabajo = svg.parentNode;
   svg.style.display = 'none';
   // el lienzo y el renderer son de la sesión (ver RENDERER): la escena vieja se
@@ -470,7 +480,8 @@ function crea(svg, op) {
   let enEstr = false;
   let aisl = null;   // lo aislado (ver aisla): { ap, grupos, partes, caja }
   const conAro = () => enEstr || !!resalta || !GENERAL;
-  const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
+  for (const e of Object.values(ESTILOS)) if (e.papel && e.papel.modulo) e.papel.social = e.papel.modulo;
+const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   function material(papel) {
     if (MATS[papel]) return MATS[papel];
     const m = new THREE.ShaderMaterial({
@@ -526,7 +537,7 @@ function crea(svg, op) {
     if (ref) return REF;
     if (apagado(papel)) return 1;
     if (!resalta && !espacioAct) {
-      if (papel === 'modulo') return 0.5;
+      if (papel === 'modulo' || papel === 'social') return 0.5;
       if (PLANTA_BAJA.indexOf(papel) >= 0) return 1.3;
     }
     return 1;
@@ -598,7 +609,7 @@ function crea(svg, op) {
   }
   // Aristas de croquis: cada arista en dos trazos a mano (un poco chuecos, con
   // un quiebre a la mitad) que se pasan de las esquinas, como en un dibujo.
-  const CROQUIS = ['nave', 'industria', 'cultura', 'aro', 'modulo', 'modcom', 'proyecto', 'vidrio'];
+  const CROQUIS = ['nave', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'proyecto', 'vidrio'];
   function aristasCroquis(eg) {
     const p = eg.attributes.position.array, l = new Lineas(), azar = G.aleatorio(31);
     const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
@@ -895,7 +906,7 @@ function crea(svg, op) {
      cubiertas, atlampa-mercado.js) en lugar de las naves simples. */
   if (MERCADO) {
     // las geometrías, una vez por sesión (ver CACHE)
-    const MG = fija('mercado', () => {
+    const MG = fija(LIGERO ? 'mercado-ligero' : 'mercado', () => {
       const geo = a => {
         const p = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { const w = W(a[i], a[i + 1], a[i + 2]); p[i] = w[0]; p[i + 1] = w[1]; p[i + 2] = w[2]; }
@@ -985,10 +996,20 @@ function crea(svg, op) {
       if (P3) {
         r.p3 = {};
         [['piso', 'predio', 30], ['resto', 'predio', 30], ['zanja', 'filtro', 30], ['jardin', 'tezontle', 30], ['agua', 'agua', 1],
-          ['plataforma', 'nave', 30], ['escalera', 'nave', 30], ['local', 'modcom', 30], ['mesa', 'nave', 30]].forEach(([k, papel, umbral]) => {
+          ['plataforma', 'nave', 30], ['escalera', 'nave', 30], ['local', 'modcom', 30], ['mesa', 'nave', 30], ['banca', 'nave', 30], ['humedal', 'nave', 30], ['agua_p', 'agua', 1]].forEach(([k, papel, umbral]) => {
           if (P3[k]) r.p3[k] = geos(geo(P3[k]), papel, P3[k + 'L'] ? false : umbral, P3[k + 'L'] ? lineas(P3[k + 'L']) : null);
         });
         ['lamina', 'baranda', 'junco', 'pasto'].forEach(k => { if (P3[k + 'L']) r.p3[k] = lineas(P3[k + 'L']).geo(); });
+      }
+      // nave sur (mercado_sur): PB de carga, biodigestor y acuaponia; PA con puestos, comedores, tarimas y baños
+      const SU = MERCADO.sur;
+      if (SU) {
+        r.sur = {};
+        [['piso', 'predio'], ['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['pa', 'nave'], ['local', 'modcom'],
+          ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle'], ['columna', 'nave'], ['escalera', 'nave']].forEach(([k, papel]) => {
+          if (SU[k]) r.sur[k] = geos(geo(SU[k]), papel, SU[k + 'L'] ? false : (k === 'agua' ? 1 : 30), SU[k + 'L'] ? lineas(SU[k + 'L']) : null);
+        });
+        ['baranda', 'pasto', 'planta'].forEach(k => { if (SU[k + 'L']) r.sur[k + 'Lin'] = lineas(SU[k + 'L']).geo(); });
       }
       return r;
     });
@@ -1014,7 +1035,7 @@ function crea(svg, op) {
       if (v.r) ponLineas(g, v.r, 'vidrio-reflejo', 0xffffff, PROGRAMA.agua, 'comercio');
       return g;
     }) : [];
-    let gP = null, gA = null, gL = null, gV = null;
+    let gP = null, gA = null, gL = null, gV = null, gT = null;
     if (MG.p3) {
       const Q = MG.p3;
       gP = pieza('mercado-piso', 'comercio', 0.05); gA = pieza('mercado-plataformas', 'comercio', 0.3); gL = pieza('mercado-locales', 'comercio', 0.33); gV = pieza('mercado-verde', 'comercio', 0.5);
@@ -1028,6 +1049,8 @@ function crea(svg, op) {
       pone(gA, 'escalera', 'nave', 'comercio');   // (las contrahuellas)
       pone(gL, 'local', 'modcom', 'comercio');     // puestos y baños
       pone(gL, 'mesa', 'nave', 'comercio');        // comedores
+      // patios del aro: bancas, bordillo del estanque y su agua
+      if (Q.banca || Q.humedal) { gT = pieza('mercado-patios', 'comercio', 0.06); pone(gT, 'banca', 'nave', 'comercio'); pone(gT, 'humedal', 'nave', 'comercio'); pone(gT, 'agua_p', 'agua', 'comercio'); }
       const pl = (k, nombre, color, colorColor, g) => { if (Q[k]) ponLineas(g, Q[k], nombre, color, colorColor, 'comercio'); };
       pl('lamina', 'rayo-lamina', 0xffffff, null, gA);
       pl('baranda', 'columna-baranda', 0xffffff, null, gA);
@@ -1058,6 +1081,20 @@ function crea(svg, op) {
     if (gPA) parte('comercio', 'pa', 'Planta alta de la nave sur', [gPA]);
     if (gP) parte('comercio', 'piso', 'Piso, zanja y jardín', [gP]);
     if (gV) parte('comercio', 'verde', 'Vegetación', [gV]);
+    if (gT) parte('comercio', 'patios', 'Patios del aro (bancas y estanques)', [gT]);
+    // nave sur: la PB (carga, biodigestor, acuaponia) y la PA (una plataforma), cada una suelta
+    if (MG.sur) {
+      const Q = MG.sur, pb = pieza('mercado-sur-pb', 'comercio', 0.07), pa = pieza('mercado-sur-pa', 'comercio', 0.32);
+      const pon = (g, k, papel) => Q[k] ? ponGeos(g, Q[k], papel, 'comercio') : null;
+      const piso = pon(pb, 'piso', 'predio'); if (piso) suelos.push(piso);
+      [['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['columna', 'nave'], ['escalera', 'nave']].forEach(([k, papel]) => pon(pb, k, papel));
+      [['pa', 'nave'], ['local', 'modcom'], ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle']].forEach(([k, papel]) => pon(pa, k, papel));
+      if (Q.barandaLin) ponLineas(pa, Q.barandaLin, 'columna-baranda', 0xffffff, null, 'comercio');
+      if (Q.pastoLin) ponLineas(pa, Q.pastoLin, 'pasto', 0xffffff, PROGRAMA.verde, 'comercio');
+      if (Q.plantaLin) ponLineas(pb, Q.plantaLin, 'pasto', 0xffffff, PROGRAMA.verde, 'comercio');
+      parte('comercio', 'sur-pa', 'Nave sur · planta alta (puestos, comedores, baños)', [pa], [0, 5, 0]);
+      parte('comercio', 'sur-pb', 'Nave sur · planta baja (carga, biodigestor, acuaponia)', [pb]);
+    }
     if (gViv) parte('comercio', 'vivienda', 'Columnas de la vivienda', [gViv], null, true);
 
     /* abriendo la nave norte (doble clic sobre ella, ver aisla('nave-norte')):
@@ -1245,10 +1282,10 @@ function crea(svg, op) {
   if (MOD) {
     // (las geometrías, una vez por sesión: por nivel, y aparte los de comercio)
     const NIVELES = fija('modulos', () => {
-    const A = MOD.a / 2, Bm = MOD.b / 2, porNivel = {}, COM = MOD.tipos.indexOf('comercio');
+    const A = MOD.a / 2, Bm = MOD.b / 2, porNivel = {}, COM = MOD.tipos.indexOf('comercio'), SOC = MOD.tipos.indexOf('44SOC');
     MOD.cajas.forEach(r => {
-      const nivel = r[2], z0 = MOD.z0 + nivel * MOD.alto, z1 = z0 + MOD.alto, com = r[3] === COM, clave = (com ? 'c' : '') + nivel;
-      if (!porNivel[clave]) porNivel[clave] = { m: new Malla(), l: new Lineas(), com, nivel };
+      const nivel = r[2], z0 = MOD.z0 + nivel * MOD.alto, z1 = z0 + MOD.alto, com = r[3] === COM, soc = r[3] === SOC, clave = (com ? 'c' : '') + (soc ? 's' : '') + nivel;
+      if (!porNivel[clave]) porNivel[clave] = { m: new Malla(), l: new Lineas(), com, soc, nivel };
       const { m, l } = porNivel[clave];
       const P = (x, y, z) => W(r[0] + MEX[0] * x + MEY[0] * y, r[1] + MEX[1] * x + MEY[1] * y, z);
       const junta = {};
@@ -1298,9 +1335,10 @@ function crea(svg, op) {
       m.quad(P(-A, -Bm, z0), P(-A, Bm, z0), P(A, Bm, z0), P(A, -Bm, z0));
     });
     const r = {};
-    Object.keys(porNivel).forEach(k => { const p = porNivel[k]; r[k] = { com: p.com, nivel: p.nivel, c: fijas(geos(p.m, p.com ? 'modcom' : 'modulo', false, p.l)) }; });
+    Object.keys(porNivel).forEach(k => { const p = porNivel[k]; r[k] = { com: p.com, soc: p.soc, nivel: p.nivel, c: fijas(geos(p.m, p.com ? 'modcom' : p.soc ? 'social' : 'modulo', false, p.l)) }; });
     return r;
     });
+    const porPiso = {};   // la vivienda de cada nivel (media y social juntas, para el despiece)
     Object.values(NIVELES).sort((a, b) => a.nivel - b.nivel).forEach(p => {
       const n = p.nivel;
       if (p.com) {   // comercio: se queda aunque se apaguen los módulos (es parte del comercio)
@@ -1308,13 +1346,14 @@ function crea(svg, op) {
         ponGeos(g, p.c, 'modcom', 'comercio');
         return;
       }
-      const g = pieza('modulos' + n, 'vivienda', 0.6 + n * 0.05);
+      const g = pieza('modulos' + n + (p.soc ? 's' : ''), 'vivienda', 0.6 + n * 0.05);
       g.userData.capa = 'modulos';
-      ponGeos(g, p.c, 'modulo', 'vivienda');
+      ponGeos(g, p.c, p.soc ? 'social' : 'modulo', 'vivienda');
       gMods.push(g);
-      // aislando la vivienda: cada nivel se oculta solo, y el despiece los separa
-      parte('vivienda', 'n' + n, 'Nivel ' + (n + 1), [g], [0, n * 2.4, 0]);
+      (porPiso[n] = porPiso[n] || []).push(g);
     });
+    // aislando la vivienda: cada nivel se oculta solo, y el despiece los separa
+    Object.keys(porPiso).forEach(n => parte('vivienda', 'n' + n, 'Nivel ' + (+n + 1), porPiso[n], [0, n * 2.4, 0]));
   }
 
   /* ===== 8. Estructura: columnas que llegan al piso ===== */
@@ -1971,7 +2010,7 @@ function crea(svg, op) {
   }
 
   /* ----- capas ----- */
-  const capas = { modulos: !!MOD, paisaje: !!PAI, estructura: false, sol: false, flujos: false, arboles: false, personas: false, accesos: false, nolli: false, planta: false, corte: false, esquema: false };
+  const capas = { modulos: !!MOD, paisaje: !!PAI, estructura: false, sol: false, flujos: false, arboles: false, postes: false, personas: false, accesos: false, nolli: false, planta: false, corte: false, esquema: false };
   function visibles() {
     // Nolli: sólo la figura y fondo (más los accesos y las personas, si están)
     const n = capas.nolli;
@@ -2014,7 +2053,7 @@ function crea(svg, op) {
      que se ve a la distancia de ese punto (en perspectiva da la distancia).
      El encuadre de la caja (encuadra) sólo se usa al abrir, con doble clic y
      al prender el sol. */
-  const EL_MIN = 2, EL_MAX = 89, H_MIN = 1.5, H_MAX = 3000;
+  const EL_MIN = 2, EL_MAX = 89, H_MIN = 1.5, H_MAX = 3000, H_INT = 3;   // H_INT: desde ahí, inspeccionando, el zoom camina
   // (la cámara arranca con la altura y el giro del tablero: el primer encuadre ya es el bueno)
   let AZ = typeof op.az === 'number' ? ((op.az % 360) + 360) % 360 : 20, EL = typeof op.el === 'number' ? Math.max(2, Math.min(89, op.el)) : 30, X = -1, ASP = 1;
   let base = { c: new THREE.Vector3(), h: 100 };
@@ -2076,7 +2115,7 @@ function crea(svg, op) {
     camO.position.copy(c).addScaledVector(d, -1500); camO.up.set(0, 1, 0); camO.lookAt(c); camO.updateProjectionMatrix();
     const dist = h / Math.tan(camP.fov / 2 * RAD);
     camP.aspect = ASP; camP.position.copy(c).addScaledVector(d, -dist); camP.up.set(0, 1, 0); camP.lookAt(c);
-    camP.near = Math.max(1, dist * 0.05); camP.far = dist * 20; camP.updateProjectionMatrix();
+    camP.near = dist < 100 ? Math.max(0.05, dist * 0.01) : Math.max(1, dist * 0.05);   // de cerca casi nada se recorta (se puede estar adentro) camP.far = Math.max(dist * 20, 3000); camP.updateProjectionMatrix();
     pide();
   }
 
@@ -2107,9 +2146,14 @@ function crea(svg, op) {
   }
 
   /* ===== Interfaz (la misma que el motor SVG) ===== */
+  // dentro (de cerca, en perspectiva): girar es mirar alrededor desde la cámara, no orbitar
+  const dentro = () => cam === camP && base.h <= H_INT + 1e-6;
+  const EL_DENTRO = [-60, 85];
   function vista(x, az, el) {
+    const fija = dentro() ? camP.position.clone() : null;
     if (az !== undefined) AZ = ((az % 360) + 360) % 360;
-    if (el !== undefined) EL = Math.max(EL_MIN, Math.min(EL_MAX, el));
+    if (el !== undefined) EL = fija ? Math.max(EL_DENTRO[0], Math.min(EL_DENTRO[1], el)) : Math.max(EL_MIN, Math.min(EL_MAX, el));
+    if (fija) base.c.copy(fija).addScaledVector(direccion(), base.h / Math.tan(camP.fov / 2 * RAD));
     const nx = GENERAL ? Math.max(0, Math.min(1, x || 0)) : 0;
     if (nx !== X) { X = nx; encuadra(); if (ext.vista) ext.vista(X); }   // al abrir (y con el contexto)
     ponCamara();
@@ -2125,6 +2169,18 @@ function crea(svg, op) {
   }
   function acerca(f, fx, fy) {
     if (fx === undefined) { fx = 0.5; fy = 0.5; }
+    // al llegar al tope del zoom la cámara sigue de frente: lo que mira avanza con ella y se mete al interior
+    if (f > 1 && base.h / f < H_INT) {
+      vueloTok++;
+      const paso = Math.min(1.2, Math.max(0.3, Math.log(f) * 2.5));   // (m por golpe de rueda: se camina, no se salta)
+      if (base.h > H_INT) { const P = puntoEn(fx, fy); base.c.sub(P).multiplyScalar(H_INT / base.h).add(P); base.h = H_INT; }
+      // hacia donde apunta el cursor (en perspectiva) o al frente
+      ndc.set(fx * 2 - 1, -(fy * 2 - 1)); ray.setFromCamera(ndc, cam);
+      const dir = cam === camP ? ray.ray.direction.clone() : direccion();
+      base.c.addScaledVector(dir, paso);
+      alOjo();
+      ponCamara(); return;
+    }
     const h = Math.max(H_MIN, Math.min(H_MAX, base.h / f)), k = h / base.h;
     if (k === 1) return;
     // el punto bajo el cursor se queda quieto: la cámara y lo que mira se le acercan
@@ -2138,6 +2194,20 @@ function crea(svg, op) {
     vueloTok++;
     const d = direccion(), r = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize(), u = new THREE.Vector3().crossVectors(r, d).normalize();
     base.c.addScaledVector(r, -dfx * 2 * base.h * ASP).addScaledVector(u, dfy * 2 * base.h);
+    ponCamara();
+  }
+  // dentro, la cámara no se hunde bajo el piso: el ojo queda a ≥ 1.6 m del suelo del predio
+  function alOjo() {
+    const camY = base.c.y - direccion().y * base.h / Math.tan(camP.fov / 2 * RAD);
+    if (camY < 1.6) base.c.y += 1.6 - camY;
+  }
+  // caminar (WASD / Q E): adelante y de lado en horizontal, arriba en vertical; dentro, a pasos de 0.5 m
+  function pasea(adelante, lado, arriba) {
+    vueloTok++;
+    const d = direccion(), f = new THREE.Vector3(d.x, 0, d.z).normalize(), r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0));
+    const paso = dentro() ? 0.5 : base.h * 0.1;
+    base.c.addScaledVector(f, adelante * paso).addScaledVector(r, lado * paso).addScaledVector(new THREE.Vector3(0, 1, 0), arriba * paso);
+    if (dentro()) alOjo();
     ponCamara();
   }
   function reencuadra() { vuelaA(); }
@@ -2487,7 +2557,7 @@ function crea(svg, op) {
     preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); },
     contextoListo: () => !ext.listo || ext.listo(), separa,
     fluye(ms) { if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
-    minimapa: G.minimapa, limitesElevacion: [EL_MIN, EL_MAX], escena: ESC, tipos: MOD ? MOD.tipos : [],
+    minimapa: G.minimapa, limitesElevacion: [EL_MIN, EL_MAX], limitesDentro: EL_DENTRO, dentro, pasea, escena: ESC, tipos: MOD ? MOD.tipos : [],
     aumento: () => 1, azimut: () => AZ, elevacion: () => EL, estilo: cambiaEstilo, perspectiva, estilos: Object.keys(ESTILOS), motor: '3d'
   };
 }

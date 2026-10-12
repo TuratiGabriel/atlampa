@@ -8,7 +8,7 @@
    Contenido: el que tenía el motor SVG (ya retirado); el método, otro.
    ============================================================ */
 export function crea(api) {
-  const { THREE, G, W, rect, Malla, Lineas, tapa, prisma, pieza, pon, ponLineas, material, raizG, trabajo, capas, pide, aplicaEstilo, ESTILOS, GENERAL } = api;
+  const { THREE, G, W, rect, Malla, Lineas, tapa, prisma, pieza, pon, ponLineas, material, raizG, trabajo, capas, pide, aplicaEstilo, ESTILOS, GENERAL, mallaAtlas, matArbol, ARBOLES_TEX } = api;
   const D = G.D, { PB, GU, GF, S, HE, CEN, ESPUELA } = G;
   const pares = (a, desde) => { const r = []; for (let i = desde || 0; i < a.length; i += 2) r.push([a[i], a[i + 1]]); return r; };
 
@@ -62,17 +62,17 @@ export function crea(api) {
     }
   }
 
-  /* ===== 1. Postes de luz en la banqueta del predio (capa 'arboles') =====
-     Los árboles de banqueta (del escaneo) ya no van: con el sitio de Rhino caían
-     dentro del predio (Gabriel, 2026-10-09: «saca los árboles de la banqueta»).
-     Los postes también venían de la banqueta ancha del satélite: se pasan a la
-     de Rhino (anillo de 1.80 m a +0.20), al punto más cercano, a 0.45 m de la
-     guarnición, con el brazo hacia el arroyo. */
-  const gArb = pieza('arboles-banqueta', null, 0.3);
+  /* ===== 1. Árboles de banqueta (capa 'arboles') y postes de luz (capa 'postes') =====
+     Los del escaneo caían dentro del predio con el sitio de Rhino (2026-10-09), así
+     que no se dibujan donde estaban: cada uno se pasa a la banqueta de Rhino
+     (anillo de 1.80 m a +0.20), al punto más cercano de la guarnición (los
+     árboles a 1.0 m, de croquis y mirando a la cámara; los postes a 0.45 m, con
+     el brazo hacia el arroyo). Gabriel (2026-10-11) pidió el botón de árboles de vuelta. */
+  const gArb = pieza('arboles-banqueta', null, 0.3), gPos = pieza('postes-banqueta', null, 0.3);
   {
-    const Z = 0.2, GUP = G.GUP, n = GUP.length, po = new Lineas();
-    (D.postes || []).forEach(a => {
-      // el lado de la guarnición más cercano (GUP va antihorario: afuera queda a la derecha)
+    const Z = 0.2, GUP = G.GUP, n = GUP.length;
+    // el lado de la guarnición más cercano (GUP va antihorario: afuera queda a la derecha)
+    const aBanqueta = a => {
       let c = null;
       for (let k = 0; k < n; k++) {
         const p = GUP[k], q = GUP[(k + 1) % n], du = q[0] - p[0], dv = q[1] - p[1], L = Math.hypot(du, dv);
@@ -80,13 +80,32 @@ export function crea(api) {
         const x = p[0] + du * t, y = p[1] + dv * t, d = Math.hypot(a[0] - x, a[1] - y);
         if (!c || d < c.d) c = { d, x, y, hu: dv / L, hv: -du / L };
       }
-      const { hu, hv } = c, u0 = c.x - hu * 0.45, v0 = c.y - hv * 0.45, u1 = u0 + hu * 1.6, v1 = v0 + hv * 1.6;
+      return c;
+    };
+    const po = new Lineas();
+    (D.postes || []).forEach(a => {
+      const { hu, hv, x, y } = aBanqueta(a), u0 = x - hu * 0.45, v0 = y - hv * 0.45, u1 = u0 + hu * 1.6, v1 = v0 + hv * 1.6;
       po.seg(W(u0, v0, Z), W(u0, v0, Z + 8));
       po.seg(W(u0 - hu * 0.5, v0 - hv * 0.5, Z + 7.6), W(u1, v1, Z + 7.6));
       po.seg(W(u1 - hv * 0.3, v1 + hu * 0.3, Z + 7.5), W(u1 + hv * 0.3, v1 - hu * 0.3, Z + 7.5));
       po.seg(W(u1, v1, Z + 7.6), W(u1, v1, Z + 7.45));
     });
-    ponLineas(gArb, po, 'poste', 0xffffff);
+    ponLineas(gPos, po, 'poste', 0xffffff);
+    // árboles: ninguno a menos de 3 m de otro (al pasarlos a la banqueta varios caen juntos)
+    const ar = [];
+    (D.arboles || []).forEach(a => {
+      const { hu, hv, x, y } = aBanqueta(a), u = x - hu, v = y - hv;
+      if (!ar.some(t => Math.hypot(t[0] - u, t[1] - v) < 3)) ar.push([u, v, a[2]]);
+    });
+    if (ar.length && mallaAtlas) {
+      const b = mallaAtlas(ar.length, matArbol);
+      ar.forEach((t, i) => {
+        const p = W(t[0], t[1], Z);
+        b.aPos.setXYZ(i, p[0], p[1], p[2]); b.aEsc.setXY(i, ARBOLES_TEX.ancho * t[2], ARBOLES_TEX.alto * t[2]);
+        b.aTile.setX(i, Math.floor(((t[0] * 13.7 + t[1] * 7.1) % 3 + 3) % 3)); b.aVolt.setX(i, i % 2 ? 1 : -1);
+      });
+      gArb.add(b.malla);
+    }
   }
 
   /* ===== 2. Flujos: carriles (los del SVG) ===== */
@@ -427,6 +446,7 @@ export function crea(api) {
   /* ---------- capas ---------- */
   function visibles() {
     gArb.visible = !!capas.arboles;
+    gPos.visible = !!capas.postes;
     gFlu.visible = !!capas.flujos;
     nombresFijos();
   }

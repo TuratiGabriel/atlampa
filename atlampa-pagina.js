@@ -29,7 +29,7 @@
                 vivienda se resalta y la estructura se prende) y Ocultar /
                 Mostrar. La estructura empieza oculta.
      Capas      Paisaje, Sol, Contexto urbano.
-     Diagramas  Accesos, Personas, Flujos, Postes.
+     Diagramas  Accesos, Personas, Flujos, Árboles, Postes.
      Vista      Color, Perspectiva, Mapa Nolli, Estilo, Resaltar.
      Leyenda    Espuela, Banqueta, Agua.
    Lo prendido y lo oculto no cambian al pasar de un apartado a otro.
@@ -50,7 +50,7 @@
    al otro y lo nuevo se traza desde ahí (ya se puede mover mientras).
    Un solo bucle rAF: corre mientras algo se mueve y se detiene solo. Con
    movimiento reducido no hay animaciones: la escena cambia de golpe.
-   #contexto, #flujos, #arboles, #personas, #color, #sinmodulos,
+   #contexto, #flujos, #arboles, #postes, #personas, #color, #sinmodulos,
    #resalta=publico, #estructura, #sol, #aisla=comercio, #az=135, #el=20 en la
    dirección (para capturas).
    ============================================================ */
@@ -556,7 +556,8 @@
   function acerca(f, fx, fy) { dib.acerca(f, fx, fy); escala(); zona.classList.toggle('con-zoom', dib.aumento() > 1); }
   function orbita(dAz, dEl) {
     azMeta += dAz;
-    elMeta = Math.max(LIM[0], Math.min(LIM[1], elMeta + dEl));
+    var lim = dib && dib.dentro && dib.dentro() ? dib.limitesDentro : LIM;   // dentro de la nave se puede mirar hacia arriba
+    elMeta = Math.max(lim[0], Math.min(lim[1], elMeta + dEl));
     arranca();
   }
   zona.addEventListener('wheel', function (ev) {
@@ -639,6 +640,10 @@
     else if (k === 'ArrowDown') orbita(0, -5);
     else if (k === '+' || k === '=') acerca(1.25);
     else if (k === '-') acerca(0.8);
+    else if (dib.pasea && /^[wasdqe]$/i.test(k) && !ev.ctrlKey && !ev.metaKey) {   // caminar (dentro de las naves)
+      var K = k.toLowerCase();
+      dib.pasea(K === 'w' ? 1 : K === 's' ? -1 : 0, K === 'd' ? 1 : K === 'a' ? -1 : 0, K === 'e' ? 1 : K === 'q' ? -1 : 0); escala();
+    }
     else if (k === '0') { dib.reencuadra(); escala(); zona.classList.remove('con-zoom'); }
     else hecho = false;
     if (hecho) ev.preventDefault();
@@ -682,7 +687,7 @@
   }
   monta();
   if (h.indexOf('contexto') >= 0) ponContexto(true, true);
-  ['flujos', 'arboles', 'personas', 'color', 'sol', 'esquema', 'corte'].forEach(function (n) { if (h.indexOf(n) >= 0) ponCapa(n, true); });
+  ['flujos', 'arboles', 'postes', 'personas', 'color', 'sol', 'esquema', 'corte'].forEach(function (n) { if (h.indexOf(n) >= 0) ponCapa(n, true); });
   if (h.indexOf('estructura') >= 0) ponOculta('estructura', false);
   if (h.indexOf('sinmodulos') >= 0) ponOculta('vivienda', true);
   var th = h.filter(function (s) { return /^resalta=/.test(s); })[0];

@@ -11,7 +11,7 @@ esquina y la ficha del apartado. Menús:
              estructura); al picar una se abre su submenú: Inspeccionar (ir a
              su apartado) y Ocultar / Mostrar.
   Capas      Paisaje, Sol y Contexto urbano (éste sólo en la general).
-  Diagramas  Accesos, Personas, Flujos y Postes.
+  Diagramas  Accesos, Personas, Flujos, Árboles y Postes.
   Vista      Color, Perspectiva, Mapa Nolli, Estilo y Resaltar (uno a la vez).
   Leyenda    Espuela, Banqueta y Agua.
 Al cambiar de apartado sólo cambian la ruta y la ficha: lo prendido y lo
@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261010c'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261012c'      # versión de los archivos (para que el navegador no use los viejos)
 
 SOTANOS = '''
       <div class="hud-grupo" role="group" aria-label="Sótanos">
@@ -106,7 +106,7 @@ def pagina(k):
 CAPAS = [('modulos', 'Módulos', True, ''), ('paisaje', 'Paisaje', True, ''), ('sol', 'Sol', False, ''),
          ('contexto', 'Contexto urbano', False, 'solo-general')]
 DIAGRAMAS = [('accesos', 'Accesos', False, ''), ('personas', 'Personas', False, ''),
-             ('flujos', 'Flujos', False, ''), ('arboles', 'Postes', False, ''),
+             ('flujos', 'Flujos', False, ''), ('arboles', 'Árboles', False, ''), ('postes', 'Postes', False, ''),
              ('esquema', 'Esquema compositivo', False, ''), ('corte', 'Corte en planta (1.75 m)', False, '')]
 RESALTA = [('', 'Nada'), ('espacio', '<i class="hud-esp hud-esp--pub"></i>Público / <i class="hud-esp hud-esp--pri"></i>privado'), ('modulos', 'Vivienda'),
            ('comercio', 'Comercio'), ('cultura', 'Arte y cultura'), ('industria', 'Industria'),
