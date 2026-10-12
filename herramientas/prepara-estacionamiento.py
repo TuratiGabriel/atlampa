@@ -5,19 +5,22 @@
 El DWG se pasa a DXF con la consola de AutoCAD 2024 (accoreconsole, en una
 carpeta temporal; el DWG no se toca) y se lee con ezdxf.
 
-El plano trae dos dibujos lado a lado: «Planta tipo sotanos» (x 0–111) y
-«Planta Baja» (el mismo marco corrido 270 m en x). Están en metros, con
-Fresno a la izquierda y Eulalia Guzmán arriba, como u y v del diagrama: basta
-una traslación. Se calzó la proyección de los edificios de la planta baja
-(capa 'proyeccion') contra las esquinas de los módulos de atlampa-modulos.js:
-(447.52, 322.60), con el 63 % de los vértices a menos de 10 cm. El 2026-10-09
-se corrió con los módulos (+0.4056, +0.3694: van donde están en
-Rhino/Contexto.3dm; ver prepara-modulos.py).
+El plano trae dos dibujos lado a lado: «Planta Baja» (x 0–126) y «Sotano
+(Planta tipo)» (el mismo marco corrido 197.2482 m en x; ver ORIGEN_X). Están en
+metros, con Fresno a la izquierda y Eulalia Guzmán arriba, como u y v del
+diagrama: basta una traslación. Hasta el 2026-10-09 la planta tipo estaba en
+x 0–111 y la planta baja corrida 270 m; se calzó con la proyección de los edificios.
+2026-10-11 (DWG nuevo de Andre): las dos plantas cambiaron de lugar y el marco se
+midió otra vez con las columnas de la capa 'R-Estructura' (217, 0.7 × 0.7) contra
+las esquinas de los módulos de atlampa-modulos.js (Contexto.3dm): TU, TV =
+(444.1892, 320.1543); 159 de 217 columnas a menos de 10 cm (73 %, mediana 2.9 cm);
+la planta baja y la planta tipo dan lo mismo con 0.3 mm de diferencia.
 
 Lo que se guarda (planta tipo, en el marco del diagrama):
   bloques   dos estacionamientos independientes (norte y sur): el contorno
             exterior del muro (capa 'Muro') y sus cajones (capa
-            'Estacionamiento', rectángulos de 5 × 2.7–2.8 m)
+            'Estacionamiento', rectángulos de 5 × 2.7–2.8 m; y las capas de
+            cajones accesibles, ver CAPAS_CAJONES)
   rampas    helicoidales dobles: centro y radios de los muros (interior,
             entre carriles, exterior); dos carriles concéntricos
   accesos   las curvas y los muros rectos de las rampas en planta baja
@@ -33,16 +36,24 @@ import sys
 import tempfile
 
 import ezdxf
-from shapely.geometry import Point, Polygon
+from shapely import snap
+from shapely.geometry import LineString, Point, Polygon
+from shapely.ops import polygonize, unary_union
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
 DWG = os.path.join(RAIZ, '..', 'Sotanos y PB para HTML.dwg')
 SALIDA = os.path.join(RAIZ, 'atlampa-estacionamiento.js')
 ACAD = r'C:\Program Files\Autodesk\AutoCAD 2024\accoreconsole.exe'
-TU, TV = 447.9256, 322.9694      # plano → diagrama (calzado con los módulos)
+TU, TV = 444.1892, 320.1543      # plano → diagrama (calzado con las columnas contra los módulos, 2026-10-11)
+ORIGEN_X = 197.2482              # x del plano donde empieza la planta tipo de sótanos (la planta baja empieza en 0)
 SOTANOS, ENTREPISO = 4, 3.5
-X_MAX = 200                      # la planta tipo de sótanos (la planta baja está en x > 270)
+X_MIN, X_MAX = 150, 400          # la planta tipo de sótanos (la planta baja está en x < 150)
+# Capas del DWG que son cajones. 2026-10-11 (Andre): P01_CAJONES_N (16 cajones de 2.35 × 4.77) y
+# P01_ACCESIBILIDAD (16 franjas de 4.77 × 1.34 junto a ellos) son los cajones de estacionamiento
+# ACCESIBLES (personas con discapacidad). En el visor van como cajones más, sin distinguirlos de los demás.
+CAPAS_CAJONES = ('Estacionamiento', 'P01_CAJONES_N', 'P01_ACCESIBILIDAD')
+ACCESIBLES = ('P01_CAJONES_N', 'P01_ACCESIBILIDAD')
 
 
 def a_dxf():
@@ -75,30 +86,30 @@ def a_dxf():
 
 
 def uv(x, y):
-    return [round(x + TU, 2), round(y + TV, 2)]
+    return [round(x - ORIGEN_X + TU, 2), round(y + TV, 2)]
 
 
-def lazos(trazos):
-    """Une polilíneas abiertas por sus extremos; devuelve los lazos cerrados."""
-    trazos = [list(t) for t in trazos]
-    cerrados = []
-    while trazos:
-        a = trazos.pop()
-        cambio = True
-        while cambio and math.dist(a[0], a[-1]) > 0.05:
-            cambio = False
-            for i, b in enumerate(trazos):
-                for bb in (b, b[::-1]):
-                    if math.dist(a[-1], bb[0]) < 0.05:
-                        a += bb[1:]
-                        trazos.pop(i)
-                        cambio = True
-                        break
-                if cambio:
-                    break
-        if math.dist(a[0], a[-1]) < 0.05 and len(a) > 3:
-            cerrados.append(a[:-1])
-    return cerrados
+def contornos_muro(m, tol=0.2):
+    """Los contornos cerrados que forman las líneas de la capa 'Muro' (polilíneas y arcos de la planta
+    tipo): se pegan los extremos a menos de tol y se polígonizan. Cada bloque queda como un polígono
+    con hueco (el grosor del muro), junto con las rampas y los cuartos pequeños."""
+    trazos = []
+    for e in m.query('LWPOLYLINE[layer=="Muro"]'):
+        pts = [tuple(p) for p in e.get_points('xy')]
+        if all(X_MIN < p[0] < X_MAX for p in pts):
+            trazos.append(LineString(pts + [pts[0]] if e.closed else pts))
+    for e in m.query('ARC[layer=="Muro"]'):
+        c = e.dxf.center
+        if not X_MIN < c.x < X_MAX:
+            continue
+        a0, a1 = math.radians(e.dxf.start_angle), math.radians(e.dxf.end_angle)
+        if a1 < a0:
+            a1 += 2 * math.pi
+        n = max(8, int((a1 - a0) * e.dxf.radius / 0.3))
+        trazos.append(LineString([(c.x + e.dxf.radius * math.cos(a0 + (a1 - a0) * i / n),
+                                   c.y + e.dxf.radius * math.sin(a0 + (a1 - a0) * i / n)) for i in range(n + 1)]))
+    red = unary_union(trazos)
+    return list(polygonize(unary_union(snap(red, red, tol))))
 
 
 def main():
@@ -106,11 +117,10 @@ def main():
     m = ezdxf.readfile(dxf).modelspace()
 
     def izq(e):
-        return e.dxf.layer and all(p[0] < X_MAX for p in e.get_points('xy'))
+        return e.dxf.layer and all(X_MIN < p[0] < X_MAX for p in e.get_points('xy'))
 
-    # muros: polilíneas de más de dos puntos → contornos de los dos bloques
-    largas = [[tuple(p) for p in e.get_points('xy')] for e in m.query('LWPOLYLINE[layer=="Muro"]') if izq(e) and len(e) > 2]
-    contornos = sorted((Polygon(l) for l in lazos(largas)), key=lambda p: -p.area)
+    # muros: los contornos cerrados de la capa Muro; los dos más grandes son los bloques
+    contornos = sorted((Polygon(p.exterior) for p in contornos_muro(m)), key=lambda p: -p.area)
     bloques = []
     for p in contornos:
         if any(p.within(q.buffer(0.5)) for q in (b['P'] for b in bloques)):
@@ -120,8 +130,8 @@ def main():
     for b, n in zip(bloques, ('norte', 'sur')):
         b['nombre'] = n
         b['cajones'] = []
-    # cajones
-    for e in m.query('LWPOLYLINE[layer=="Estacionamiento"]'):
+    # cajones (incluye los accesibles: ver CAPAS_CAJONES)
+    for e in m.query('LWPOLYLINE[layer=="%s"]' % '" | layer=="'.join(CAPAS_CAJONES)):
         if not izq(e):
             continue
         pts = list(e.get_points('xy'))
@@ -137,7 +147,7 @@ def main():
     arcos = {}
     for e in m.query('ARC CIRCLE[layer=="Muro"]'):
         c = e.dxf.center
-        if c.x > X_MAX:
+        if not X_MIN < c.x < X_MAX:
             continue
         k = (round(c.x, 1), round(c.y, 1))
         arcos.setdefault(k, []).append(e)
@@ -160,7 +170,7 @@ def main():
     # cuartos: polígonos con nombre (el texto más cercano)
     textos = []
     for e in m.query('MTEXT'):
-        if e.dxf.insert.x < X_MAX:
+        if X_MIN < e.dxf.insert.x < X_MAX:
             textos.append((e.plain_text().replace('\n', ' ').strip(), e.dxf.insert.x, e.dxf.insert.y))
 
     def nombre(x, y):
@@ -172,13 +182,13 @@ def main():
         if not izq(e) or len(pts) != 4:
             continue
         xs, ys = [p[0] for p in pts], [p[1] for p in pts]
-        if max(xs) - min(xs) > 40 or max(ys) - min(ys) > 40 or min(xs) < -1:
+        if max(xs) - min(xs) > 40 or max(ys) - min(ys) > 40 or min(xs) < ORIGEN_X - 1:
             continue                                  # banquetas y calles
         c = ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2)
         cuartos.append({'n': nombre(*c), 'pol': [v for p in pts for v in uv(*p)]})
     for e in m.query('CIRCLE[layer=="Banqueta" | layer=="Agua"]'):
         c = e.dxf.center
-        if c.x < X_MAX:
+        if X_MIN < c.x < X_MAX:
             cuartos.append({'n': nombre(c.x, c.y), 'c': uv(c.x, c.y), 'r': round(e.dxf.radius, 2)})
 
     datos = {
@@ -193,7 +203,8 @@ def main():
     print('accesos', len(accesos), '· cuartos', [c['n'] for c in cuartos])
     cab = ('/* Estacionamiento. Generado por herramientas/prepara-estacionamiento.py: no editar a mano.\n'
            '   Fuente: Sotanos y PB para HTML.dwg (planta tipo de sótanos), trasladada al marco del diagrama.\n'
-           '   bloques: planta = contorno exterior del muro [u, v, …]; cajones = [u0, v0, u1, v1].\n'
+           '   bloques: planta = contorno exterior del muro [u, v, …]; cajones = [u0, v0, u1, v1]\n'
+           '   (incluyen los accesibles: capas ' + ' y '.join(ACCESIBLES) + ', sin distinguirlos).\n'
            '   rampas: helicoidales dobles, centro, radio interior y exterior, carriles [r0, r1].\n'
            '   accesos: ["a", u, v, r, ángulo inicial, final] (arco, grados) o ["l", u0, v0, u1, v1].\n'
            '   ' + str(SOTANOS) + ' sótanos de ' + str(ENTREPISO) + ' m en cada bloque. */\n')
