@@ -150,7 +150,7 @@ def figuras():
     # ---- Estacionamiento: cajones por sótano (handoff) × 4 sótanos
     F['estacionamiento'] = {'cajones_por_sotano': M('estacionamiento', 'cajones_por_sotano'), 'sotanos': M('estacionamiento', 'sotanos'),
                             'cajones_total': M('estacionamiento', 'cajones_por_sotano') * M('estacionamiento', 'sotanos'), 'entrepiso_m': M('estacionamiento', 'entrepiso_m')}
-    fuentes['estacionamiento'] = 'programa/datos/manual.json (cajones norte 135 + sur 94 por sótano, handoff/procesos/paisaje-y-estacionamiento.md)'
+    fuentes['estacionamiento'] = 'programa/datos/manual.json (cajones norte 130 + sur 133 por sótano, DWG 2026-10-11; handoff/procesos/paisaje-y-estacionamiento.md)'
 
     # ---- Arte y cultura y aro: manual (no hay área en archivo)
     F['cultura'] = {k: M('cultura', k) for k in ('construido_m2', 'plaza_m2', 'lamina_m2', 'huella_m2')}

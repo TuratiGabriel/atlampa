@@ -28,10 +28,10 @@
  },
  "estacionamiento": {
   "cajones_por_sotano": {
-   "valor": 229,
+   "valor": 263,
    "unidad": "cajones",
    "estado": "calculado_a_mano",
-   "fuente": "handoff/procesos/paisaje-y-estacionamiento.md: norte 135 + sur 94 por sótano"
+   "fuente": "herramientas/prepara-estacionamiento.py y atlampa-estacionamiento.js (DWG 2026-10-11): norte 130 + sur 133 por sótano, incluye 16 cajones accesibles"
   },
   "sotanos": {
    "valor": 4,

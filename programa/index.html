@@ -198,7 +198,7 @@ a{color:var(--accent)}
         </div>
       </div>
     </div>
-    <p class="src"><b>FUENTE</b> handoff/procesos/paisaje-y-estacionamiento.md (norte 135, sur 94; manual). Plano: Sotanos y PB para HTML.dwg.</p>
+    <p class="src"><b>FUENTE</b> handoff/procesos/paisaje-y-estacionamiento.md (norte 130, sur 133, DWG 2026-10-11; manual). Plano: Sotanos y PB para HTML.dwg.</p>
   </div>
 </details>
 
@@ -226,7 +226,7 @@ a{color:var(--accent)}
     </div>
   </div>
   <div class="tbl"><table id="pot-tbl"></table></div>
-  <p class="src"><b>FUENTE</b> cálculo en diagrama/herramientas/programa.py: vivienda, naves, industria y aro desde Rhino/Contexto.3dm (mallas de módulos y capa industry_bake); arte y cultura manual; sótanos = 916 cajones × 25 m² (supuesto). El predio de la geometría es 18,305 m²; con 18,200 m² el máximo sería 7.2 × 14,560 = 104,832 m². Máximo construible = 7.2 × desplante máximo (80 % del predio).</p>
+  <p class="src"><b>FUENTE</b> cálculo en diagrama/herramientas/programa.py: vivienda, naves, industria y aro desde Rhino/Contexto.3dm (mallas de módulos y capa industry_bake); arte y cultura manual; sótanos = cajones × 25 m² (supuesto). El predio de la geometría es 18,305 m²; con 18,200 m² el máximo sería 7.2 × 14,560 = 104,832 m². Máximo construible = 7.2 × desplante máximo (80 % del predio).</p>
   <p class="src flag">Lo que no está en el repo: el área construida de la nave sur en planta alta, los niveles de la industria, y si la norma cuenta vivienda elevada en el COS. Cambian el COS y el CUS.</p>
 </section>
 
@@ -350,7 +350,7 @@ fetch('programa.json', {cache: 'no-cache'}).then(r => r.json()).then(d => {
     '<thead><tr><th>Concepto</th><th>m²</th></tr></thead><tbody>' +
     Object.entries(Q.construido_m2).map(([k, v]) => `<tr><td>${k}</td><td>${fmt(v)}</td></tr>`).join('') +
     `<tr class="sum"><td>Total sobre piso</td><td>${fmt(Q.sobre_piso_m2)}</td></tr>` +
-    `<tr><td>Sótanos (916 cajones × 25 m², supuesto)</td><td>${fmt(Q.sotanos_m2)}</td></tr>` +
+    `<tr><td>Sótanos (${fmt(F.estacionamiento.cajones_total)} cajones × 25 m², supuesto)</td><td>${fmt(Q.sotanos_m2)}</td></tr>` +
     `<tr class="sum"><td>Total con sótanos</td><td>${fmt(Q.sobre_piso_m2 + Q.sotanos_m2)}</td></tr></tbody>`;
 
   // Árboles
