@@ -1,0 +1,87 @@
+{
+ "_nota": "Cifras que no salen de ningún archivo del repo. Cada una lleva valor, fuente y estado. Edítalas con su fuente; no inventes.",
+ "cultura": {
+  "construido_m2": {
+   "valor": 1180,
+   "unidad": "m²",
+   "estado": "por_confirmar",
+   "fuente": "handoff/procesos/arte-cultura-y-aro.md: 2 pabellones de 2 niveles, fondo 12 m, al ras del aro"
+  },
+  "lamina_m2": {
+   "valor": 2000,
+   "unidad": "m²",
+   "estado": "por_confirmar",
+   "fuente": "Lámina original de Gabriel (2 pabellones curvos, 2,000 m²)"
+  },
+  "plaza_m2": {
+   "valor": 1645,
+   "unidad": "m²",
+   "estado": "calculado_a_mano",
+   "fuente": "atlampa-geo.js: plaza cultural en la esquina NO del predio hasta el aro"
+  },
+  "huella_m2": {
+   "valor": 590,
+   "unidad": "m²",
+   "estado": "supuesto",
+   "fuente": "Mitad de construido_m2 (2 niveles). No hay polígono de la huella en el repo"
+  }
+ },
+ "estacionamiento": {
+  "cajones_por_sotano": {
+   "valor": 229,
+   "unidad": "cajones",
+   "estado": "calculado_a_mano",
+   "fuente": "handoff/procesos/paisaje-y-estacionamiento.md: norte 135 + sur 94 por sótano"
+  },
+  "sotanos": {
+   "valor": 4,
+   "unidad": "niveles",
+   "estado": "confirmado",
+   "fuente": "handoff/procesos/paisaje-y-estacionamiento.md"
+  },
+  "entrepiso_m": {
+   "valor": 3.5,
+   "unidad": "m",
+   "estado": "confirmado",
+   "fuente": "herramientas/prepara-estacionamiento.py (SOTANOS, ENTREPISO)"
+  },
+  "m2_por_cajon": {
+   "valor": 25,
+   "unidad": "m²/cajón",
+   "estado": "supuesto",
+   "fuente": "Supuesto de trabajo, cajón con su circulación. No hay plano de sótano con área por nivel"
+  }
+ },
+ "normas": {
+  "CAS_min": {
+   "valor": 0.2,
+   "unidad": "fracción",
+   "estado": "dato_del_equipo",
+   "fuente": "Gabriel: COS 80 %, de ahí área libre mínima 20 %"
+  },
+  "COS_max": {
+   "valor": 0.8,
+   "unidad": "fracción",
+   "estado": "dato_del_equipo",
+   "fuente": "Gabriel (2026-10-12)"
+  },
+  "CUS_max": {
+   "valor": 7.2,
+   "unidad": "×predio",
+   "estado": "dato_del_equipo",
+   "fuente": "Gabriel (2026-10-12)"
+  },
+  "predio_referencia_m2": {
+   "valor": 18200,
+   "unidad": "m²",
+   "estado": "dato_del_equipo",
+   "fuente": "Gabriel: «alrededor de 18,200 m²»; la geometría de Rhino da 18,305"
+  }
+ },
+ "pendientes_sin_dato": [
+  "Área construida de la nave sur en planta alta",
+  "Niveles de la nave industrial",
+  "Si la norma cuenta la vivienda elevada dentro del COS",
+  "Árboles de banqueta y calle (levantar de escaneo-arboles-postes.png)"
+ ]
+}
