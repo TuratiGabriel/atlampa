@@ -28,7 +28,7 @@ python herramientas/programa.py
 Escribe `programa/programa.json`. Necesita `modelo/Contexto.3dm` (o `../Rhino/Contexto.3dm`) y los scripts `prepara-*.py`.
 
 ## Publicación (Vercel)
-Proyecto en Vercel con **Root Directory = `programa`**, sin build (`vercel.json`). Cada merge a `master` redespliega.
+Proyecto en Vercel con **Root Directory = `programa`**, sin build (`vercel.json`). Cada merge a `master` redespliega solo.
 
 ## Reglas cortas
 Sin datos inventados. Toda cifra con fuente. Los `.3dm` no se tocan. Lo que no está claro queda como `supuesto` o `por_confirmar`.
