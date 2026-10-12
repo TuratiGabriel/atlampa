@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261011a'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261011b'      # versión de los archivos (para que el navegador no use los viejos)
 
 SOTANOS = '''
       <div class="hud-grupo" role="group" aria-label="Sótanos">
@@ -53,8 +53,8 @@ APARTADOS = {
                 'dibujados en líneas para que se vean todos los niveles a la vez: el contorno de cada sótano, sus cajones, '
                 'la cisterna, el cuarto de máquinas y los biodigestores en el primer sótano, y las dos rampas helicoidales '
                 'dobles que bajan un sótano por vuelta desde la planta baja.',
-        'datos': ['2 bloques independientes', '4 sótanos de 3.5 m', '231 cajones por sótano · 924 en total',
-                  'Norte 114 · sur 117 por sótano', 'Helicoidales dobles desde la planta baja'],
+        'datos': ['2 bloques independientes', '4 sótanos de 3.5 m', '263 cajones por sótano · 1052 en total',
+                  'Norte 130 · sur 133 por sótano', 'Helicoidales dobles desde la planta baja'],
         'extra': SOTANOS,
         'leyenda': ['<li><i class="ad-leyenda__est"></i>Sótano</li>', '<li><i class="ad-leyenda__cajon"></i>Cajón</li>',
                     '<li><i class="ad-leyenda__helice"></i>Helicoidal</li>'],

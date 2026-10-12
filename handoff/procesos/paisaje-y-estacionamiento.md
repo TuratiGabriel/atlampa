@@ -17,3 +17,5 @@ Para decidir programas por asoleamiento, usa un análisis aparte como `analisis/
   Convierte con accoreconsole de AutoCAD 2024; desde Git Bash los argumentos `/i` se rompen, así que usa PowerShell o subprocess.
 - 2 bloques (norte 135, sur 94 cajones por sótano) y 4 sótanos de 3.5 m. Helicoidales dobles: el norte baja horario, el sur antihorario.
 - Sólo se ve en su apartado: se quita el piso para ver la excavación.
+- Cajones accesibles (2026-10-11): las capas `P01_CAJONES_N` (16 cajones) y `P01_ACCESIBILIDAD` (16 franjas de 1.34 m junto a ellos) del DWG son cajones de estacionamiento para personas con discapacidad. En el visor van como cajones más, sin distinguirlos.
+- Cisterna, cuarto de máquinas y biodigestores: el DWG de 2026-10-11 ya no los trae; quedan en espera (`cuartos: []`).

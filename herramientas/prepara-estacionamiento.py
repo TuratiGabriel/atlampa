@@ -19,7 +19,8 @@ la planta baja y la planta tipo dan lo mismo con 0.3 mm de diferencia.
 Lo que se guarda (planta tipo, en el marco del diagrama):
   bloques   dos estacionamientos independientes (norte y sur): el contorno
             exterior del muro (capa 'Muro') y sus cajones (capa
-            'Estacionamiento', rectángulos de 5 × 2.7–2.8 m)
+            'Estacionamiento', rectángulos de 5 × 2.7–2.8 m; y las capas de
+            cajones accesibles, ver CAPAS_CAJONES)
   rampas    helicoidales dobles: centro y radios de los muros (interior,
             entre carriles, exterior); dos carriles concéntricos
   accesos   las curvas y los muros rectos de las rampas en planta baja
@@ -48,6 +49,11 @@ TU, TV = 444.1892, 320.1543      # plano → diagrama (calzado con las columnas 
 ORIGEN_X = 197.2482              # x del plano donde empieza la planta tipo de sótanos (la planta baja empieza en 0)
 SOTANOS, ENTREPISO = 4, 3.5
 X_MIN, X_MAX = 150, 400          # la planta tipo de sótanos (la planta baja está en x < 150)
+# Capas del DWG que son cajones. 2026-10-11 (Andre): P01_CAJONES_N (16 cajones de 2.35 × 4.77) y
+# P01_ACCESIBILIDAD (16 franjas de 4.77 × 1.34 junto a ellos) son los cajones de estacionamiento
+# ACCESIBLES (personas con discapacidad). En el visor van como cajones más, sin distinguirlos de los demás.
+CAPAS_CAJONES = ('Estacionamiento', 'P01_CAJONES_N', 'P01_ACCESIBILIDAD')
+ACCESIBLES = ('P01_CAJONES_N', 'P01_ACCESIBILIDAD')
 
 
 def a_dxf():
@@ -124,8 +130,8 @@ def main():
     for b, n in zip(bloques, ('norte', 'sur')):
         b['nombre'] = n
         b['cajones'] = []
-    # cajones
-    for e in m.query('LWPOLYLINE[layer=="Estacionamiento"]'):
+    # cajones (incluye los accesibles: ver CAPAS_CAJONES)
+    for e in m.query('LWPOLYLINE[layer=="%s"]' % '" | layer=="'.join(CAPAS_CAJONES)):
         if not izq(e):
             continue
         pts = list(e.get_points('xy'))
@@ -197,7 +203,8 @@ def main():
     print('accesos', len(accesos), '· cuartos', [c['n'] for c in cuartos])
     cab = ('/* Estacionamiento. Generado por herramientas/prepara-estacionamiento.py: no editar a mano.\n'
            '   Fuente: Sotanos y PB para HTML.dwg (planta tipo de sótanos), trasladada al marco del diagrama.\n'
-           '   bloques: planta = contorno exterior del muro [u, v, …]; cajones = [u0, v0, u1, v1].\n'
+           '   bloques: planta = contorno exterior del muro [u, v, …]; cajones = [u0, v0, u1, v1]\n'
+           '   (incluyen los accesibles: capas ' + ' y '.join(ACCESIBLES) + ', sin distinguirlos).\n'
            '   rampas: helicoidales dobles, centro, radio interior y exterior, carriles [r0, r1].\n'
            '   accesos: ["a", u, v, r, ángulo inicial, final] (arco, grados) o ["l", u0, v0, u1, v1].\n'
            '   ' + str(SOTANOS) + ' sótanos de ' + str(ENTREPISO) + ' m en cada bloque. */\n')
