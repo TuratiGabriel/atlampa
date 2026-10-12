@@ -77,4 +77,5 @@ No leas todo. Abre **sólo** el archivo de `diagrama/handoff/procesos/` que pida
 | estructura de acero, predimensionamiento, Grasshopper                    | `diagrama/handoff/procesos/estructura.md`          |
 | paisaje, vegetación, sol, estacionamiento                                | `diagrama/handoff/procesos/paisaje-y-estacionamiento.md` |
 | usar Rhino por MCP                                                       | `diagrama/handoff/procesos/rhino-mcp.md`           |
+| el sitio de cifras del programa (m², CAS/COS/CUS, árboles) y sus datos manuales | `programa/CLAUDE.md` (reglas propias; no toques el visor) |
 </indice>
