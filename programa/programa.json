@@ -128,7 +128,9 @@
    },
    "sobre_piso_m2": 32508,
    "sotanos_m2": 22900,
-   "maximo_construible_m2": 131793,
+   "desplante_max_m2": 14644,
+   "maximo_construible_m2": 105434,
+   "CUS_max_sobre_predio": 5.76,
    "desplante_pb_m2": 8371,
    "desplante_proy_m2": 10987,
    "COS_pb": 0.457,
@@ -140,7 +142,7 @@
    "cumple_CAS": true,
    "cumple_COS": true,
    "cumple_CUS": true,
-   "nota": "La proyección de vivienda y el aro son elevados: si la norma sólo cuenta lo que toca el piso, usa COS_pb y CAS_pb. Los sótanos no cuentan para COS. Predio de geometría 18,305 m² (la norma y el dato de 18,200 difieren 0.6 %)."
+   "nota": "La proyección de vivienda y el aro son elevados: si la norma sólo cuenta lo que toca el piso, usa COS_pb y CAS_pb. Los sótanos no cuentan para COS. El CUS máximo se aplica sobre el desplante máximo (COS_max × predio), no sobre el predio. Predio de geometría 18,305 m² (el dato del equipo, 18,200, difiere 0.6 %)."
   }
  },
  "fuentes": {

@@ -27,7 +27,7 @@ No toques:
 4. **Si el cambio altera una cifra que sale de Rhino** (vivienda, naves, industria, estructura), no la pises en `manual.json`: el origen está en `Contexto.3dm` o en `departamentos.json`. Dilo y pregunta.
 5. **Unidades y fecha:** m², m, fracciones (0.8 = 80 %). Fecha ISO.
 6. **Predio:** la geometría de Rhino da 18,305 m²; el equipo habla de «alrededor de 18,200». No los mezcles: indica cuál usas.
-7. **Normas del proyecto (dato del equipo):** COS ≤ 80 %, CUS ≤ 7.2, CAS (área libre) ≥ 20 %. Cámbialas sólo si Gabriel lo dice.
+7. **Normas del proyecto (dato del equipo):** COS ≤ 80 %, CAS (área libre) ≥ 20 %, y CUS ≤ 7.2 **× el desplante máximo** (COS_max × predio), no × el predio. Cámbialas sólo si Gabriel lo dice.
 8. **Antes de cambiar una cifra relevante, pregunta** con una sola ronda de 3 preguntas con opciones, recomendando una. Si la instrucción es clara, aplícala y di qué quedó abierto.
 9. Escribe en español, breve y con vocabulario de arquitecto, no de programador.
 </reglas>
@@ -48,7 +48,7 @@ niveles de la nave industrial, si la norma cuenta la vivienda elevada en el COS,
 <como_se_calcula>
 - **Vivienda:** `herramientas/departamentos.json` (una etiqueta por módulo); módulos ÷ tamaño = departamentos; × m² = vendible.
 - **COS:** desplante = proyección en planta. `COS_pb` cuenta lo que toca el piso (naves, industria, arte y cultura); `COS_proy` suma lo elevado (vivienda, aro).
-- **CUS:** construido sobre piso ÷ predio. Con sótanos = cajones × m² por cajón (supuesto).
+- **Máximo construible:** 7.2 × desplante máximo (0.8 × predio). **CUS:** construido sobre piso ÷ predio (para comparar con 7.2 × 0.8 = 5.76). Con sótanos = cajones × m² por cajón (supuesto).
 - **CAS:** 1 − COS.
 - Detalle y fuentes por cifra: tabla «Fuentes» del sitio y `herramientas/programa.py`.
 </como_se_calcula>

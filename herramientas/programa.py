@@ -247,16 +247,18 @@ def potencial(m, ind_poly, F, P):
         'construido_m2': construido,
         'sobre_piso_m2': round(sobre_piso),
         'sotanos_m2': sotanos_m2,
-        'maximo_construible_m2': round(CUS_MAX * predio),
+        'desplante_max_m2': round(COS_MAX * predio),
+        'maximo_construible_m2': round(CUS_MAX * COS_MAX * predio),   # CUS × desplante máximo (COS_max × predio), no × predio
+        'CUS_max_sobre_predio': round(CUS_MAX * COS_MAX, 2),
         'desplante_pb_m2': round(desplante_pb),
         'desplante_proy_m2': round(desplante_proy),
         'COS_pb': round(cos_pb, 3), 'COS_proy': round(cos_proy, 3),
         'CAS_proy': round(1 - cos_proy, 3), 'CAS_pb': round(1 - cos_pb, 3),
         'CUS_sobre_piso': round(cus_sobre, 2), 'CUS_con_sotanos': round(cus_total, 2),
         'cumple_CAS': (1 - cos_proy) >= CAS_MIN, 'cumple_COS': cos_proy <= COS_MAX,
-        'cumple_CUS': cus_sobre <= CUS_MAX,
+        'cumple_CUS': sobre_piso <= CUS_MAX * COS_MAX * predio,
         'nota': ('La proyección de vivienda y el aro son elevados: si la norma sólo cuenta lo que toca el piso, '
-                 'usa COS_pb y CAS_pb. Los sótanos no cuentan para COS. Predio de geometría 18,305 m² (la norma y el dato de 18,200 difieren 0.6 %).'),
+                 'usa COS_pb y CAS_pb. Los sótanos no cuentan para COS. El CUS máximo se aplica sobre el desplante máximo (COS_max × predio), no sobre el predio. Predio de geometría 18,305 m² (el dato del equipo, 18,200, difiere 0.6 %).'),
     }
 
 

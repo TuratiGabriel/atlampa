@@ -67,9 +67,9 @@
   },
   "CUS_max": {
    "valor": 7.2,
-   "unidad": "×predio",
+   "unidad": "× desplante máximo",
    "estado": "dato_del_equipo",
-   "fuente": "Gabriel (2026-10-12)"
+   "fuente": "Gabriel (2026-10-12): el 7.2 multiplica el desplante máximo disponible (COS_max × predio), no el predio"
   },
   "predio_referencia_m2": {
    "valor": 18200,
