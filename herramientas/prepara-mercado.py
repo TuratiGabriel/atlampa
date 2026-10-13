@@ -1407,6 +1407,7 @@ SUR = {
     'otras_kg_m2': 8.0, 'otras_frac': 0.30, 'lluvia_m': 0.80, 'escurre': 0.85,
     'org_kg_puesto': 0.5, 'trh': 30,                 # biodigestor: kg/día de orgánicos por puesto de comida; días de retención
 }
+COLUMNAS_SUR = []   # (u, v) de las columnas de la PA de la nave sur (las llena mercado_sur; el acero de la cubierta las continúa)
 
 
 def tubo(tris, lins, a, b, r, n=10):
@@ -1511,11 +1512,13 @@ def mercado_sur():
     rayas(L['pa'], pa, zp + 0.005, 0.4)
     # columnas de la PA: en las líneas de valles y cumbreras, a cada línea de postes (no en la carga ni en los vacíos)
     n_col = 0
+    COLUMNAS_SUR.clear()
     for u in list(P_['valles']) + list(P_['cumbres']):
         for v in P_['postes'][1:-1]:
             q = Point(u, v)
             if pa.buffer(-0.3).contains(q) and not caja2d(*P_['vehiculo']).buffer(0.5).contains(q):
                 caja(S['columna'], L['columna'], u - 0.15, v - 0.15, z0, u + 0.15, v + 0.15, zp - e)
+                COLUMNAS_SUR.append((u, v))
                 n_col += 1
     # barandal: lado largo (fachada este) y todo borde de la PA con vacío (> 0.30) que no sea muro ni vidrio
     muros_ext = caja2d(*P_['int']).exterior.buffer(0.05).union(disco.exterior.buffer(0.35))
@@ -1635,6 +1638,152 @@ def mercado_sur():
     res['ACUAPONIA_GRANDE'] = res['acuaponia/pb_util'] > 0.5
     print('nave sur', json.dumps(res, ensure_ascii=False))
     return {**{k: plano(v) for k, v in S.items() if v}, **{k + 'L': plano(v) for k, v in L.items() if v}}, arboles, res
+
+
+# ================= PROPUESTA nave sur: cubierta y acero (2026-10-13) =================
+# Gabriel quitó la cubierta de Rhino de la nave sur el 2026-10-12 («luego se genera») porque no cabe sobre
+# su planta alta. Medido contra la malla de Rhino: en los valles (donde van dos filas de puestos de 3.0 m)
+# sólo quedan 1.93 m libres sobre +4.28, 300 de 699 puntos del techo de los puestos la atraviesan y 5 de 10
+# árboles de las tarimas chocan con ella. Esta es la propuesta: las mismas crujías a dos aguas (cumbreras y
+# valles sobre las líneas de columnas de la planta alta), subidas lo que pide el programa, con la cumbrera
+# de en medio abierta sobre el vacío de luz de la acuaponia, y su acero independiente (como el de la nave
+# norte: mismas secciones, sin conectarse a la vivienda). Todo editable; CUBIERTA_SUR = False la deja como
+# estaba (sin cubierta y sin acero).
+CUBIERTA_SUR = True
+ALEROS_SUR = (504.6, 558.55)    # bordes oeste y este de la cubierta de Rhino (u)
+V_CUB_SUR = (323.87, 396.37)    # y sus extremos sur y norte (v)
+HOLGURA_PUESTO = 0.15           # (supuesto) entre el techo de los puestos y la cara de abajo de la viga
+Z_TECHO_PUESTO = SUR['pa'] + PUESTO[2] + 0.1    # losa del techo de un puesto (puesto_geo): +7.38
+Z_VIGA_S = round(math.ceil((Z_TECHO_PUESTO + HOLGURA_PUESTO + PERALTE) / 0.05 - 1e-9) * 0.05, 2)   # cara de arriba de la viga: +8.05
+Z_VALLE_S = round(Z_VIGA_S + 0.20, 2)    # valles y aleros, como en la norte (viga +6.00, valle +6.21)
+Z_CUMBRE_S = 9.80               # (supuesto) bajo la losa del aro (+10.03); da ≈ 10° y el visor lee los faldones
+# abertura de luz: el vacío de la PA menos lo que abre la lluvia con viento (regla del hoyo de la norte: no cae agua en la plataforma)
+D_LLUVIA_S = (Z_CUMBRE_S - SUR['pa']) * math.tan(math.radians(LLUVIA_ANG))
+ABERTURA_SUR = (SUR['luz'][0] + D_LLUVIA_S, SUR['luz'][1] + D_LLUVIA_S, SUR['luz'][2] - D_LLUVIA_S, SUR['luz'][3] - D_LLUVIA_S)
+Z_MURO_SUR = 6.2                # tope de los muros de Rhino en los lados largos: sobre ellos queda una franja abierta
+
+
+def nodos_cubierta_sur():
+    """(u, z) de los quiebres de la cubierta de la nave sur, de alero a alero: cumbreras y valles sobre las líneas de columnas."""
+    return [(ALEROS_SUR[0], Z_VALLE_S)] + sorted([(u, Z_CUMBRE_S) for u in SUR['cumbres']] + [(u, Z_VALLE_S) for u in SUR['valles']]) + [(ALEROS_SUR[1], Z_VALLE_S)]
+
+
+def cubierta_sur():
+    """Los faldones de la cubierta de la nave sur como triángulos (u, v, z) sin recortar (el vidrio del corte
+    del aro toma de ellos su altura)."""
+    nodos = nodos_cubierta_sur()
+    v0, v1 = V_CUB_SUR
+    tris = []
+    for (ua, za), (ub, zb) in zip(nodos, nodos[1:]):
+        tris.append([(ua, v0, za), (ub, v0, zb), (ub, v1, zb)])
+        tris.append([(ua, v0, za), (ub, v1, zb), (ua, v1, za)])
+    return tris
+
+
+def recorta_cubierta(T3, rects):
+    """Lo de los triángulos T3 fuera del círculo del aro y de las aberturas rects, con sus aristas (lo mismo que
+    hace main() con las cubiertas de Rhino). Devuelve (triángulos, segmentos) planos."""
+    tris, lins, cortes = [], [], []
+    for T in T3:
+        piezas = fuera_del_circulo(T, cortes)
+        for q in rects:
+            piezas = [x for pz in piezas for x in fuera_de_rect(pz, q, cortes)]
+        for pol in piezas:
+            for i in range(1, len(pol) - 1):
+                for p in (pol[0], pol[i], pol[i + 1]):
+                    tris.extend(round(c, 3) for c in p)
+    for a, b in aristas(T3):
+        segs = segmento_fuera(a, b)
+        for q in rects:
+            segs = [x for s in segs for x in segmento_fuera_rect(s[0], s[1], q)]
+        for s in segs:
+            lins.extend(round(c, 3) for p in s for c in p)
+    for a, b in cortes:
+        for s in costuras_fuera(a, b, rects):
+            lins.extend(round(c, 3) for p in s for c in p)
+    return tris, lins
+
+
+def reticula_sur(techo):
+    """Acero independiente de la nave sur (propuesta, predimensionamiento): las columnas de la PA (COLUMNAS_SUR)
+    siguen hasta la viga; un marco de muro a muro en cada línea de postes (cara de arriba +8.05), largueros en
+    cada línea de columnas, pares bajo la cubierta y montantes en las cumbreras. Mismas secciones que la nave
+    norte (COL, VIGA_B, PERALTE, PAR). Sin conectarse a la vivienda."""
+    tris, lins = [], []
+    cuenta = {'columnas': 0, 'vigas': 0, 'largueros': 0, 'pares': 0, 'montantes': 0}
+    en_abertura = lambda u, v: ABERTURA_SUR[0] < u < ABERTURA_SUR[2] and ABERTURA_SUR[1] < v < ABERTURA_SUR[3]
+    zv = Z_VIGA_S - PERALTE / 2
+    for u, v in COLUMNAS_SUR:
+        caja(tris, lins, u - COL / 2, v - COL / 2, SUR['pa'], u + COL / 2, v + COL / 2, Z_VIGA_S - PERALTE)
+        cuenta['columnas'] += 1
+    filas = SUR['postes'][1:-1]
+    for v in filas:
+        tramo = corta_por_aro((SUR['int'][0], v), (SUR['int'][2], v))
+        if not tramo:
+            continue
+        a, b = tramo
+        barra(tris, lins, (a[0], a[1], zv), (b[0], b[1], zv), VIGA_B, PERALTE)
+        cuenta['vigas'] += 1
+        # pares bajo la cubierta, siguiendo los quiebres de cada faldón (en la abertura no hay cubierta)
+        pts, u = [], a[0]
+        while u <= b[0] + 1e-9:
+            z = z_bajo(u, v, techo)
+            if z is not None and not en_abertura(u, v):
+                pts.append((u, v, z - PAR / 2))
+            u += 0.25
+        tramos, act = [], [pts[0]] if pts else []
+        for p, q in zip(pts, pts[1:]):
+            if abs(q[0] - p[0]) < 0.26 and abs(q[2] - p[2]) < 0.5:
+                act.append(q)
+            else:
+                tramos.append(act); act = [q]
+        if act:
+            tramos.append(act)
+        for t in tramos:
+            if len(t) < 2:
+                continue
+            ks = [t[0]]
+            for i in range(1, len(t) - 1):
+                s0 = (t[i][2] - t[i - 1][2]) / (t[i][0] - t[i - 1][0])
+                s1 = (t[i + 1][2] - t[i][2]) / (t[i + 1][0] - t[i][0])
+                if abs(s1 - s0) > 0.02:
+                    ks.append(t[i])
+            ks.append(t[-1])
+            for p, q in zip(ks, ks[1:]):
+                barra(tris, lins, p, q, PAR, PAR)
+        cuenta['pares'] += 1
+        for u in SUR['cumbres']:
+            z = z_bajo(u, v, techo)
+            if z is not None and not en_abertura(u, v) and math.hypot(u - ARO[0], v - ARO[1]) >= CORTE + 0.3 and z - Z_VIGA_S > 0.3:
+                barra(tris, lins, (u, v, Z_VIGA_S), (u, v, z - PAR), 0.2, 0.2)
+                cuenta['montantes'] += 1
+    for u in sorted(SUR['cumbres'] + SUR['valles']):   # largueros a lo largo de cada línea de columnas
+        tramo = corta_por_aro((u, filas[0]), (u, filas[-1]))
+        if tramo:
+            barra(tris, lins, (tramo[0][0], tramo[0][1], zv), (tramo[1][0], tramo[1][1], zv), VIGA_B, PERALTE)
+            cuenta['largueros'] += 1
+    print('acero sur', cuenta)
+    return tris, lins, cuenta
+
+
+def revisa_cubierta_sur(techo, sur, arboles, acero):
+    """Cuánto queda libre entre lo más alto de la PA de la nave sur (techos de puestos y baños, árboles de las
+    tarimas) y la cara de abajo de la cubierta: tiene que ser > 0. Devuelve lo que va al resumen."""
+    loc = sur['local']
+    arriba = [(loc[i], loc[i + 1], loc[i + 2]) for i in range(0, len(loc), 3) if loc[i + 2] > Z_TECHO_PUESTO - 0.2]
+    h_p = [z_bajo(u, v, techo) - z for u, v, z in arriba if z_bajo(u, v, techo) is not None]
+    h_a = [z_bajo(a[0], a[1], techo) - (a[2] + a[3]) for a in arboles if a[2] > SUR['pa'] and z_bajo(a[0], a[1], techo) is not None]
+    nodos = nodos_cubierta_sur()
+    grados = [math.degrees(math.atan2(abs(zb - za), ub - ua)) for (ua, za), (ub, zb) in zip(nodos, nodos[1:])]
+    res = {'cumbre_z': Z_CUMBRE_S, 'valle_z': Z_VALLE_S, 'viga_z': Z_VIGA_S, 'pendiente_grados': [round(min(grados), 1), round(max(grados), 1)],
+           'abertura': [round(x, 2) for x in ABERTURA_SUR], 'abertura_m2': round((ABERTURA_SUR[2] - ABERTURA_SUR[0]) * (ABERTURA_SUR[3] - ABERTURA_SUR[1]), 1),
+           'vacio_luz_m2': round((SUR['luz'][2] - SUR['luz'][0]) * (SUR['luz'][3] - SUR['luz'][1]), 1),
+           'holgura_min_puestos_m': round(min(h_p), 2), 'holgura_min_arboles_m': round(min(h_a), 2) if h_a else None,
+           'franja_sobre_muros_m': round(Z_VALLE_S - Z_MURO_SUR, 2), 'acero': acero}
+    print('cubierta sur', json.dumps(res, ensure_ascii=False))
+    if res['holgura_min_puestos_m'] < 0 or (h_a and min(h_a) < 0):
+        print('OJO: la cubierta de la nave sur choca con la planta alta', res['holgura_min_puestos_m'], res['holgura_min_arboles_m'])
+    return res
 
 
 # ================= Cinta del aro (Gabriel, 2026-10-09) =================
@@ -1861,11 +2010,19 @@ def main():
     canalon(cie_t, cie_l)
     sal['cubierta'].extend(plano(cie_t))
     lin['cubierta'].extend(plano(cie_l))
-    vid_t, vid_l, vid_r = vidrio_aro([techo, techo_s])
+    techo_sur = cubierta_sur() if CUBIERTA_SUR else None   # (la de Rhino se quitó el 2026-10-12: ver PROPUESTA nave sur)
+    vid_t, vid_l, vid_r = vidrio_aro([techo, techo_sur or techo_s])
     print('fachada al aro (vidrio)', len(vid_t), 'triángulos', len(vid_l), 'marcos')
     S3, L3, arboles, resumen = mercado_norte(m, capas)
     sur, arb_s, resumen['sur'] = mercado_sur()
     arboles = list(arboles) + arb_s
+    acero_s = None
+    if techo_sur:   # cubierta y acero de la nave sur (propuesta)
+        c_t, c_l = recorta_cubierta(techo_sur, [ABERTURA_SUR])
+        sal['cubierta'].extend(c_t)
+        lin['cubierta'].extend(c_l)
+        acero_s = reticula_sur(techo_sur)
+        resumen['sur']['cubierta'] = revisa_cubierta_sur(techo_sur, sur, arb_s, acero_s[2])
     cin_t, cin_l, cinta = cinta_aro()
     cinta.update({'tris': plano(cin_t), 'lineas': plano(cin_l)})
     # huella de cada nave: la caja de todo lo copiado al norte y al sur de Heliotropo
@@ -1879,6 +2036,7 @@ def main():
              'perimetro': sal['perimetro'], 'cubierta': sal['cubierta'],
              'perimetroL': lin['perimetro'], 'cubiertaL': lin['cubierta'],
              'acero': plano(acero_t), 'aceroL': plano(acero_l),
+             **({'aceroS': plano(acero_s[0]), 'aceroSL': plano(acero_s[1])} if acero_s else {}),
              'vivienda': plano(viv_t), 'viviendaL': plano(viv_l),
              # la cara curva del corte del aro: vidrio por ahora (marco y reflejo, líneas)
              'vidrio': plano(vid_t), 'vidrioL': plano(vid_l), 'vidrioR': plano(vid_r),
@@ -1894,7 +2052,8 @@ def main():
     js = ('/* Generado por herramientas/prepara-mercado.py desde Rhino/Contexto.3dm: no editar a mano.\n'
           '   Triángulos (u, v, z) del perímetro y las cubiertas del mercado (con el hoyo pixelado y los\n'
           '   cierres del valle), la retícula de acero propuesta y las columnas de la vivienda que la\n'
-          '   cruzan; vidrio = la cara curva del corte del aro (vidrio por ahora; vidrioL marcos, vidrioR\n'
+          '   cruzan; la cubierta de la nave sur y su acero (aceroS) son propuesta (CUBIERTA_SUR);\n'
+          '   vidrio = la cara curva del corte del aro (vidrio por ahora; vidrioL marcos, vidrioR\n'
           '   reflejos); pa = la planta alta de la nave sur; cinta = la franja del aro que se desprende y baja\n'
           '   (th0…th1: donde el aro queda angosto; perfil [θ, z]); …L = sus aristas (segmentos) ya recortadas\n'
           '   por el aro; naves = huella [u0, v0, u1, v1]. */\n'

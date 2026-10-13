@@ -457,12 +457,12 @@ function crea(svg, op) {
   /* El mercado de Rhino: completo inspeccionando Comercio; en la vista general,
      ligero, como fachada de papel (2026-10-12, Gabriel: «que ya se note un poco más
      del detalle, no todo»): lo exterior y los cambios (muros, cubiertas con el hoyo,
-     vidrio, cinta, patios del aro y la planta alta de la nave sur, que ya no tiene
-     cubierta), sin el acero ni el interior de la nave norte. */
+     vidrio, cinta, patios del aro y la planta alta de la nave sur), sin el acero ni
+     el interior de la nave norte. */
   const subconj = (o, ks) => { if (!o) return null; const r = {}; ks.forEach(k => { if (o[k]) r[k] = o[k]; if (o[k + 'L']) r[k + 'L'] = o[k + 'L']; }); return r; };
   const LIGERO = GENERAL && MERC;
   const MERCADO = ESC === 'comercio' ? MERC : LIGERO ? Object.assign({}, MERC, {
-    acero: null, vivienda: null, paso3: subconj(MERC.paso3, ['banca', 'humedal', 'agua_p']),
+    acero: null, aceroS: null, vivienda: null, paso3: subconj(MERC.paso3, ['banca', 'humedal', 'agua_p']),
     sur: subconj(MERC.sur, ['pa', 'local', 'muro', 'tarima', 'maceta']), arboles: (MERC.arboles || []).filter(t => t[2] > 3)
   }) : null;
   const trabajo = svg.parentNode;
@@ -1018,6 +1018,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
         return { id: 'cubierta-' + k, nombre: 'Cubierta · ' + NAVE_N[k[0]] + ' · faldón ' + (j + 1) + (s ? ' (cae al ' + (s < 0 ? 'oeste' : 'este') + ')' : ''), c: geos(geo(ct[k]), 'nave', false, cl[k] ? lineas(cl[k]) : null) };
       });
       if (MERCADO.acero) r.acero = geos(geo(MERCADO.acero), 'nave', false, lineas(MERCADO.aceroL));
+      if (MERCADO.aceroS) r.aceroS = geos(geo(MERCADO.aceroS), 'nave', false, lineas(MERCADO.aceroSL));   // acero de la cubierta de la nave sur (propuesta)
       if (MERCADO.vivienda && MERCADO.vivienda.length) r.vivienda = geos(geo(MERCADO.vivienda), 'modulo', false, lineas(MERCADO.viviendaL));
       // la planta alta de la nave sur (Rhino): ahí llega el descanso de la cinta del aro
       if (MERCADO.pa && MERCADO.pa.length) r.pa = geos(geo(MERCADO.pa), 'nave', false, lineas(MERCADO.paL));
@@ -1065,6 +1066,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     // la retícula de acero que rigidiza la nave norte (y sobre la que va la cubierta)
     const gAce = MG.acero ? pieza('mercado-acero', 'comercio', 0.38) : null;
     if (gAce) ponGeos(gAce, MG.acero, 'nave', 'comercio', true);
+    // y el de la nave sur: las columnas de la planta alta siguen hasta la cubierta propuesta
+    const gAceS = MG.aceroS ? pieza('mercado-sur-acero', 'comercio', 0.39) : null;
+    if (gAceS) ponGeos(gAceS, MG.aceroS, 'nave', 'comercio', true);
     // las columnas de la vivienda que cruzan el mercado (independientes: de referencia)
     const gViv = MG.vivienda ? pieza('mercado-vivienda', 'vivienda', 0.37) : null;
     if (gViv) ponGeos(gViv, MG.vivienda, 'modulo', 'vivienda');
@@ -1119,6 +1123,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     MG.muros.forEach((m, i) => parte('comercio', m.id, m.nombre, [murosG[i]]));
     if (vidG.length) parte('comercio', 'vidrio', 'Fachada al aro (vidrio)', vidG);
     if (gAce) parte('comercio', 'acero', 'Estructura de acero', [gAce], [0, 4.5, 0]);
+    if (gAceS) parte('comercio', 'acero-sur', 'Estructura de acero · nave sur', [gAceS], [0, 4.5, 0]);
     if (gA) parte('comercio', 'plataformas', 'Plataformas, escaleras y barandales', [gA], [0, 2.2, 0]);
     if (gL) parte('comercio', 'puestos', 'Puestos, comedores y baños', [gL], [0, 2.2, 0]);
     if (gPA) parte('comercio', 'pa', 'Planta alta de la nave sur', [gPA]);
