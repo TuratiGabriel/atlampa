@@ -647,9 +647,12 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
      si tiene hacia dónde, se desplaza (despiece). objs: los grupos que mueve;
      dir: [x, y, z] en m (mundo) o, por grupo, en su userData.dir. */
   const PARTES = {};
-  function parte(ap, id, nombre, objs, dir, oculta) {
-    (PARTES[ap] = PARTES[ap] || []).push({ id, nombre, objs, dir: dir || null, oculta: !!oculta, oculto: !!oculta, desplazado: false, k: 0 });
+  function parte(ap, id, nombre, objs, dir, oculta, grupo) {
+    (PARTES[ap] = PARTES[ap] || []).push({ id, nombre, objs, dir: dir || null, oculta: !!oculta, oculto: !!oculta, desplazado: false, k: 0, grupo: !!grupo });
   }
+  // (2026-10-12, Gabriel: «poder apagar toda la cubierta de una y todas las paredes de una»): una parte-grupo junta
+  // grupos que también tienen su parte propia; sólo se oculta (no se desplaza) y basta con que una de las dos esté oculta
+  const parteGrupo = (ap, id, nombre, objs) => { if (objs.length) parte(ap, id, nombre, objs, null, false, true); };
   // Aristas de croquis: cada arista en dos trazos a mano (un poco chuecos, con
   // un quiebre a la mitad) que se pasan de las esquinas, como en un dibujo.
   const CROQUIS = ['nave', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'proyecto', 'vidrio'];
@@ -1018,7 +1021,11 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
         return { id: 'cubierta-' + k, nombre: 'Cubierta · ' + NAVE_N[k[0]] + ' · faldón ' + (j + 1) + (s ? ' (cae al ' + (s < 0 ? 'oeste' : 'este') + ')' : ''), c: geos(geo(ct[k]), 'nave', false, cl[k] ? lineas(cl[k]) : null) };
       });
       if (MERCADO.acero) r.acero = geos(geo(MERCADO.acero), 'nave', false, lineas(MERCADO.aceroL));
-      if (MERCADO.aceroS) r.aceroS = geos(geo(MERCADO.aceroS), 'nave', false, lineas(MERCADO.aceroSL));   // acero de la cubierta de la nave sur (propuesta)
+      if (MERCADO.aceroS) r.aceroS = geos(geo(MERCADO.aceroS), 'nave', false, lineas(MERCADO.aceroSL));   // acero de la cubierta de la nave sur (si el generador lo trae)
+      // tragaluces de la nave norte (2026-10-12): vidrio sobre la cubierta, en el lenguaje del hoyo
+      if (MERCADO.tragaluz && MERCADO.tragaluz.length) r.tragaluz = geos(geo(MERCADO.tragaluz), 'vidrio', false, lineas(MERCADO.tragaluzL));
+      // (2026-10-13) la cubierta nueva de la nave sur: franjas de vidrio de los escalones y módulos altos translúcidos
+      if (MERCADO.tragaluz_s && MERCADO.tragaluz_s.length) r.tragaluz_s = geos(geo(MERCADO.tragaluz_s), 'vidrio', false, lineas(MERCADO.tragaluz_sL));
       if (MERCADO.vivienda && MERCADO.vivienda.length) r.vivienda = geos(geo(MERCADO.vivienda), 'modulo', false, lineas(MERCADO.viviendaL));
       // la planta alta de la nave sur (Rhino): ahí llega el descanso de la cinta del aro
       if (MERCADO.pa && MERCADO.pa.length) r.pa = geos(geo(MERCADO.pa), 'nave', false, lineas(MERCADO.paL));
@@ -1040,7 +1047,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       if (P3) {
         r.p3 = {};
         [['piso', 'predio', 30], ['resto', 'predio', 30], ['zanja', 'filtro', 30], ['jardin', 'tezontle', 30], ['agua', 'agua', 1],
-          ['plataforma', 'nave', 30], ['escalera', 'nave', 30], ['local', 'modcom', 30], ['mesa', 'nave', 30], ['banca', 'nave', 30], ['humedal', 'nave', 30], ['agua_p', 'agua', 1]].forEach(([k, papel, umbral]) => {
+          ['plataforma', 'nave', 30], ['escalera', 'nave', 30], ['local', 'modcom', 30], ['mesa', 'nave', 30], ['banca', 'nave', 30], ['humedal', 'nave', 30], ['agua_p', 'agua', 1], ['arriate', 'tezontle', 30]].forEach(([k, papel, umbral]) => {
           if (P3[k]) r.p3[k] = geos(geo(P3[k]), papel, P3[k + 'L'] ? false : umbral, P3[k + 'L'] ? lineas(P3[k + 'L']) : null);
         });
         ['lamina', 'baranda', 'junco', 'pasto'].forEach(k => { if (P3[k + 'L']) r.p3[k] = lineas(P3[k + 'L']).geo(); });
@@ -1050,7 +1057,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       if (SU) {
         r.sur = {};
         [['piso', 'predio'], ['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['pa', 'nave'], ['local', 'modcom'],
-          ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle'], ['columna', 'nave'], ['escalera', 'nave']].forEach(([k, papel]) => {
+          ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle'], ['columna', 'nave'], ['escalera', 'nave'], ['cubo', 'modcom'], ['local_pb', 'modcom'], ['mesa_pb', 'nave'], ['jardinera', 'tezontle'], ['jardin', 'tezontle']].forEach(([k, papel]) => {
           if (SU[k]) r.sur[k] = geos(geo(SU[k]), papel, SU[k + 'L'] ? false : (k === 'agua' ? 1 : 30), SU[k + 'L'] ? lineas(SU[k + 'L']) : null);
         });
         ['baranda', 'pasto', 'planta'].forEach(k => { if (SU[k + 'L']) r.sur[k + 'Lin'] = lineas(SU[k + 'L']).geo(); });
@@ -1063,6 +1070,10 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const murosG = MG.muros.map(m => { const g = sub(gMur, m.dir.map(x => x * 7)); g.userData.norte = m.id[5] === 'n'; ponGeos(g, m.c, 'nave', 'comercio'); return g; });
     const gCub = pieza('mercado-cubierta', 'comercio', 0.4);
     const cubG = MG.cubiertas.map(m => { const g = sub(gCub, [0, 9, 0]); g.userData.norte = m.id[9] === 'n'; ponGeos(g, m.c, 'nave', 'comercio'); return g; });
+    const tragG = MG.tragaluz ? sub(gCub, [0, 9, 0]) : null;
+    if (tragG) { tragG.userData.norte = true; ponGeos(tragG, MG.tragaluz, 'vidrio', 'comercio'); }
+    const tragSG = MG.tragaluz_s ? sub(gCub, [0, 9, 0]) : null;
+    if (tragSG) ponGeos(tragSG, MG.tragaluz_s, 'vidrio', 'comercio');
     // la retícula de acero que rigidiza la nave norte (y sobre la que va la cubierta)
     const gAce = MG.acero ? pieza('mercado-acero', 'comercio', 0.38) : null;
     if (gAce) ponGeos(gAce, MG.acero, 'nave', 'comercio', true);
@@ -1095,7 +1106,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       pone(gA, 'plataforma', 'nave', 'comercio');
       pone(gA, 'escalera', 'nave', 'comercio');   // (las contrahuellas)
       pone(gL, 'local', 'modcom', 'comercio');     // puestos y baños
-      pone(gL, 'mesa', 'nave', 'comercio');        // comedores
+      pone(gL, 'mesa', 'nave', 'comercio');        // barras, bancos de las fondas y barras-mirador
+      pone(gL, 'arriate', 'tezontle', 'comercio'); // arriates y la jardinera de la orilla de la P2
       // patios del aro: bancas, bordillo del estanque y su agua
       if (Q.banca || Q.humedal) { gT = pieza('mercado-patios', 'comercio', 0.06); pone(gT, 'banca', 'nave', 'comercio'); pone(gT, 'humedal', 'nave', 'comercio'); pone(gT, 'agua_p', 'agua', 'comercio'); }
       const pl = (k, nombre, color, colorColor, g) => { if (Q[k]) ponLineas(g, Q[k], nombre, color, colorColor, 'comercio'); };
@@ -1119,7 +1131,11 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     }
     // aislando el mercado: sus partes (las que se desplazan, hacia dónde)
     // cada cubierta (por nave y faldón) y cada muro (por nave y lado), sueltos
+    parteGrupo('comercio', 'cubierta-toda', 'Toda la cubierta (con tragaluces)', cubG.concat(tragG ? [tragG] : [], tragSG ? [tragSG] : []));
+    parteGrupo('comercio', 'muros-todos', 'Todos los muros (y el vidrio del aro)', murosG.concat(vidG));
     MG.cubiertas.forEach((m, i) => parte('comercio', m.id, m.nombre, [cubG[i]]));
+    if (tragG) parte('comercio', 'tragaluces', 'Tragaluces (vidrio)', [tragG]);
+    if (tragSG) parte('comercio', 'tragaluces-sur', 'Cubierta sur: franjas de vidrio y módulos translúcidos', [tragSG]);
     MG.muros.forEach((m, i) => parte('comercio', m.id, m.nombre, [murosG[i]]));
     if (vidG.length) parte('comercio', 'vidrio', 'Fachada al aro (vidrio)', vidG);
     if (gAce) parte('comercio', 'acero', 'Estructura de acero', [gAce], [0, 4.5, 0]);
@@ -1135,13 +1151,13 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const Q = MG.sur, pb = pieza('mercado-sur-pb', 'comercio', 0.07), pa = pieza('mercado-sur-pa', 'comercio', 0.32);
       const pon = (g, k, papel) => Q[k] ? ponGeos(g, Q[k], papel, 'comercio') : null;
       const piso = pon(pb, 'piso', 'predio'); if (piso) suelos.push(piso);
-      [['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['columna', 'nave'], ['escalera', 'nave']].forEach(([k, papel]) => pon(pb, k, papel));
+      [['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['columna', 'nave'], ['escalera', 'nave'], ['cubo', 'modcom'], ['local_pb', 'modcom'], ['mesa_pb', 'nave'], ['jardinera', 'tezontle'], ['jardin', 'tezontle']].forEach(([k, papel]) => pon(pb, k, papel));
       [['pa', 'nave'], ['local', 'modcom'], ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle']].forEach(([k, papel]) => pon(pa, k, papel));
       if (Q.barandaLin) ponLineas(pa, Q.barandaLin, 'columna-baranda', 0xffffff, null, 'comercio');
       if (Q.pastoLin) ponLineas(pa, Q.pastoLin, 'pasto', 0xffffff, PROGRAMA.verde, 'comercio');
       if (Q.plantaLin) ponLineas(pb, Q.plantaLin, 'pasto', 0xffffff, PROGRAMA.verde, 'comercio');
-      parte('comercio', 'sur-pa', 'Nave sur · planta alta (puestos, comedores, baños)', [pa], [0, 5, 0]);
-      parte('comercio', 'sur-pb', 'Nave sur · planta baja (carga, biodigestor, acuaponia)', [pb]);
+      parte('comercio', 'sur-pa', 'Nave sur · planta alta (locales, fondas, terraza, baños)', [pa], [0, 5, 0]);
+      parte('comercio', 'sur-pb', 'Nave sur · planta baja (mercado, patio de luz, servicio, vitrina de acuaponia)', [pb]);
     }
     if (gViv) parte('comercio', 'vivienda', 'Columnas de la vivienda', [gViv], null, true);
 
@@ -1153,7 +1169,10 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     [gAce, gA, gL, gV, gP].forEach(g => { if (g) g.userData.norte = true; });   // (paso 3 y acero: todo de la nave norte)
     vidG.forEach(g => { g.userData.norte = g.userData.dir[2] > 0; });          // (el vidrio norte se va hacia el sur, al centro del aro: +z)
     const caja3 = new THREE.Box3();
+    parteGrupo('nave-norte', 'cubierta-toda', 'Toda la cubierta (con tragaluces)', cubG.filter(g => g.userData.norte).concat(tragG ? [tragG] : []));
+    parteGrupo('nave-norte', 'muros-todos', 'Todos los muros (y el vidrio del aro)', murosG.filter(g => g.userData.norte).concat(vidG.filter(g => g.userData.norte)));
     MG.cubiertas.forEach((m, i) => { if (cubG[i].userData.norte) parte('nave-norte', m.id, m.nombre, [cubG[i]], [0, SUBE_CUBIERTA, 0]); });
+    if (tragG) parte('nave-norte', 'tragaluces', 'Tragaluces (vidrio)', [tragG], [0, SUBE_CUBIERTA, 0]);
     MG.muros.forEach((m, i) => {
       if (!murosG[i].userData.norte) return;
       caja3.setFromObject(murosG[i]);
@@ -1166,7 +1185,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (gL) parte('nave-norte', 'puestos', 'Puestos, comedores y baños', [gL]);
     if (gP) parte('nave-norte', 'piso', 'Piso, zanja y jardín', [gP]);
     if (gV) parte('nave-norte', 'verde', 'Vegetación', [gV]);
-    const sur = murosG.filter(g => !g.userData.norte).concat(cubG.filter(g => !g.userData.norte), vidG.filter(g => !g.userData.norte));
+    const sur = murosG.filter(g => !g.userData.norte).concat(cubG.filter(g => !g.userData.norte), vidG.filter(g => !g.userData.norte), tragSG ? [tragSG] : []);
     if (sur.length) parte('nave-norte', 'nave-sur', 'Nave sur', sur, null, true);
   } else NAVESG: {
     // la cara curva del corte del aro no es muro: va de vidrio (por ahora), con un parteluz en cada quiebre
@@ -2146,7 +2165,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   function aislaVisibles() {
     if (!aisl) return;
     raizG.children.forEach(o => { o.visible = aisl.grupos.has(o); });
-    aisl.partes.forEach(pt => pt.objs.forEach(o => { o.visible = !pt.oculto; }));
+    const apagados = new Set();
+    aisl.partes.forEach(pt => { if (pt.oculto) pt.objs.forEach(o => apagados.add(o)); });
+    aisl.partes.forEach(pt => pt.objs.forEach(o => { o.visible = !apagados.has(o); }));
     [gSol, gPers, gAcc, gEstAcc, gNolli, gCorte].forEach(g => { g.visible = false; });
     capaRot.classList.remove('con-sol');
   }
@@ -2514,7 +2535,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (ap === 'estacionamiento') return [gEst];
     return piezas.filter(p => p.ap === ap && !p.g.userData.oculto).map(p => p.g);
   }
-  const mueve3 = pt => !!(pt.dir || pt.objs.some(o => o.userData.dir));
+  const mueve3 = pt => !pt.grupo && !!(pt.dir || pt.objs.some(o => o.userData.dir));
   // (la de la parte manda: un mismo grupo se mueve distinto en el mercado y en la nave norte abierta)
   function dirDe(pt, o) { return pt.dir || o.userData.dir || [0, 0, 0]; }
   // dónde va cada grupo de una parte: el despiece (dir · k)
@@ -2522,7 +2543,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   // la caja (u, v, z) de lo que se ve de lo aislado (con las partes donde estén o donde van a quedar)
   function cajaAislado(final) {
     const b = new THREE.Box3(), bb = new THREE.Box3(), guarda = [];
-    if (final) aisl.partes.forEach(pt => pt.objs.forEach(o => { guarda.push([o, o.position.clone()]); coloca(pt, o, pt.desplazado ? 1 : 0); }));
+    if (final) aisl.partes.forEach(pt => { if (!pt.grupo) pt.objs.forEach(o => { guarda.push([o, o.position.clone()]); coloca(pt, o, pt.desplazado ? 1 : 0); }); });
     aisl.grupos.forEach(g => {
       g.updateMatrixWorld(true);
       g.traverse(o => {
@@ -2577,6 +2598,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       if (muerto || tok !== despTok || !aisl) return;
       const t = Math.min(1, (ms - t0) / 750), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       aisl.partes.forEach((pt, i) => {
+        if (pt.grupo) return;
         pt.k = de[i] + ((pt.desplazado ? 1 : 0) - de[i]) * e;
         pt.objs.forEach(o => coloca(pt, o, pt.k));
       });

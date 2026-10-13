@@ -53,10 +53,14 @@ Ejes compositivos: el de la vivienda pasa por el aro; el segundo va de las naves
 - **Sé propositivo**, como arquitecto especialista: no te limites a ejecutar.
 - **Mide, no supongas:** lo nuevo debe calzar con `Contexto.3dm` a < 1 cm.
 - **Repo compartido con Gabriel** (`github.com/TuratiGabriel/atlampa`):
-  - Antes de empezar, `git pull`. Trabaja en tu rama (`industria` o `cultura`), nunca en `master`.
+  - **Commits y pushes sólo a TU rama; nunca a `master`.** Master es lo que está publicado en Vercel y sólo Gabriel lo toca.
+    Tu rama: `arte-cultura` (arte y cultura), `industria` (industria) o la que Gabriel te asigne. Antes de cualquier commit o push,
+    confirma con `git branch --show-current` que no dice `master`. Prohibido: `git push origin master`, `git push origin HEAD:master`,
+    `git merge` hacia master, `--force`, y cambiar de rama para "subirlo rápido". Si git rechaza un push a master, no lo rodees: avísale al usuario.
+  - Antes de empezar, `git pull` (en tu rama).
   - Toca sólo tus archivos (`prepara-<tuyo>.py`, `atlampa-<tuyo>.js`) y los ganchos mínimos (tu bloque en `atlampa-3d.js`, tu ficha en
     `paginas.py`). No reformatees.
-  - Commits chicos. Al terminar un paso, sube la rama y abre un pull request: Gabriel lo integra.
+  - Commits chicos. Al terminar un paso, sube **tu rama** (`git push origin <tu-rama>`) y abre un pull request hacia `master`: sólo Gabriel lo aprueba e integra.
   - Si un cambio cae fuera de tu programa (motor, estilo, geo), pregúntale primero al usuario.
   - Nunca sobrescribas un `.3dm` ajeno.
 - Al cambiar datos, sube `V` en `herramientas/paginas.py`; el navegador cachea.
