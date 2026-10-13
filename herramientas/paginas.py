@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261013a'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261013b'      # versión de los archivos (para que el navegador no use los viejos)
 
 SOTANOS = '''
       <div class="hud-grupo" role="group" aria-label="Sótanos">
@@ -62,7 +62,7 @@ APARTADOS = {
     'comercio': {
         'titulo': 'Comercio',
         'desc': 'Las dos naves de comercio, de techos a dos aguas con crujías de 17.97 m, cortadas por el círculo del aro.',
-        'datos': ['Nave sur: 3 crujías', 'Nave norte: 2 crujías', 'Alero +6.20 · cumbrera +9.20'],
+        'datos': ['Nave sur: 3 crujías', 'Nave norte: 2 crujías', 'Norte: alero +6.20 · cumbrera +9.20', 'Sur: las mismas aguas, subidas y plegadas (+7.90 / +10.90)'],
         'extra': '', 'leyenda': [],
     },
     'industria': {

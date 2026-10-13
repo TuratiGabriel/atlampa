@@ -534,7 +534,7 @@ def vidrio_aro(techos):
         for k in range(n):
             a = 2 * math.pi * k / n
             u, v = ARO[0] + math.cos(a) * CORTE, ARO[1] + math.sin(a) * CORTE
-            z = z_bajo(u, v, techo)
+            z = techo(u, v) if callable(techo) else z_bajo(u, v, techo)
             P.append((u, v, None if z is None else z - 0.02))
         # huecos de menos de 1 m (el canal del valle): la altura más baja de los lados
         for k in range(n):
@@ -2007,7 +2007,8 @@ def mercado_sur():
     res = {'carga_m2': round(caja2d(*P_['vehiculo']).area + caja2d(*P_['anden_caja']).area + caja2d(*P_['servicio']).area, 1),
            'biodigestor_m2': 0, 'camaras_residuos_bodega_m2': round(caja2d(*P_['biodigestor']).area, 1),
            'clusters_pb': len(clus_pb), 'clusters_pa': len(clus_pa), 'barras': len(cocinas) + len(cocinas_a), 'respiros': len(huecos),
-           'jardin_sur_m2': round(banda.area + caja2d(*J_['banqueta']).area, 1), 'cubierta_modulos': CUB_SUR.get('modulos'),
+           'jardin_sur_m2': round(banda.area + caja2d(*J_['banqueta']).area, 1), 'cubierta_modulos': CUB_SUR.get('modulos'), 'cubierta_dobleces': CUB_SUR.get('dobleces'),
+           'cubierta_alero': CUBIERTA_SUR['valle'], 'cubierta_cumbrera': CUBIERTA_SUR['valle'] + CUBIERTA_SUR['subida'],
            'tubos': n_t, 'acuaponia_m2': round(A_acu, 1), 'tanques_m2': round(A_t, 1), 'cultivo_m2': round(A_c, 1),
            'peces_kg_año': round(biomasa * P_['cosechas_peces']), 'lechugas_año': round(cult_lech * P_['lechuga_m2'] * P_['ciclos_lechuga']),
            'otras_kg_año': round(A_c * P_['otras_frac'] * P_['otras_kg_m2']), 'lluvia_m3_año': round(lluvia),
@@ -2960,13 +2961,75 @@ def jardin_inundable(S, L, g, z_borde, k_pared, k_agua, k_junco, arboles, rng, n
 # Cubierta de la nave sur (2026-10-13; ref. Mauricio Rocha, mercado de San Pablo Oztotepec): módulos de crujía (entre
 # cumbres y valles ≈ 9 m × postes 6.6 m) a tres alturas: alto sobre cada vacío (translúcido: luz cenital a la PB),
 # damero bajo / medio en el resto (cada escalón de 1 m es una franja de luz: vidrio si mira al N o al E, persiana si mira
-# al S o al O), bajo corrido sobre el servicio; la fila del muro norte, al menos medio (el piñón llega a +9.2).
-CUBIERTA_SUR = {'bajo': 8.30, 'medio': 9.30, 'alto': 10.30, 'canto': 0.20}
+# al S o al O), bajo corrido sobre el servicio; la fila del muro norte, al menos medio.
+# 2026-10-13 (Gabriel: «que esa forma cuadrada le responda a las aguas originales … levantar los costados y doblar en
+# medio para canalizar el agua; los que estén por encima, la forma inversa para rechazar el agua y mandarla a los demás
+# techos»): cada módulo es un pedazo de las dos aguas de Rhino (valle o alero → cumbrera: +3.00 en media crujía, 1:3)
+# cortado y subido su escalón, con un doblez a lo largo de la pendiente, a la mitad entre postes:
+#   · CANAL (costados arriba, doblez abajo): la lluvia baja por en medio hasta el valle, lejos del vidrio del vecino;
+#   · LOMO (doblez arriba): sólo el que no tiene vecino más alto en su fila y sí alguno más bajo; el agua se va a los
+#     costados, a los techos de junto.
+# La silueta completa sube 1.70 (alero +7.90 en vez de +6.20) para dejar ≥ 3.00 libres sobre la PA (+4.28) en su punto
+# más bajo (el doblez de un canal en el valle). El módulo más alto vuela sobre el de junto lo que pide la lluvia a
+# LLUVIA_ANG para que no le llegue al vidrio del escalón; en los valles, donde el agua sí llega al escalón, el pie del
+# escalón es lámina (pretil) sobre el canalón.
+CUBIERTA_SUR = {'valle': 7.90, 'subida': 3.00, 'escalon': 1.00, 'doblez': 0.40, 'canto': 0.20, 'pretil': 0.30}
+NIV_SUR = {'bajo': 0, 'medio': 1, 'alto': 2}
 CUB_SUR = {}   # lo llena mercado_sur: triángulos y líneas de la cubierta (opaca) y del vidrio, para main()
 
 
+def _cruces(a, b, cu=(), cv=()):
+    """Los puntos donde el segmento a→b cruza las líneas u = c (cu) o v = c (cv), en orden."""
+    ts = []
+    for k, cs in ((0, cu), (1, cv)):
+        d = b[k] - a[k]
+        if abs(d) < 1e-9:
+            continue
+        for c in cs:
+            t = (c - a[k]) / d
+            if 1e-6 < t < 1 - 1e-6:
+                ts.append(t)
+    return [(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for t in sorted(ts)]
+
+
+def losa_f(tris, lins, g, f, canto, cu=(), cv=()):
+    """Extruye g del canto hacia abajo bajo la superficie z = f(u, v), plana por pedazos entre las líneas u = cu, v = cv."""
+    for p in poligonos(g):
+        x0, y0, x1, y1 = p.bounds
+        us = [x0 - 1] + sorted(c for c in cu if x0 < c < x1) + [x1 + 1]
+        vs = [y0 - 1] + sorted(c for c in cv if y0 < c < y1) + [y1 + 1]
+        for ua, ub in zip(us, us[1:]):
+            for va, vb in zip(vs, vs[1:]):
+                for pz in poligonos(p.intersection(caja2d(ua, va, ub, vb))):
+                    for t in tri_poligono(pz, 0):
+                        top = [(x, y, f(x, y)) for x, y, _ in t]
+                        tris.append(tuple(top))
+                        tris.append(tuple((x, y, z - canto) for x, y, z in (top[0], top[2], top[1])))
+        for anillo in [p.exterior] + list(p.interiors):
+            c = list(anillo.coords)
+            for a, b in zip(c, c[1:]):
+                pts = [a] + _cruces(a, b, cu, cv) + [b]
+                for s, e in zip(pts, pts[1:]):
+                    za, zb = f(*s), f(*e)
+                    tris.append(((s[0], s[1], za - canto), (e[0], e[1], zb - canto), (e[0], e[1], zb)))
+                    tris.append(((s[0], s[1], za - canto), (e[0], e[1], zb), (s[0], s[1], za)))
+                    lins += [((s[0], s[1], za), (e[0], e[1], zb)), ((s[0], s[1], za - canto), (e[0], e[1], zb - canto))]
+                lins.append(((a[0], a[1], f(*a) - canto), (a[0], a[1], f(*a))))
+
+
+def linea_f(lins, g, a, b, f, cu=(), cv=(), dz=0.0):
+    """El tramo a→b dentro de g, sobre la superficie z = f (+ dz), partido en las líneas de quiebre."""
+    s_ = g.intersection(LineString([a, b]))
+    for ln in getattr(s_, 'geoms', [s_]):
+        if ln.geom_type != 'LineString' or ln.length < 0.05:
+            continue
+        p0, p1 = ln.coords[0], ln.coords[-1]
+        pts = [p0] + _cruces(p0, p1, cu, cv) + [p1]
+        lins += [((s[0], s[1], f(*s) + dz), (e[0], e[1], f(*e) + dz)) for s, e in zip(pts, pts[1:])]
+
+
 def cubierta_sur(huecos):
-    U = [NAVES_P[1][0], 513.5, 522.6, 531.5, 540.7, 549.5, NAVES_P[1][2]]
+    U = [NAVES_P[1][0], 513.5, 522.6, 531.5, 540.7, 549.5, NAVES_P[1][2]]   # alero O, cumbrera, valle, …, alero E
     V = [NAVES_P[1][1]] + SUR['postes'][1:-1] + [NAVES_P[1][3]]
     techo = caja2d(*NAVES_P[1]).difference(Point(ARO).buffer(CORTE, 256))
     C = CUBIERTA_SUR
@@ -2985,53 +3048,117 @@ def cubierta_sur(huecos):
                 if j == len(V) - 2 and n == 'bajo':
                     n = 'medio'
             mods[(i, j)] = (q, n)
+    niv = {k: NIV_SUR[n] for k, (q, n) in mods.items()}
+    # el doblez: lomo si nadie en su fila (los vecinos al N y al S) lo rebasa y alguno queda abajo; canal si no
+    forma = {}
+    for (i, j) in mods:
+        vec = [niv[(i, j + d)] for d in (-1, 1) if (i, j + d) in mods]
+        forma[(i, j)] = 'lomo' if vec and max(vec) <= niv[(i, j)] and min(vec) < niv[(i, j)] else 'canal'
+
+    def sup(k):
+        """z de la cara de arriba del módulo k (fuera de su celda sigue a nivel: los volados)."""
+        i, j = k
+        a, b = (U[i], U[i + 1]) if i % 2 == 0 else (U[i + 1], U[i])   # (valle o alero, cumbrera)
+        v0, v1 = V[j], V[j + 1]
+        vm, h = (v0 + v1) / 2, (v1 - v0) / 2
+        sg = 1 if forma[k] == 'lomo' else -1
+        z0 = C['valle'] + C['escalon'] * niv[k]
+
+        def f(u, v):
+            u, v = min(max(u, U[i]), U[i + 1]), min(max(v, v0), v1)
+            return z0 + C['subida'] * (u - a) / (b - a) + sg * C['doblez'] * (1 - abs(v - vm) / h)
+        return f
+    F = {k: sup(k) for k in mods}
+    celda = {(i, j): caja2d(U[i], V[j], U[i + 1], V[j + 1]) for (i, j) in mods}
+    quiebres = {(i, j): ((U[i], U[i + 1]), (V[j], (V[j] + V[j + 1]) / 2, V[j + 1])) for (i, j) in mods}
+    rango = lambda k: (niv[k], forma[k] == 'lomo')
     t_c, l_c, t_v, l_v = [], [], [], []
-    for (i, j), (q, n) in mods.items():
-        z = C[n]
-        if n == 'alto':   # translúcido (policarbonato alveolar): va con el vidrio
-            losa(t_v, l_v, q, z - 0.05, z)
-            for p in poligonos(q):
-                u0, v0, u1, v1 = p.bounds
-                x = u0 + 1.2
-                while x < u1 - 0.1:
-                    l_v.append(((x, v0, z + 0.01), (x, v1, z + 0.01)))
-                    x += 1.2
-        else:
-            losa(t_c, l_c, q, z - C['canto'], z)
-    orden = {'bajo': 0, 'medio': 1, 'alto': 2}
+    volados = {k: [] for k in mods}
+    tg = math.tan(math.radians(LLUVIA_ANG))
+    n_pretil = 0
     for (i, j), (q, n) in mods.items():
         for (di, dj) in ((1, 0), (0, 1)):
-            vec = mods.get((i + di, j + dj))
-            if not vec or vec[1] == n:
+            k2 = (i + di, j + dj)
+            if k2 not in mods or rango((i, j)) == rango(k2):
                 continue
-            (qa, na), (qb, nb) = (q, n), vec
-            arriba_a = orden[na] > orden[nb]
-            lin = qa.intersection(qb)
-            if lin.is_empty or lin.length < 0.5:
+            hi, lo = ((i, j), k2) if rango((i, j)) > rango(k2) else (k2, (i, j))
+            fh, fl = F[hi], F[lo]
+            lin = q.intersection(mods[k2][0])
+            segs = [s for s in getattr(lin, 'geoms', [lin]) if s.geom_type == 'LineString' and s.length > 0.5]
+            if not segs:
                 continue
-            seg = list(lin.geoms)[0] if hasattr(lin, 'geoms') else lin
-            if seg.geom_type != 'LineString':
-                continue
-            (x0, y0), (x1, y1) = seg.coords[0], seg.coords[-1]
-            z_alto, z_bajo = C[na if arriba_a else nb] - C['canto'], C[nb if arriba_a else na]
-            # hacia dónde mira la cara del módulo alto: la del lado del módulo bajo
-            cara = ('E' if arriba_a else 'O') if di else ('N' if arriba_a else 'S')
-            if cara in ('N', 'E'):   # franja de vidrio
-                t_v += [((x0, y0, z_bajo), (x1, y1, z_bajo), (x1, y1, z_alto)), ((x0, y0, z_bajo), (x1, y1, z_alto), (x0, y0, z_alto))]
-                L_ = math.dist((x0, y0), (x1, y1))
-                k = max(1, int(L_ / 1.5))
-                for t in range(k + 1):
-                    x, y = x0 + (x1 - x0) * t / k, y0 + (y1 - y0) * t / k
-                    l_v.append(((x, y, z_bajo), (x, y, z_alto)))
-            else:                    # persiana metálica: lamas cada 0.15
-                zz = z_bajo + 0.1
-                while zz < z_alto - 0.05:
-                    l_c.append(((x0, y0, zz), (x1, y1, zz)))
-                    zz += 0.15
-                l_c += [((x0, y0, z_bajo), (x0, y0, z_alto)), ((x1, y1, z_bajo), (x1, y1, z_alto))]
+            valle = di == 1 and (i + 1) % 2 == 0            # el escalón cae en un valle: ahí llega el agua del bajo
+            pr = C['pretil'] if valle else 0.0
+            # hacia dónde mira el escalón: hacia el módulo bajo
+            cara = ('E' if hi == (i, j) else 'O') if di else ('N' if hi == (i, j) else 'S')
+            for sg_ in segs:
+                p0, p1 = sg_.coords[0], sg_.coords[-1]
+                pts = [p0] + _cruces(p0, p1, (), (quiebres[lo][1][1],) if di else ()) + [p1]
+                zl = [fl(*p) for p in pts]
+                zt = [max(fh(*p) - C['canto'], z_ + pr) for p, z_ in zip(pts, zl)]
+                alto_max = max(t_ - z_ for t_, z_ in zip(zt, zl))
+                if alto_max < 0.05:
+                    continue
+                # el volado del alto: lo que pide la lluvia a LLUVIA_ANG sobre la cara más alta del escalón
+                if niv[hi] > niv[lo]:
+                    w = max(0.25, math.ceil((alto_max * tg + 0.05) * 20) / 20)
+                    lado = -1 if (hi[0] > lo[0] or hi[1] > lo[1]) else 1   # hacia el bajo
+                    if di:
+                        x = p0[0]
+                        s_ = caja2d(min(x, x + lado * w), min(p0[1], p1[1]), max(x, x + lado * w), max(p0[1], p1[1]))
+                    else:
+                        y = p0[1]
+                        s_ = caja2d(min(p0[0], p1[0]), min(y, y + lado * w), max(p0[0], p1[0]), max(y, y + lado * w))
+                    volados[hi].append(s_.intersection(techo))
+                tramo = list(zip(pts, zl, zt))
+                for (s, a_, b_), (e, c_, d_) in zip(tramo, tramo[1:]):
+                    if pr:   # pretil de lámina al pie
+                        t_c += [((s[0], s[1], a_), (e[0], e[1], c_), (e[0], e[1], c_ + pr)), ((s[0], s[1], a_), (e[0], e[1], c_ + pr), (s[0], s[1], a_ + pr))]
+                        l_c.append(((s[0], s[1], a_ + pr), (e[0], e[1], c_ + pr)))
+                    za0, za1, zb0, zb1 = a_ + pr, b_, c_ + pr, d_
+                    if cara in ('N', 'E'):   # franja de vidrio con montantes cada ~1.5
+                        t_v += [((s[0], s[1], za0), (e[0], e[1], zb0), (e[0], e[1], zb1)), ((s[0], s[1], za0), (e[0], e[1], zb1), (s[0], s[1], za1))]
+                        m_ = max(1, int(math.dist(s, e) / 1.5))
+                        for t in range(m_ + 1):
+                            x, y = s[0] + (e[0] - s[0]) * t / m_, s[1] + (e[1] - s[1]) * t / m_
+                            l_v.append(((x, y, za0 + (zb0 - za0) * t / m_), (x, y, za1 + (zb1 - za1) * t / m_)))
+                    else:                    # persiana metálica: lamas cada 0.15, paralelas al pie
+                        o = 0.10
+                        while o < max(za1 - za0, zb1 - zb0) - 0.05:
+                            ha, hb = za1 - za0 - o - 0.05, zb1 - zb0 - o - 0.05   # lo que le sobra a la lama en cada punta
+                            if ha >= 0 or hb >= 0:
+                                t0, t1 = (0.0, 1.0) if ha >= 0 and hb >= 0 else ((0.0, ha / (ha - hb)) if ha >= 0 else (ha / (ha - hb), 1.0))
+                                P_ = lambda t: (s[0] + (e[0] - s[0]) * t, s[1] + (e[1] - s[1]) * t, za0 + (zb0 - za0) * t + o)
+                                l_c.append((P_(t0), P_(t1)))
+                            o += 0.15
+                        l_c += [((s[0], s[1], za0), (s[0], s[1], za1)), ((e[0], e[1], zb0), (e[0], e[1], zb1))]
+                n_pretil += bool(pr)
+    for k, (q, n) in mods.items():
+        g = unary_union([q] + volados[k]) if volados[k] else q
+        f = F[k]
+        cu, cv = quiebres[k]
+        vm = cv[1]
+        u0, _, u1, _ = g.bounds
+        if n == 'alto':   # translúcido (policarbonato alveolar, las celdas a lo largo de la pendiente): va con el vidrio
+            losa_f(t_v, l_v, g, f, 0.05, cu, cv)
+            for d in (0.0, 1.1, -1.1, 2.2, -2.2, 3.3, -3.3):
+                linea_f(l_v, g, (u0 - 1, vm + d), (u1 + 1, vm + d), f, cu, cv, 0.01)
+        else:
+            losa_f(t_c, l_c, g, f, C['canto'], cu, cv)
+            linea_f(l_c, g, (u0 - 1, vm), (u1 + 1, vm), f, cu, cv, 0.005)   # el doblez
+
+    def z_en(u, v, celdas=False):
+        """z más alta de los módulos que tocan (u, v); con celdas, aunque el aro corte el módulo."""
+        p = Point(u, v)
+        zs = [F[k](u, v) for k, (q, n) in mods.items() if (celda[k] if celdas else q).buffer(0.01).contains(p)]
+        return max(zs) if zs else None
     CUB_SUR.update({'tris': t_c, 'lins': l_c, 'vid': t_v, 'vidL': l_v,
-                    'z': lambda u, v: next((CUBIERTA_SUR[n_] for q_, n_ in mods.values() if q_.buffer(0.01).contains(Point(u, v))), CUBIERTA_SUR['bajo']),
-                    'modulos': {n_: sum(1 for _, x in mods.values() if x == n_) for n_ in ('bajo', 'medio', 'alto')}})
+                    'z': lambda u, v: z_en(u, v) or C['valle'],
+                    # la cara de abajo en (u, v), para el vidrio del corte del aro (que cae justo en la orilla cortada)
+                    'abajo': lambda u, v: (lambda z_: None if z_ is None else z_ - C['canto'])(z_en(u, v, True)),
+                    'modulos': {n_: sum(1 for _, x in mods.values() if x == n_) for n_ in ('bajo', 'medio', 'alto')},
+                    'dobleces': {f_: sum(1 for x in forma.values() if x == f_) for f_ in ('canal', 'lomo')},
+                    'pretiles': n_pretil, 'U': U, 'V': V, 'mapa': {k: (n, forma[k]) for k, (q, n) in mods.items()}, 'sup': F})
     return mods
 
 
@@ -3671,7 +3798,7 @@ def main():
     resumen['patios'] = patios_aro(S3, L3, arboles)   # (después de las dos naves: las mesitas siguen a sus locales)
     print('paso 3', json.dumps({k: v for k, v in resumen.items() if k != 'sur'}, ensure_ascii=False))
     cin_t, cin_l, cinta = cinta_aro()
-    vid_t, vid_l, vid_r = vidrio_aro([techo, techo_s])
+    vid_t, vid_l, vid_r = vidrio_aro([techo, CUB_SUR.get('abajo') or techo_s])
     print('fachada al aro (vidrio)', len(vid_t), 'triángulos', len(vid_l), 'marcos', '· vanos', len(VIDRIO_VANOS))
     planta_plano_png()
     disco_c = Point(ARO).buffer(CORTE, 256)

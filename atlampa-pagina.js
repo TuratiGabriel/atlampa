@@ -354,7 +354,7 @@
           'Sur: ' + ((su.clusters_pb || 0) + (su.clusters_pa || 0)) + ' clusters con trastiendas · ' + fondas + ' barras de comida · ' + (su.respiros || 0) + ' respiro',
           'Norte sobre la retícula de vivienda: isla, portal y calle de las plantas con pórtico',
           'Jardín de la esquina NE ' + Math.round(r.jardin_m2) + ' m² (' + Math.round(r.jardin_abierto_m2 || 0) + ' abiertos, alero ' + (r.alero_m || 0).toFixed(2) + ') · jardín sur ' + Math.round(su.jardin_sur_m2 || 0) + ' m²',
-          'Foro bajo el hoyo (con vidrio) · cubierta sur en módulos a tres alturas'];
+          'Foro bajo el hoyo (con vidrio) · cubierta sur: las dos aguas en módulos a tres alturas' + (su.cubierta_dobleces ? ', ' + su.cubierta_dobleces.canal + ' en canal y ' + su.cubierta_dobleces.lomo + ' en lomo' : '')];
         if (su.acuaponia_m2) datos.push('Acuaponia: vitrina de ' + Math.round(su.acuaponia_m2) + ' m²');
         if (c) datos.push('Cinta del aro: ' + Math.round(c.largo) + ' m al ' + Math.max.apply(null, c.pendientes).toFixed(1) + ' %');
         datos.push('Fachada al aro: vidrio (por definir)');
