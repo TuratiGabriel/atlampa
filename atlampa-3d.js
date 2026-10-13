@@ -1416,6 +1416,81 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     ponLineas(gCol, l, 'columna', 0xffffff, null, null);
   }
 
+  /* Los dos accesos siguen las bocas reales de las helicoidales. Se comparten
+     entre la vista general (pavimento) y el diagrama de estacionamiento
+     (flechas), para que ambas lecturas siempre coincidan. */
+  function rutasAccesoEstacionamiento(bahia) {
+    if (!EST) return [];
+    const arco = (c, r, a0, a1) => Array.from({ length: 25 }, (_, i) => { const a = (a0 + (a1 - a0) * i / 24) * RAD; return [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r]; });
+    const angV = (c, r, v) => Math.asin(Math.max(-1, Math.min(1, (v - c[1]) / r))) / RAD;
+    const rn = EST.rampas.find(r => r.bloque === 'norte'), rs = EST.rampas.find(r => r.bloque === 'sur');
+    const ri = 6.7, re = 10.95, rutas = [];
+    const calleN = bahia ? GU.n + 2.4 : (GU.n + GF.n) / 2;
+    const calleS = bahia ? GU.s - 2.4 : (GU.s + GF.s) / 2;
+    if (rn) {
+      const c = rn.c, vb = c[1] + 5.3;
+      const cA = [c[0] + ri - re, vb], ent = arco(cA, re, angV(cA, re, GU.n), 0);
+      rutas.push({ bloque: 'norte', puntos: [[ent[0][0], calleN], ...ent, [c[0] + ri, c[1]]].reverse() });
+      const cB = [c[0] + 2 * re, vb], sal = arco(cB, re, 180, 180 - angV(cB, re, GU.n));
+      rutas.push({ bloque: 'norte', puntos: [[c[0] + re, c[1]], [c[0] + re, vb], ...sal, [sal[sal.length - 1][0], calleN]].reverse() });
+    }
+    if (rs) {
+      const c = rs.c, vb = c[1] - 5.2;
+      const cA = [c[0] + 2 * re, vb], ent = arco(cA, re, 180 - angV(cA, re, GU.s), 180);
+      rutas.push({ bloque: 'sur', puntos: [[ent[0][0], calleS], ...ent, [c[0] + re, c[1]]] });
+      const cB = [c[0] + ri - re, vb], sal = arco(cB, re, 0, angV(cB, re, GU.s));
+      rutas.push({ bloque: 'sur', puntos: [[c[0] + ri, c[1]], [c[0] + ri, vb], ...sal, [sal[sal.length - 1][0], calleS]] });
+    }
+    return rutas;
+  }
+
+  /* En la vista completa sólo asoman las llegadas: dos bahías que cortan la
+     banqueta y el arranque de cada helicoidal. Los sótanos siguen ocultos. */
+  const gEstEntradas = pieza('entradas-estacionamiento', 'estacionamiento', 0.045);
+  if (EST && GENERAL) {
+    const m = new Malla(), l = new Lineas(), ancho = 3.8;
+    const predN = (PRED[2][1] + PRED[3][1]) / 2, predS = (PRED[0][1] + PRED[1][1]) / 2;
+    const altura = (v, bloque) => {
+      if (bloque === 'norte') {
+        if (v >= GU.n) return 0.04;
+        if (v <= predN) return 0.255;
+        return 0.04 + (GU.n - v) / (GU.n - predN) * 0.215;
+      }
+      if (v <= GU.s) return 0.04;
+      if (v >= predS) return 0.255;
+      return 0.04 + (v - GU.s) / (predS - GU.s) * 0.215;
+    };
+    const cinta = (ruta) => {
+      const p = ruta.puntos, nr = p.map((q, i) => {
+        const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)], du = b[0] - a[0], dv = b[1] - a[1], d = Math.hypot(du, dv) || 1;
+        return [-dv / d, du / d];
+      });
+      const iz = p.map((q, i) => W(q[0] + nr[i][0] * ancho / 2, q[1] + nr[i][1] * ancho / 2, altura(q[1], ruta.bloque)));
+      const de = p.map((q, i) => W(q[0] - nr[i][0] * ancho / 2, q[1] - nr[i][1] * ancho / 2, altura(q[1], ruta.bloque)));
+      for (let i = 1; i < p.length; i++) m.quad(de[i - 1], de[i], iz[i], iz[i - 1]);
+      l.poli(iz); l.poli(de); l.seg(iz[0], de[0]);
+    };
+    rutasAccesoEstacionamiento(true).forEach(cinta);
+
+    // El primer arco hace legible la continuidad con la rampa sin descubrir el sótano.
+    const PASOS = 18, VUELTA = 0.18;
+    EST.rampas.forEach(r => {
+      const giro = r.bloque === 'norte' ? -1 : 1;
+      const en = (rad, t) => { const a = giro * t * 2 * Math.PI; return W(r.c[0] + Math.cos(a) * rad, r.c[1] + Math.sin(a) * rad, 0.255 - t * 0.28); };
+      (r.carriles || [r.r]).forEach(cr => {
+        for (let i = 0; i < PASOS; i++) {
+          const t0 = VUELTA * i / PASOS, t1 = VUELTA * (i + 1) / PASOS;
+          m.quad(en(cr[0], t0), en(cr[1], t0), en(cr[1], t1), en(cr[0], t1));
+          l.seg(en(cr[0], t0), en(cr[0], t1)); l.seg(en(cr[1], t0), en(cr[1], t1));
+        }
+        l.seg(en(cr[0], 0), en(cr[1], 0));
+        l.seg(en(cr[0], VUELTA), en(cr[1], VUELTA));
+      });
+    });
+    pon(gEstEntradas, m, 'rampa', 'estacionamiento', false);
+    ponLineas(gEstEntradas, l, 'rampa-superficie', 0x4e5357, PROGRAMA.est, 'estacionamiento');
+  }
+
   /* ===== 9. Estacionamiento: en rayos X (se ve a través del piso) ===== */
   const gEst = pieza('estacionamiento', 'estacionamiento', 0.05);
   let estNivel = 0;
@@ -1817,26 +1892,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       // el carril de la derecha. (Las bocas de las rampas no coinciden con los
       // triángulos de la lámina, que siguen en Accesos.)
       const m = new Malla(), z0 = 0.3;
-      const arco = (c, r, a0, a1) => Array.from({ length: 25 }, (_, i) => { const a = (a0 + (a1 - a0) * i / 24) * RAD; return [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r, z0]; });
-      const angV = (c, r, v) => Math.asin(Math.max(-1, Math.min(1, (v - c[1]) / r))) / RAD;   // ángulo (−90…90) donde el arco llega a v
-      const rn = EST.rampas.find(r => r.bloque === 'norte'), rs = EST.rampas.find(r => r.bloque === 'sur');
-      const ce = (GU.n + GF.n) / 2, cc = (GU.s + GF.s) / 2, ri = 6.7, re = 10.95;   // ejes de las calles; los carriles de la helicoidal
-      const rutas = [];
-      if (rn) {   // a Eulalia Guzmán (norte)
-        const c = rn.c, vb = c[1] + 5.3;   // ahí empiezan los arcos del acceso
-        const cA = [c[0] + ri - re, vb], ent = arco(cA, re, angV(cA, re, GU.n), 0);
-        rutas.push([[ent[0][0], ce, z0], ...ent, [c[0] + ri, c[1], z0]]);
-        const cB = [c[0] + 2 * re, vb], sal = arco(cB, re, 180, 180 - angV(cB, re, GU.n));
-        rutas.push([[c[0] + re, c[1], z0], [c[0] + re, vb, z0], ...sal, [sal[sal.length - 1][0], ce, z0]]);
-      }
-      if (rs) {   // a Clavel (sur)
-        const c = rs.c, vb = c[1] - 5.2;
-        const cA = [c[0] + 2 * re, vb], ent = arco(cA, re, 180 - angV(cA, re, GU.s), 180);
-        rutas.push([[ent[0][0], cc, z0], ...ent, [c[0] + re, c[1], z0]]);
-        const cB = [c[0] + ri - re, vb], sal = arco(cB, re, 0, angV(cB, re, GU.s));
-        rutas.push([[c[0] + ri, c[1], z0], [c[0] + ri, vb, z0], ...sal, [sal[sal.length - 1][0], cc, z0]]);
-      }
-      rutas.forEach(r => flechaPunteada(m, r, { ancho: 1.1 }));
+      rutasAccesoEstacionamiento(false).forEach(r => flechaPunteada(m, r.puntos.map(q => [q[0], q[1], z0]), { ancho: 1.1 }));
       // en rayos X, como el estacionamiento: la bajada se ve a través del piso
       const me = new THREE.Mesh(m.geo(), new THREE.MeshBasicMaterial({ color: 0x3d7fe0, side: THREE.DoubleSide, depthTest: false }));
       me.renderOrder = 5; gEstAcc.add(me);
@@ -2068,6 +2124,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     gPai.visible = gPlantas.visible = !n && capas.paisaje && !gPai.userData.oculto;
     gCol.visible = !n && capas.estructura;
     gEst.visible = !n && ESC === 'estacionamiento';
+    gEstEntradas.visible = !n && GENERAL && !ocultos.has('estacionamiento');
     gSol.visible = !n && capas.sol;
     gPers.visible = capas.personas;
     gAcc.visible = capas.accesos;
