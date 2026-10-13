@@ -7,7 +7,7 @@
 - Lee dos cosas de la carpeta del proyecto y, si no están (colaboradores, sesiones en la nube), usa su copia del repo:
   `../Rhino/Contexto.3dm` → `modelo/Contexto.3dm`, y `../analisis/mercado/columnas_vivienda.json` → `herramientas/columnas-vivienda.json`
   (las 10 columnas de la vivienda que cruzan la nave norte; con ese respaldo se reproducen idénticos acero, vivienda, perímetro, cubierta, vidrio y cinta).
-- Sólo se ve en el apartado Comercio (`MERCADO` reemplaza las naves simples); en la general va una versión ligera.
+- Se ve completo en todas las vistas (`MERCADO` reemplaza las naves simples en la general y en cada apartado; 2026-10-13).
 - Se copia **tal cual** de Rhino. Lo que cae dentro del aro (r 47) se recorta. En Comercio, la calle y la banqueta se recortan a la huella.
 - Arriba de cada bloque del script hay un `PROPUESTA` editable (nave norte, hoyo y acero, paso 3, patios del aro, nave sur, cubierta y acero de la sur, cinta).
 - Análisis de apoyo en `analisis/mercado/` (en la carpeta del proyecto, **fuera del repo**): `sol_nave_norte.py` y la planta rotulada `planta_mercado_norte.png`.

@@ -454,9 +454,9 @@ const ARBOLES_TEX = (() => {
 function crea(svg, op) {
   op = op || {};
   const ESC = op.escena || 'general', GENERAL = ESC === 'general';
-  /* El mercado de Rhino, completo en la vista general y en Comercio (la vista general iba ligera, sin acero ni
-     interior de la nave norte, mientras el motor gráfico no aguantaba el detalle; ya no). */
-  const MERCADO = ESC === 'comercio' || GENERAL ? MERC : null;
+  /* El mercado de Rhino, completo en todas las vistas (2026-10-13: lo que se sube va con todo su detalle;
+     antes iba ligero en la general y como naves simples en los otros apartados). */
+  const MERCADO = MERC;
   const trabajo = svg.parentNode;
   svg.style.display = 'none';
   // el lienzo y el renderer son de la sesión (ver RENDERER): la escena vieja se
@@ -883,7 +883,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     // plantas: todo estático
     const pasto = new Lineas(), tallo = new Lineas(), junco = new Lineas(), flores = [[], [], []];
     const domo = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), arb = [];
-    G.plantasDe(ESC === 'paisajismo' ? 2 : 1).forEach(c => {
+    G.plantasDe(2).forEach(c => {   // completas en todas las vistas (antes, fuera de Paisajismo, un tercio)
       let a = c.pasto;
       for (let i = 0; i < a.length; i += 4) {
         const u = a[i], v = a[i + 1], h = a[i + 2], w = a[i + 3] * h, b = W(u, v, Z), ang = (u * 7.3 + v * 3.1) % Math.PI;
