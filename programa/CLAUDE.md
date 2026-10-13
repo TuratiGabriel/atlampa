@@ -33,13 +33,11 @@ No toques:
 </reglas>
 
 <flujo>
-1. `git pull` y trabaja en **tu rama** (`programa/<tu-nombre>-<tema>`). **Commits y pushes sólo a esa rama; nunca a `master`**
-   (master está publicado en Vercel y sólo Gabriel lo toca). Antes de commit o push revisa `git branch --show-current`.
-   Prohibido `git push origin master`, `git push origin HEAD:master`, merges hacia master y `--force`.
+1. `git pull` y trabaja en **tu rama** (`programa/<tu-nombre>-<tema>`), nunca en `master`.
 2. Edita `manual.json` / `arboles.json` / `index.html`.
 3. Corre `python programa/validar.py`. Debe terminar en «OK».
 4. Commits chicos, mensaje en español: qué cambió y de dónde sale.
-5. Sube tu rama (`git push origin <tu-rama>`) y abre un **pull request** con la plantilla. Sólo Gabriel lo aprueba e integra. Al integrarlo, Vercel publica solo.
+5. Abre un **pull request** con la plantilla. Gabriel lo integra. Al integrarlo, Vercel publica solo.
 </flujo>
 
 <pendientes_sin_dato>

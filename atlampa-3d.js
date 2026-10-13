@@ -454,17 +454,9 @@ const ARBOLES_TEX = (() => {
 function crea(svg, op) {
   op = op || {};
   const ESC = op.escena || 'general', GENERAL = ESC === 'general';
-  /* El mercado de Rhino: completo inspeccionando Comercio; en la vista general,
-     ligero, como fachada de papel (2026-10-12, Gabriel: «que ya se note un poco más
-     del detalle, no todo»): lo exterior y los cambios (muros, cubiertas con el hoyo,
-     vidrio, cinta, patios del aro y la planta alta de la nave sur), sin el acero ni
-     el interior de la nave norte. */
-  const subconj = (o, ks) => { if (!o) return null; const r = {}; ks.forEach(k => { if (o[k]) r[k] = o[k]; if (o[k + 'L']) r[k + 'L'] = o[k + 'L']; }); return r; };
-  const LIGERO = GENERAL && MERC;
-  const MERCADO = ESC === 'comercio' ? MERC : LIGERO ? Object.assign({}, MERC, {
-    acero: null, aceroS: null, vivienda: null, paso3: subconj(MERC.paso3, ['banca', 'humedal', 'agua_p']),
-    sur: subconj(MERC.sur, ['pa', 'local', 'muro', 'tarima', 'maceta']), arboles: (MERC.arboles || []).filter(t => t[2] > 3)
-  }) : null;
+  /* El mercado de Rhino, completo en la vista general y en Comercio (la vista general iba ligera, sin acero ni
+     interior de la nave norte, mientras el motor gráfico no aguantaba el detalle; ya no). */
+  const MERCADO = ESC === 'comercio' || GENERAL ? MERC : null;
   const trabajo = svg.parentNode;
   svg.style.display = 'none';
   // el lienzo y el renderer son de la sesión (ver RENDERER): la escena vieja se
@@ -952,7 +944,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
      cubiertas, atlampa-mercado.js) en lugar de las naves simples. */
   if (MERCADO) {
     // las geometrías, una vez por sesión (ver CACHE)
-    const MG = fija(LIGERO ? 'mercado-ligero' : 'mercado', () => {
+    const MG = fija('mercado', () => {
       const geo = a => {
         const p = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { const w = W(a[i], a[i + 1], a[i + 2]); p[i] = w[0]; p[i + 1] = w[1]; p[i + 2] = w[2]; }
