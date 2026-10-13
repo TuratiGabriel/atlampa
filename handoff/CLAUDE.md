@@ -60,6 +60,8 @@ Ejes compositivos: el de la vivienda pasa por el aro; el segundo va de las naves
   - Si un cambio cae fuera de tu programa (motor, estilo, geo), pregúntale primero al usuario.
   - Nunca sobrescribas un `.3dm` ajeno.
 - Al cambiar datos, sube `V` en `herramientas/paginas.py`; el navegador cachea.
+- Antes de subir, corre `python diagrama/herramientas/revisa.py --base origin/master` (< 1 s). Si sale algo, arréglalo antes del push:
+  la misma revisión corre en cada pull request y lo marca en rojo.
 - Lleva una memoria propia de decisiones (con fecha), pendientes y archivos.
 </reglas_siempre>
 
