@@ -11,17 +11,17 @@
 - Lámina original: 2 pabellones curvos de 2 niveles y 2,000 m². Con fondo de 12 m al ras del aro salía ~1,180 m²; la diferencia está sin confirmar.
 - Ficha en `paginas.py`: desactualizada (habla de los pabellones).
 
-## Plantas y distribución (v21, 2026-10-13)
+## Edificio y plantas (v22, 2026-10-13)
 - Hoja: `diagrama/modelo/arte_y_cultura_plantas.html` (plantas por nivel, módulos tipo, áreas, volumen 3D e isométrico).
-  Se armó sobre la geometría de esta rama: placas N1, N2 y azotea, salas E1/E2, auditorio, X1 y X2, las 14 columnas, las rampas
-  traseras y el aro del conjunto (círculo 39.5–46.55, piso +10.03, ensanchado sobre la azotea). Sin X3 ni escaleras traseras.
-- Núcleo en la celda (−7,18) y un módulo de baños M · H en (−7,17) en los 4 niveles (una sola bajada). Talleres húmedos en PB,
-  uno seco en N1. Montacargas al poniente: servicio y bodegas en PB, sala 2 en N1, sala B en N2, café en la azotea.
-- `atlampa-3d-cultura.js`: `DATA.mods` ya son los módulos de esa distribución y `DATA.umb` las 9 sombrillas de un módulo a
-  +15.00 (`lv.PAD`) sobre las columnas con i + j par; las otras 5 columnas llegan a la azotea. `DATA.par` (parasoles a +12) ya no se dibuja.
-- Vivienda: mismos 85 módulos quitados y 18 de comercio que `prepara-modulos.py`.
-- Pendientes para el equipo: en la azotea el núcleo deja 0.75 m atrás y 1.05 m al frente, así que la pista de 2 m no da la vuelta;
-  el aro (+10.03) queda 0.51 m arriba del +9.00 del concepto (N2 → azotea = 3.51 m); en N2 el núcleo parte la sala en dos.
+- El edificio es el de la propuesta de Diego (concepto v15–v20), casi intacto: placas que crecen al frente y atrás al bajar
+  (N1 933, N2 714, azotea 528 m²), escaleras en X (X1–X3 al frente, X4–X6 atrás, trazadas desde el eje del aro de proyecto
+  `C`, `R0`, `BULGE` de `DATA`), solo columnas (sin la estructura en X de `gridMembers`) y sombrillas de un módulo a +15.00.
+  Las rampas traseras de la rama anterior ya no van.
+- Contexto: manda el aro del conjunto (`atlampa-geo.js`). Se ensancha sobre `azotea` = azotea + descansos de X3 y X6 (`DATA.RFg`),
+  así que X3 y X6 llegan al aro (+9.51 aquí, +10.03 en el visor). Con esta azotea `prepara-modulos.py` da los mismos 85 módulos
+  quitados y 18 de comercio. El aro lleva 3 sombrillas en su tramo este (`DATA.umb` con `ring`), con columna propia.
+- Distribución: núcleo en (−7,18) y un módulo de baños M · H en (−7,17) en los 4 niveles (una sola bajada); talleres en PB y N1.
+- Pendientes: el aro queda 0.51 m arriba del +9.00 del concepto (X3 y X6 suben 3.51 m); comercio a +7.47 y +10.47 contra el aro.
 
 ## Aro
 - Círculo con centro (505.75, 409.05), losa con r ≈ 39.5–46.55, piso a +10.03 (Rhino 9.92), 33 columnas.
