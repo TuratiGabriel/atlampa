@@ -53,7 +53,8 @@ Ejes compositivos: el de la vivienda pasa por el aro; el segundo va de las naves
 - **Sé propositivo**, como arquitecto especialista: no te limites a ejecutar.
 - **Mide, no supongas:** lo nuevo debe calzar con `Contexto.3dm` a < 1 cm.
 - **Repo compartido con Gabriel** (`github.com/TuratiGabriel/atlampa`):
-  - Antes de empezar, `git pull`. Trabaja en tu rama (`industria` o `cultura`), nunca en `master`.
+  - Antes de empezar, trae lo nuevo de `master` a tu rama: `python diagrama/herramientas/ramas.py actualiza <tu rama>`.
+    Trabaja en tu rama (`industria` o `cultura`), nunca en `master`.
   - Toca sólo tus archivos (`prepara-<tuyo>.py`, `atlampa-<tuyo>.js`) y los ganchos mínimos (tu bloque en `atlampa-3d.js`, tu ficha en
     `paginas.py`). No reformatees.
   - Commits chicos. Al terminar un paso, sube la rama y abre un pull request: Gabriel lo integra.
@@ -79,5 +80,6 @@ No leas todo. Abre **sólo** el archivo de `diagrama/handoff/procesos/` que pida
 | estructura de acero, predimensionamiento, Grasshopper                    | `diagrama/handoff/procesos/estructura.md`          |
 | paisaje, vegetación, sol, estacionamiento                                | `diagrama/handoff/procesos/paisaje-y-estacionamiento.md` |
 | usar Rhino por MCP                                                       | `diagrama/handoff/procesos/rhino-mcp.md`           |
+| ramas, ver una rama en local, mezclar, integrar a master, conflictos     | `diagrama/handoff/procesos/ramas-y-version-local.md` |
 | el sitio de cifras del programa (m², CAS/COS/CUS, árboles) y sus datos manuales | `programa/CLAUDE.md` (reglas propias; no toques el visor) |
 </indice>
