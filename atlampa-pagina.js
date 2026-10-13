@@ -70,7 +70,7 @@
   zona.tabIndex = 0;
   // El dibujo: atlampa-3d.js (Three.js); los datos del sitio, atlampa-geo.js.
   var VER = (document.currentScript && document.currentScript.src.split('?')[1]) || '';
-  var estiloAct = 'rayado', perspAct = true;
+  var estiloAct = 'clay', perspAct = false;
   var antesNolli = null, NORTE_ARRIBA = -9.96;   // azimut con el norte arriba (el modelo está girado 9.96°)
   function creaDibujo() {
     var d = window.Atlampa3D.crea(svg, { escena: ESCENA, az: azMeta, el: elMeta });
@@ -546,7 +546,7 @@
     var vista = '<button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="' + prendida('color') + '">Color</button>' +
       '<button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="' + perspAct + '">Perspectiva</button>' +
       '<p class="hud-panel__t">Estilo</p>' +
-      ['rayado', 'plano'].map(function (e) { return '<button class="hud-op hud-op--radio" type="button" data-estilo="' + e + '" aria-pressed="' + (estiloAct === e) + '">' + (e === 'rayado' ? 'Rayado' : 'Plano') + '</button>'; }).join('');
+      ['clay', 'rayado', 'plano'].map(function (e) { var n = e === 'clay' ? 'Clay' : e === 'rayado' ? 'Rayado' : 'Plano'; return '<button class="hud-op hud-op--radio" type="button" data-estilo="' + e + '" aria-pressed="' + (estiloAct === e) + '">' + n + '</button>'; }).join('');
     nav.innerHTML = (partes.length ? '<details class="hud-menu" name="hud"><summary class="hud-menu__t">Partes</summary><div class="hud-panel hud-panel--partes">' + filasPartes(partes) + '</div></details>' : '') +
       '<details class="hud-menu" name="hud"><summary class="hud-menu__t">Vista</summary><div class="hud-panel">' + vista + '</div></details>' +
       '<button class="hud-salir" type="button" data-aisla-sale>Salir <span aria-hidden="true">✕</span></button>';

@@ -24,8 +24,14 @@ export function crea(api) {
     ctxsuelo: { gris: 0.03, arista: 0.1 },
     carro: { gris: 0.14, arista: 0 }
   });
+  Object.assign(ESTILOS.clay.papel, {
+    contexto: { modo: 1, gris: 0.82, arista: 0.18 },
+    ctxsuelo: { modo: 1, gris: 0.5, grano: 0.012, arista: 0.1 },
+    carro: { modo: 1, gris: 0.72, arista: 0.14 }
+  });
   Object.assign(ESTILOS.rayado.lineas, { ctxresalta: 0.9, ctxcalle: 0.22, ctxavenida: 0.32, ctxtren: 0.3, flecha: 0.5, poste: 0.5 });
   Object.assign(ESTILOS.plano.lineas, { ctxresalta: 0.85, ctxcalle: 0.2, ctxavenida: 0.3, ctxtren: 0.28, flecha: 0.45, poste: 0.45 });
+  Object.assign(ESTILOS.clay.lineas, { ctxresalta: 0.72, ctxcalle: 0.2, ctxavenida: 0.28, ctxtren: 0.26, flecha: 0.42, poste: 0.42 });
 
   /* ---------- Geometría ---------- */
   // partes de una polilínea fuera del rectángulo r (Liang-Barsky por tramo)
@@ -186,7 +192,7 @@ export function crea(api) {
       varying float vOp;
       void main() { vOp = iGiro.z > 1.0 ? 0.35 : 0.75; vec3 p = position * iGiro.z; p = vec3(p.x * iGiro.x + p.z * iGiro.y, p.y, -p.x * iGiro.y + p.z * iGiro.x);
         gl_Position = projectionMatrix * viewMatrix * vec4(p + iPos, 1.0); }`,
-    fragmentShader: /* glsl */`varying float vOp; void main() { gl_FragColor = vec4(vec3(1.0), vOp); }`
+    fragmentShader: /* glsl */`varying float vOp; void main() { gl_FragColor = vec4(vec3(0.42), vOp); }`
   });
   const carrosAr = new THREE.LineSegments(ar, matAr);
   carrosAr.frustumCulled = false;

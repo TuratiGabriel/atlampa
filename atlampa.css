@@ -3,19 +3,19 @@
    El modelo es 3D (atlampa-3d.js): su estilo (croquis, rayado, colores del
    programa) vive en el motor. Aquí va lo que flota encima, como en un
    videojuego: marca y ruta, menús desplegables, ficha del apartado,
-   minimapa, leyenda y rótulos. Fondo negro, blancos y grises; rotulación a
-   mano de arquitecto (Architects Daughter) y textos chicos en Inter.
+   minimapa, leyenda y rótulos. La maqueta editorial vive sobre blanco y los
+   controles negros conservan contraste sobre cualquier vista.
    ============================================================ */
 @font-face{ font-family:"Architects Daughter"; font-style:normal; font-weight:400; font-display:swap; src:url(fuentes/architects-daughter.woff2) format("woff2"); }
 @font-face{ font-family:"Inter"; font-style:normal; font-weight:300 500; font-display:swap; src:url(fuentes/inter-v20.woff2) format("woff2"); }
 
 /* ---------- Tokens ---------- */
 :root{
-  --bg:#000000;
-  --fg:#f4f4f4;
-  --muted:#9a9a9a;
-  --trazo:rgba(255,255,255,.14);
-  --font-display:"Architects Daughter", "Segoe Print", cursive;
+  --bg:#f7f7f4;
+  --fg:#f7f7f4;
+  --muted:#b7b9bd;
+  --trazo:rgba(255,255,255,.2);
+  --font-display:"Inter", system-ui, sans-serif;
   --font-ui:"Inter", system-ui, sans-serif;
   --gutter:clamp(16px, 3vw, 40px);
   --ease-ui:cubic-bezier(.4,0,.2,1);
@@ -70,10 +70,13 @@ body{ height:100vh; height:100dvh; overflow:hidden; }
 
 .hud-cabeza, .hud-barra, .hud-ficha, .hud-camara{ position:absolute; z-index:3; transition:opacity .3s var(--ease-ui); }
 .hud-cabeza{ top:18px; left:var(--gutter); display:flex; align-items:baseline; gap:14px; pointer-events:none; }
-/* lo que va directo sobre el dibujo (cielo claro o piso negro): se invierte con lo de atrás */
-.hud-cabeza, .ad-ayuda, .ad-3d-rot{ mix-blend-mode:difference; }
+/* La marca y las ayudas quedan oscuras sobre el fondo editorial claro. */
+.hud-cabeza, .ad-ayuda, .ad-3d-rot{ mix-blend-mode:normal; }
 .hud-marca{ pointer-events:auto; font-family:var(--font-display); font-size:clamp(26px, 2.4vw, 36px); line-height:1; letter-spacing:.02em; color:var(--fg); text-decoration:none; }
 .hud-ruta{ font-family:var(--font-display); font-size:16px; letter-spacing:.05em; color:var(--muted); }
+.hud-cabeza .hud-marca{ color:#111318; font-weight:500; }
+.hud-cabeza .hud-ruta{ color:#6f747c; }
+.ad-ayuda{ color:rgba(31,34,39,.62); }
 body[data-escena="general"] .hud-ruta{ font-size:13px; }
 .hud-marca:focus-visible{ outline:1px solid var(--fg); outline-offset:4px; }
 
@@ -83,7 +86,8 @@ body[data-escena="general"] .hud-ruta{ font-size:13px; }
 .hud-menu__t{
   list-style:none; cursor:pointer; display:flex; align-items:center; gap:9px; padding:7px 13px 6px;
   font-family:var(--font-display); font-size:15px; letter-spacing:.05em; color:var(--muted);
-  background:rgba(0,0,0,.62); border:1px solid var(--trazo); border-radius:3px;
+  background:rgba(8,9,11,.94); border:1px solid rgba(255,255,255,.2); border-radius:6px;
+  box-shadow:0 5px 18px rgba(28,32,38,.16);
   -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
   transition:color .2s var(--ease-ui), border-color .2s var(--ease-ui);
 }
@@ -96,7 +100,8 @@ body[data-escena="general"] .hud-ruta{ font-size:13px; }
 .hud-panel{
   position:absolute; top:calc(100% + 6px); right:0; min-width:190px; max-height:calc(100dvh - 120px); overflow-y:auto;
   display:flex; flex-direction:column; gap:2px; padding:10px 14px 12px;
-  background:rgba(0,0,0,.8); border:1px solid var(--trazo); border-radius:3px;
+  background:rgba(8,9,11,.96); border:1px solid rgba(255,255,255,.2); border-radius:6px;
+  box-shadow:0 14px 38px rgba(28,32,38,.2);
   -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
   animation:hud-abre .18s var(--ease-ui);
 }
@@ -147,7 +152,8 @@ body:not([data-escena="general"]) .solo-general{ display:none; }
 /* ficha del apartado */
 .hud-ficha{
   top:76px; left:var(--gutter); width:236px; display:flex; flex-direction:column; gap:10px; padding:14px 16px;
-  background:rgba(0,0,0,.62); border:1px solid var(--trazo); border-radius:3px;
+  background:rgba(8,9,11,.94); border:1px solid rgba(255,255,255,.2); border-radius:6px;
+  box-shadow:0 10px 30px rgba(28,32,38,.16);
   -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
 }
 .hud-ficha[hidden]{ display:none; }
@@ -160,7 +166,8 @@ body:not([data-escena="general"]) .solo-general{ display:none; }
 .hud-camara{ right:var(--gutter); bottom:18px; display:flex; align-items:flex-end; gap:8px; }
 .ad-zoom{ display:flex; flex-direction:column; gap:4px; }
 .ad-zoom__b{
-  width:28px; height:26px; border:1px solid var(--trazo); border-radius:3px; background:rgba(0,0,0,.62); color:var(--muted); font-size:15px; line-height:1;
+  width:28px; height:26px; border:1px solid rgba(255,255,255,.2); border-radius:6px; background:rgba(8,9,11,.94); color:var(--muted); font-size:15px; line-height:1;
+  box-shadow:0 4px 14px rgba(28,32,38,.14);
   transition:color .2s var(--ease-ui), border-color .2s var(--ease-ui);
 }
 @media (hover:hover){ .ad-zoom__b:hover{ color:var(--fg); border-color:rgba(255,255,255,.4); } }
@@ -189,6 +196,7 @@ body.sin-sol [data-l="sol"], body.sin-arboles [data-l="arboles"], body.sin-perso
   .hud-panel{ top:auto; bottom:calc(100% + 6px); left:0; right:auto; max-height:60dvh; }
   .hud-ficha{ display:none; }
   .ad-ayuda{ display:none; }
+  .hud-camara{ right:14px; bottom:104px; }
 }
 
 /* ---------- Minimapa: en la esquina; indica y, con un clic, nortea ---------- */
@@ -285,7 +293,8 @@ body.aislado .hud-barra:not(.hud-barra--aislado){ display:none; }
 .hud-salir{
   display:flex; align-items:center; gap:8px; padding:7px 13px 6px;
   font-family:var(--font-display); font-size:15px; letter-spacing:.05em; color:var(--fg);
-  background:rgba(0,0,0,.62); border:1px solid rgba(255,255,255,.4); border-radius:3px;
+  background:rgba(8,9,11,.94); border:1px solid rgba(255,255,255,.4); border-radius:6px;
+  box-shadow:0 5px 18px rgba(28,32,38,.16);
   -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); cursor:pointer;
   transition:border-color .2s var(--ease-ui);
 }
@@ -295,21 +304,21 @@ body.aislado .hud-barra:not(.hud-barra--aislado){ display:none; }
 .hud-ficha__nota{ font-size:11px; letter-spacing:.03em; color:rgba(154,154,154,.75); line-height:1.4; }
 
 /* ---------- Cuadros de datos ----------
-   Un punto blanco discreto abre la lectura física sin sacar al usuario del
+   Un punto negro discreto abre la lectura física sin sacar al usuario del
    modelo. El panel conserva el lenguaje negro, blanco y gris del tablero. */
 .hud-dato-punto{
   position:absolute; z-index:5; right:38px; top:50%; width:28px; height:28px; margin-top:-14px;
   border:0; border-radius:50%; background:transparent; cursor:pointer; transition:opacity .16s var(--ease-ui);
 }
 .hud-dato-punto::before{
-  content:""; position:absolute; inset:7px; border:1px solid rgba(255,255,255,.9); border-radius:50%;
-  background:#fff; box-shadow:0 0 0 4px rgba(0,0,0,.42), 0 0 0 5px rgba(255,255,255,.18);
+  content:""; position:absolute; inset:7px; border:1px solid #08090b; border-radius:50%;
+  background:#08090b; box-shadow:0 0 0 4px rgba(255,255,255,.78), 0 0 0 5px rgba(8,9,11,.2);
   transition:transform .2s var(--ease-ui), box-shadow .2s var(--ease-ui);
 }
 .hud-dato-punto::after{
-  content:""; position:absolute; inset:3px; border:1px solid rgba(255,255,255,.28); border-radius:50%;
+  content:""; position:absolute; inset:3px; border:1px solid rgba(8,9,11,.3); border-radius:50%;
 }
-@media (hover:hover){ .hud-dato-punto:hover::before{ transform:scale(1.2); box-shadow:0 0 0 5px rgba(0,0,0,.52), 0 0 0 6px rgba(255,255,255,.32); } }
+@media (hover:hover){ .hud-dato-punto:hover::before{ transform:scale(1.2); box-shadow:0 0 0 5px rgba(255,255,255,.9), 0 0 0 6px rgba(8,9,11,.34); } }
 .hud-dato-punto:focus-visible{ outline:1px solid var(--fg); outline-offset:3px; }
 .hud-dato-punto[aria-expanded="true"]::before{ transform:scale(.72); }
 

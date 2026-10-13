@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlampa · Industria</title>
-<link rel="stylesheet" href="atlampa.css?v=20261012g">
-<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261012g">
+<link rel="stylesheet" href="atlampa.css?v=20261012h">
+<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261012h">
 <!-- Three.js del CDN (pendiente: copiarlo a lib/ para presentar sin internet) -->
 <script type="importmap">{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head>
@@ -111,11 +111,12 @@
       <summary class="hud-menu__t">Vista</summary>
       <div class="hud-panel">
         <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">Color</button>
-        <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="true">Perspectiva</button>
+        <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="false">Perspectiva</button>
         <button class="hud-op" type="button" data-capa="planta" aria-pressed="false">Planta</button>
         <button class="hud-op" type="button" data-capa="nolli" aria-pressed="false">Mapa Nolli</button>
         <p class="hud-panel__t">Estilo</p>
-        <button class="hud-op hud-op--radio" type="button" data-estilo="rayado" aria-pressed="true">Rayado</button>
+        <button class="hud-op hud-op--radio" type="button" data-estilo="clay" aria-pressed="true">Clay</button>
+        <button class="hud-op hud-op--radio" type="button" data-estilo="rayado" aria-pressed="false">Rayado</button>
         <button class="hud-op hud-op--radio" type="button" data-estilo="plano" aria-pressed="false">Plano</button>
         <p class="hud-panel__t">Resaltar</p>
         <button class="hud-op hud-op--radio" type="button" data-resalta="" aria-pressed="true">Nada</button>
@@ -159,12 +160,12 @@
 
   <p class="ad-ayuda">Arrastrar (derecho o izquierdo): orbitar · Shift + arrastrar o botón central: mover · rueda: zoom al cursor · clic en una parte: entrar · doble clic: aislarla (en el vacío: encuadre)</p>
 </main>
-<script src="atlampa-datos.js?v=20261012g"></script>
-<script src="atlampa-modulos.js?v=20261012g"></script>
-<script src="atlampa-estacionamiento.js?v=20261012g"></script>
-<script src="atlampa-paisaje.js?v=20261012g"></script>
-<script src="atlampa-mercado.js?v=20261012g"></script>
-<script src="atlampa-geo.js?v=20261012g"></script>
-<script src="atlampa-pagina.js?v=20261012g"></script>
+<script src="atlampa-datos.js?v=20261012h"></script>
+<script src="atlampa-modulos.js?v=20261012h"></script>
+<script src="atlampa-estacionamiento.js?v=20261012h"></script>
+<script src="atlampa-paisaje.js?v=20261012h"></script>
+<script src="atlampa-mercado.js?v=20261012h"></script>
+<script src="atlampa-geo.js?v=20261012h"></script>
+<script src="atlampa-pagina.js?v=20261012h"></script>
 </body>
 </html>

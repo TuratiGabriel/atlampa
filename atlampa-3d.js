@@ -53,6 +53,25 @@ const W = (u, v, z) => [u - CEN[0], z, -(v - CEN[1])];
 /* ---------- Estilos ---------- */
 const PAPELES = ['suelo', 'calle', 'banqueta', 'predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'proyecto', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'arbusto', 'copa', 'est', 'rampa', 'vidrio'];
 const ESTILOS = {
+  clay: {
+    // Maqueta editorial: masas mate, luz difusa y un solo protagonista azul.
+    // El contexto se mantiene cálido, simplificado y casi monocromático.
+    fondo: '#f7f7f4', cielo: '#fbfbf9', perspectiva: false,
+    papel: {
+      suelo: { modo: 1, gris: 0.28, arista: 0.08 }, calle: { modo: 1, gris: 0.56, grano: 0.018, arista: 0.16 },
+      banqueta: { modo: 1, gris: 0.48, grano: 0.008, arista: 0.18 }, predio: { modo: 1, gris: 0.42, arista: 0.3 },
+      plaza: { modo: 1, gris: 0.5, grano: 0.008, arista: 0.22 }, verde: { modo: 1, gris: 0.6, arista: 0.08 },
+      tezontle: { modo: 1, gris: 0.58, grano: 0.014, arista: 0.08 }, agua: { modo: 1, gris: 0.68, arista: 0.2 },
+      filtro: { modo: 1, gris: 0.62, arista: 0.16 }, nave: { modo: 1, gris: 0.96, arista: 0.72 },
+      industria: { modo: 1, gris: 0.96, arista: 0.72 }, cultura: { modo: 1, gris: 0.96, arista: 0.72 },
+      aro: { modo: 1, gris: 0.96, arista: 0.76 }, modulo: { modo: 1, gris: 0.96, arista: 0.68 },
+      modcom: { modo: 1, gris: 0.96, arista: 0.72 }, arbusto: { modo: 1, gris: 0.7, arista: 0.08 },
+      copa: { modo: 1, gris: 0.68, arista: 0.06 }, est: { modo: 1, gris: 0.66, arista: 0.28 },
+      rampa: { modo: 1, gris: 0.68, arista: 0.22 }, proyecto: { modo: 1, gris: 0.96, arista: 0.72 },
+      vidrio: { modo: 3, gris: 0.18, arista: 0.42 }
+    },
+    lineas: { pasto: 0.36, flor: 0.5, junco: 0.34, tronco: 0.46, sendero: 0.32, rayo: 0.18, columna: 0.5, est: 0.34, rampa: 0.58, sol: 0.4, vidrio: 0.42 }
+  },
   rayado: {
     // Croquis + rayado (lo que escogió Gabriel): los volúmenes sólo con sus
     // aristas a mano (un trazo delgado que se pasa de las esquinas), las caras
@@ -87,6 +106,12 @@ const ESTILOS = {
 // colores del programa (lámina de usos), para el modo Color
 // (en tonos claros: sobre el fondo negro tienen que leerse)
 const PROGRAMA = { vivienda: '#ff5cb0', comercio: '#8a98ff', industria: '#d2d4d8', publico: '#ff6f63', cultura: '#c9a6ff', verde: '#a8e063', agua: '#8fd0ff', tez: '#ff9a6b', est: '#d2d4d8', aro: '#f2c14e', social: '#e8ff5a' };
+const CLAY_PROYECTO = '#1759d6';
+const CLAY_TINTA = {
+  suelo: '#deded9', calle: '#cfd1d0', banqueta: '#dedfdb', predio: '#e6e5df', plaza: '#deded9',
+  verde: '#b7bbb5', tezontle: '#c4c2bc', agua: '#aebbc1', filtro: '#b7bbb5', arbusto: '#9ea49e', copa: '#979d98',
+  est: '#b8bbbd', rampa: '#b8bbbd', contexto: '#e7e4dc', ctxsuelo: '#dadbd8', carro: '#aeb2b5'
+};
 // qué programa / espacio es cada papel
 const PROG_DE = { social: 'social', nave: 'comercio', vidrio: 'comercio', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', modcom: 'comercio', social: 'social', aro: 'aro', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est', rampa: 'est' };
 // Público / privado (un solo botón, dos colores): privado, los volúmenes de
@@ -193,7 +218,7 @@ const VERT = /* glsl */`
   }`;
 const FRAG = /* glsl */`
   uniform vec3 uFondo; uniform vec3 uTinta; uniform float uModo; uniform float uTono; uniform float uPaso; uniform float uMundo;
-  uniform float uGris; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform float uCorte;
+  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform float uCorte;
   varying vec3 vN; varying vec3 vW;` + DIB_GLSL + `
   // una raya cada periodo de c (antialias con fwidth; si es muy denso, el promedio)
   float raya(float c, float grueso) {
@@ -243,6 +268,8 @@ const FRAG = /* glsl */`
       col = mix(uFondo, uTinta, clamp((uGris + r * uTono) * uBrillo, 0.0, 1.0));
     } else {
       col = mix(uFondo, uTinta, clamp(uGris * mix(0.55, 1.15, lam) * uBrillo, 0.0, 1.0));
+      float ruido = fract(sin(dot(floor(gl_FragCoord.xy * 0.55), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+      col += ruido * uGrano;
     }
     gl_FragColor = vec4(col, uOpacidad);
   }`;
@@ -304,7 +331,7 @@ const R_SOL = 150, CICLO_SOL = 24000;
 // (U: canal de dibujo; dibujándose, cada figura aparece de abajo hacia arriba)
 function matAtlas(tex, cols, filas, U) {
   return new THREE.ShaderMaterial({
-    uniforms: Object.assign({ uMapa: { value: tex }, uN: { value: cols }, uP: { value: filas }, uTinta: { value: new THREE.Color(1, 1, 1) }, uOpacidad: { value: 1 }, uCorte: CORTE_Y }, U || canalDib()),
+    uniforms: Object.assign({ uMapa: { value: tex }, uN: { value: cols }, uP: { value: filas }, uTinta: { value: new THREE.Color(1, 1, 1) }, uPlano: { value: 0 }, uOpacidad: { value: 1 }, uCorte: CORTE_Y }, U || canalDib()),
     vertexShader: /* glsl */`
       attribute vec3 aPos; attribute vec2 aEsc; attribute float aTile; attribute float aVolt; attribute float aPose;
       uniform float uN; uniform float uP; varying vec2 vUv; varying float vY; varying float vK; varying float vAlto;` + DIB_GLSL + `
@@ -319,12 +346,12 @@ function matAtlas(tex, cols, filas, U) {
         vK = uDib.x < 0.999 ? clamp((uDib.x - dibInicio(aPos, 6.0)) / 0.09, 0.0, 1.0) : 1.0;
       }`,
     fragmentShader: /* glsl */`
-      uniform sampler2D uMapa; uniform vec3 uTinta; uniform float uOpacidad; uniform float uCorte; varying vec2 vUv; varying float vY; varying float vK; varying float vAlto;
+      uniform sampler2D uMapa; uniform vec3 uTinta; uniform float uPlano; uniform float uOpacidad; uniform float uCorte; varying vec2 vUv; varying float vY; varying float vK; varying float vAlto;
       void main() {
         if (vY > uCorte || vAlto > vK) discard;
         vec4 t = texture2D(uMapa, vUv);
         if (t.a < 0.5) discard;
-        gl_FragColor = vec4(t.rgb * uTinta, uOpacidad);
+        gl_FragColor = vec4(mix(t.rgb * uTinta, uTinta, uPlano), uOpacidad);
       }`
   });
 }
@@ -459,7 +486,7 @@ function crea(svg, op) {
   trabajo.insertBefore(lienzoEsq, svg);
 
   const escena = new THREE.Scene();
-  let estilo = ESTILOS.rayado;
+  let estilo = ESTILOS.clay;
   escena.background = new THREE.Color(estilo.cielo || estilo.fondo);
 
   const camO = new THREE.OrthographicCamera(-1, 1, 1, -1, -2000, 4000);
@@ -488,7 +515,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide,
       polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
       uniforms: Object.assign({ uFondo: { value: new THREE.Color(0, 0, 0) }, uTinta: { value: new THREE.Color(1, 1, 1) }, uModo: { value: 0 }, uTono: { value: 0.5 },
-        uPaso: { value: 3 }, uMundo: { value: 0 }, uGris: { value: 0.1 }, uOpacidad: { value: 1 }, uLuz: { value: luz }, uPx: { value: renderer.getPixelRatio() },
+        uPaso: { value: 3 }, uMundo: { value: 0 }, uGris: { value: 0.1 }, uGrano: { value: 0 }, uOpacidad: { value: 1 }, uLuz: { value: luz }, uPx: { value: renderer.getPixelRatio() },
         uBrillo: { value: 1 }, uGrueso: { value: 0.22 }, uCorte: CORTE_Y }, canalDe(papel))
     });
     m.userData.papel = papel;
@@ -506,6 +533,11 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   }
   const blanco = new THREE.Color(1, 1, 1);
   function tinta(papel) {
+    if (estilo === ESTILOS.clay && !conColor && !espacioAct) {
+      if (['nave', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'proyecto'].indexOf(papel) >= 0) return new THREE.Color(CLAY_PROYECTO);
+      if (papel === 'vidrio') return new THREE.Color('#7aa2dc');
+      return new THREE.Color(CLAY_TINTA[papel] || '#aeb1af');
+    }
     // el vidrio, siempre un poco azul (con Color, más)
     if (papel === 'vidrio' && !espacioAct) return new THREE.Color(conColor ? PROGRAMA.agua : '#cfeaff');
     if (espacioAct) { const e = espacioDe(papel); return e ? new THREE.Color(ESPACIO_COLOR[e]) : blanco; }
@@ -536,6 +568,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (aisl) return 1;   // aislado: lo que queda se ve entero
     if (ref) return REF;
     if (apagado(papel)) return 1;
+    if (estilo === ESTILOS.clay) return 1;
     if (!resalta && !espacioAct) {
       if (papel === 'modulo' || papel === 'social') return 0.5;
       if (PLANTA_BAJA.indexOf(papel) >= 0) return 1.3;
@@ -549,7 +582,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const m = MATS[k], e = estilo.papel[m.userData.papel] || estilo.papel.proyecto, u = m.uniforms;
       u.uModo.value = e.modo !== undefined ? e.modo : estilo === ESTILOS.plano ? 1 : 0;
       // con Color, más tinta: que contraste con el negro
-      u.uTono.value = (e.tono || 0.4) * (conColor ? 1.35 : 1); u.uPaso.value = e.paso || 3; u.uGrueso.value = (e.grueso || 0.22) * (conColor ? 1.3 : 1); u.uMundo.value = e.mundo || 0; u.uGris.value = e.gris || 0.1;
+      u.uFondo.value.set(estilo.fondo); u.uTono.value = (e.tono || 0.4) * (conColor ? 1.35 : 1); u.uPaso.value = e.paso || 3; u.uGrueso.value = (e.grueso || 0.22) * (conColor ? 1.3 : 1); u.uMundo.value = e.mundo || 0; u.uGris.value = e.gris || 0.1; u.uGrano.value = e.grano || 0;
       u.uTinta.value = tinta(m.userData.papel);
       // Público / privado: las áreas se llenan de su color (el croquis sólo tenía aristas)
       if (espacioAct && espacioDe(m.userData.papel)) {
@@ -578,12 +611,18 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       if (enEstr) { const est = m.userData.nombre === 'columna'; m.opacity = est ? 1 : m.opacity * 0.6; m.depthTest = !est; m.renderOrder = est ? 5 : 0; }
       else { m.depthTest = true; m.renderOrder = 0; }
       if (espacioAct && LINEAS_PAISAJE.indexOf(base) >= 0) m.color.set(ESPACIO_COLOR.publico);
-      else if (conColor && m.userData.colorColor) m.color.set(m.userData.colorColor); else m.color.set(m.userData.color);
+      else if (conColor && m.userData.colorColor) m.color.set(m.userData.colorColor);
+      else if (estilo === ESTILOS.clay) m.color.set(base.indexOf('ctx') === 0 ? '#a9adae' : '#717779');
+      else m.color.set(m.userData.color);
     });
     // árboles de croquis: con Color, verde claro; tenues como referencia o si se resalta otra cosa
     const refArb = !GENERAL && ESC !== 'paisajismo', apArb = apagadaLinea('pasto');
-    matArbol.uniforms.uTinta.value.set(espacioAct ? ESPACIO_COLOR.publico : conColor ? '#c6ec8f' : '#ffffff').multiplyScalar((refArb ? REF : 1) * (conEsquema ? TENUE_ESQ : 1));
-    if (matPersEsq) matPersEsq.uniforms.uTinta.value.setScalar(conEsquema ? TENUE_ESQ : 1);
+    matArbol.uniforms.uTinta.value.set(espacioAct ? ESPACIO_COLOR.publico : conColor ? '#c6ec8f' : estilo === ESTILOS.clay ? '#8f9691' : '#ffffff').multiplyScalar((refArb ? REF : 1) * (conEsquema ? TENUE_ESQ : 1));
+    matArbol.uniforms.uPlano.value = estilo === ESTILOS.clay ? 1 : 0;
+    if (matPersEsq) {
+      matPersEsq.uniforms.uTinta.value.set(estilo === ESTILOS.clay ? '#777d80' : '#ffffff').multiplyScalar(conEsquema ? TENUE_ESQ : 1);
+      matPersEsq.uniforms.uPlano.value = estilo === ESTILOS.clay ? 1 : 0;
+    }
     matArbol.uniforms.uOpacidad.value = apArb ? TENUE : 1; matArbol.transparent = apArb; matArbol.depthWrite = !apArb;
     if (enEstr) { matArbol.uniforms.uOpacidad.value = 0.35; matArbol.transparent = true; matArbol.depthWrite = false; }
     pide();
@@ -1061,7 +1100,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const A = MERCADO.arboles || [];
       [[gV, A.filter(t => t[2] < 0.3)], [gA, A.filter(t => t[2] >= 0.3)]].forEach(([g, lista]) => {
         if (!lista.length) return;
-        const b = mallaAtlas(lista.length, matAtlas(ARBOLES_TEX.tex, ARBOLES_TEX.N, 1, DIB.base));
+        const b = mallaAtlas(lista.length, matArbol);
         lista.forEach((t, i) => {
           const p = W(t[0], t[1], t[2]);
           b.aPos.setXYZ(i, p[0], p[1], p[2]); b.aEsc.setXY(i, ARBOLES_TEX.ancho * t[3] * 0.8, ARBOLES_TEX.alto * t[3]);

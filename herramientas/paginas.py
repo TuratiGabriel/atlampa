@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261012g'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261012h'      # versión de los archivos (para que el navegador no use los viejos)
 
 SOTANOS = '''
       <div class="hud-grupo" role="group" aria-label="Sótanos">
@@ -174,11 +174,12 @@ PLANTILLA = '''<!doctype html>
       <summary class="hud-menu__t">Vista</summary>
       <div class="hud-panel">
         <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">Color</button>
-        <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="true">Perspectiva</button>
+        <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="false">Perspectiva</button>
         <button class="hud-op" type="button" data-capa="planta" aria-pressed="false">Planta</button>
         <button class="hud-op" type="button" data-capa="nolli" aria-pressed="false">Mapa Nolli</button>
         <p class="hud-panel__t">Estilo</p>
-        <button class="hud-op hud-op--radio" type="button" data-estilo="rayado" aria-pressed="true">Rayado</button>
+        <button class="hud-op hud-op--radio" type="button" data-estilo="clay" aria-pressed="true">Clay</button>
+        <button class="hud-op hud-op--radio" type="button" data-estilo="rayado" aria-pressed="false">Rayado</button>
         <button class="hud-op hud-op--radio" type="button" data-estilo="plano" aria-pressed="false">Plano</button>
         <p class="hud-panel__t">Resaltar</p>
 {resalta}
