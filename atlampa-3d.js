@@ -35,6 +35,7 @@ const CULTURA_DET = await import('./atlampa-3d-cultura.js' + (VER ? '?' + VER : 
 const { PB, GU, GF, S, HE, CEN, PIEZAS, ANILLO, CORTE, COLUMNAS, ESPUELA, ESP_FIN, CULTURA, PLAZA_C, GIRO, MOD, EST, PAI, MEX, MEY } = G;
 // El mercado de Gabriel (Rhino, por herramientas/prepara-mercado.py): sólo en el apartado Comercio
 const MERC = window.ATLAMPA_MERCADO || null;
+const INFRA = window.ATLAMPA_INFRAESTRUCTURA || null;
 const RAD = Math.PI / 180;
 // caja [u0, v0, u1, v1] menos otra caja: las (hasta 4) cajas que quedan
 function menosCaja(c, h) {
@@ -500,7 +501,7 @@ function crea(svg, op) {
   const MATS = {};      // clave → ShaderMaterial
   const ARISTAS = {};   // clave → LineBasicMaterial
   const LINEAS = {};    // nombre → LineBasicMaterial (plantas, columnas…)
-  let conColor = false, resalta = null, espacioAct = null, conEsquema = false, matPersEsq = null;
+  let conColor = false, resalta = null, espacioAct = null, conEsquema = false, infraAct = null, matPersEsq = null;
   // con el esquema compositivo, el modelo entero queda muy tenue (pero se lee: no se va a negro)
   const TENUE_ESQ = 0.32;
   // Inspeccionando la estructura (no sólo mostrándola): de lo demás sólo
@@ -594,8 +595,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
         else u.uTono.value = Math.min(1, u.uTono.value * 2.2);
       }
       u.uBrillo.value = enfasis(m.userData.papel, m.userData.ref) * (conEsquema ? TENUE_ESQ : 1);
-      const ap = apagado(m.userData.papel), vid = m.userData.papel === 'vidrio';
-      u.uOpacidad.value = ap ? TENUE : 1; m.transparent = ap || vid; m.depthWrite = !ap && !vid;
+      const ap = apagado(m.userData.papel), vid = m.userData.papel === 'vidrio', inf = !!infraAct;
+      u.uOpacidad.value = (ap ? TENUE : 1) * (inf ? 0.09 : 1); m.transparent = ap || vid || inf; m.depthWrite = !ap && !vid && !inf;
       // inspeccionando la estructura: de lo demás, sólo el contorno (menos el aro)
       m.visible = !(enEstr && !m.userData.estr && m.userData.papel !== 'aro');
       if (enEstr && m.userData.estr) { u.uBrillo.value = 1; u.uModo.value = 0; u.uGris.value = 0.5; }
@@ -604,14 +605,14 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     Object.keys(ARISTAS).forEach(k => {
       const m = ARISTAS[k], e = estilo.papel[m.userData.papel] || estilo.papel.proyecto;
       m.color.copy(tinta(m.userData.papel));
-      m.opacity = Math.min(1, (e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1);
+      m.opacity = Math.min(1, (e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
       if (enEstr && m.userData.papel !== 'aro' && m.opacity > 0.001) m.opacity = 0.42;
       m.visible = m.opacity > 0.001;
     });
     Object.keys(LINEAS).forEach(k => {
       const m = LINEAS[k], base = m.userData.nombre.split('-')[0];
       const pb = nada && ['pasto', 'flor', 'junco', 'tronco', 'sendero', 'rayo'].indexOf(base) >= 0 ? 1.3 : 1;
-      m.opacity = Math.min(1, (estilo.lineas[base] !== undefined ? estilo.lineas[base] : 0.4) * (m.userData.ref ? REF : pb)) * (apagadaLinea(base) ? TENUE : 1) * (conEsquema ? TENUE_ESQ : 1);
+      m.opacity = Math.min(1, (estilo.lineas[base] !== undefined ? estilo.lineas[base] : 0.4) * (m.userData.ref ? REF : pb)) * (apagadaLinea(base) ? TENUE : 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
       if (enEstr) { const est = m.userData.nombre === 'columna'; m.opacity = est ? 1 : m.opacity * 0.6; m.depthTest = !est; m.renderOrder = est ? 5 : 0; }
       else { m.depthTest = true; m.renderOrder = 0; }
       if (espacioAct && LINEAS_PAISAJE.indexOf(base) >= 0) m.color.set(ESPACIO_COLOR.publico);
@@ -627,7 +628,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       matPersEsq.uniforms.uTinta.value.set(estilo === ESTILOS.clay ? '#777d80' : '#ffffff').multiplyScalar(conEsquema ? TENUE_ESQ : 1);
       matPersEsq.uniforms.uPlano.value = estilo === ESTILOS.clay ? 1 : 0;
     }
-    matArbol.uniforms.uOpacidad.value = apArb ? TENUE : 1; matArbol.transparent = apArb; matArbol.depthWrite = !apArb;
+    matArbol.uniforms.uOpacidad.value = (apArb ? TENUE : 1) * (infraAct ? 0.09 : 1); matArbol.transparent = apArb || !!infraAct; matArbol.depthWrite = !apArb && !infraAct;
     if (enEstr) { matArbol.uniforms.uOpacidad.value = 0.35; matArbol.transparent = true; matArbol.depthWrite = false; }
     pide();
   }
@@ -1894,7 +1895,143 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     }
   }
 
-  /* ===== 13. Mapa Nolli =====
+  /* ===== 13. Infraestructura técnica conceptual =====
+     Los trazos explican el sistema; no sustituyen planos ejecutivos. Los
+     cuartos de sótano se dibujan por encima del depth buffer para poder leerlos
+     a través del proyecto atenuado. */
+  const gInfraElec = new THREE.Group(), gInfraHidro = new THREE.Group(), INFRA_RUTAS = [];
+  gInfraElec.visible = gInfraHidro.visible = false;
+  escena.add(gInfraElec, gInfraHidro);
+  const INFRA_COLOR = {
+    electrica: 0xb88725, potable: 0x4b82a8, pluvial: 0x76b5c7, gris: 0x8c9394,
+    negra: 0x504844, tratada: 0x4d9788, riego: 0x78945f, solidos: 0x8b7868
+  };
+  function materialInfra(color, opacidad) {
+    return new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0.02, transparent: true,
+      opacity: opacidad === undefined ? 0.9 : opacidad, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+  }
+  function cajaInfra(grupo, caja, z0, z1, color, opacidad) {
+    const m = new Malla(); prisma(m, rect(...caja), z0, z1);
+    const g = m.geo(), me = new THREE.Mesh(g, materialInfra(color, opacidad)); me.renderOrder = 7; grupo.add(me);
+    const ar = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.95, depthTest: false }));
+    ar.renderOrder = 8; grupo.add(ar); return me;
+  }
+  function rotuloInfra(grupo, texto, p, color) {
+    const c = document.createElement('canvas'), x = c.getContext('2d'), pr = 2; c.width = 360 * pr; c.height = 58 * pr;
+    x.scale(pr, pr); x.font = '600 16px Inter, sans-serif'; const w = Math.min(330, x.measureText(texto).width + 28);
+    x.fillStyle = 'rgba(250,250,247,.94)'; x.strokeStyle = 'rgba(20,20,20,.25)'; x.lineWidth = 1;
+    x.beginPath(); x.roundRect((360 - w) / 2, 6, w, 40, 5); x.fill(); x.stroke();
+    x.fillStyle = '#' + new THREE.Color(color).getHexString(); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(texto, 180, 26);
+    const t = new THREE.CanvasTexture(c), s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false }));
+    s.position.set(...W(...p)); s.scale.set(18, 2.9, 1); s.renderOrder = 12; grupo.add(s); return s;
+  }
+  function trazoInfra(grupo, puntos, color, radio, opacidad) {
+    const curva = new THREE.CatmullRomCurve3(puntos.map(q => new THREE.Vector3(...W(...q))), false, 'centripetal');
+    const tubo = new THREE.Mesh(new THREE.TubeGeometry(curva, Math.max(12, puntos.length * 10), radio || 0.1, 6, false),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: opacidad === undefined ? 0.7 : opacidad, depthTest: false, depthWrite: false }));
+    tubo.renderOrder = 9; grupo.add(tubo);
+    return { curva, tubo };
+  }
+  function tuberia(grupo, puntos, color, velocidad, cantidadFlechas) {
+    const trazo = trazoInfra(grupo, puntos, color, 0.1, 0.7), curva = trazo.curva;
+    const flechas = [];
+    const cantidad = cantidadFlechas === undefined ? 3 : cantidadFlechas;
+    for (let i = 0; i < cantidad; i++) {
+      const f = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.9, 8), new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }));
+      f.renderOrder = 11; grupo.add(f); flechas.push({ m: f, fase: i / cantidad });
+    }
+    INFRA_RUTAS.push({ grupo, curva, flechas, velocidad: velocidad || 0.025 });
+  }
+  function ramalesPorNivel(grupo, nucleo, color, desplazamiento, lado, largo, opacidad, radio) {
+    const a = (nucleo.azimut || 0) * RAD, dx = Math.cos(a) * (largo || 2.4) * lado, dy = Math.sin(a) * (largo || 2.4) * lado;
+    const u = nucleo.centro[0] + desplazamiento[0], v = nucleo.centro[1] + desplazamiento[1];
+    for (let i = 0; i < nucleo.niveles; i++) {
+      const z = 9.35 + i * 3;
+      trazoInfra(grupo, [[u, v, z], [u + dx, v + dy, z]], color, radio || 0.055, opacidad || 0.62);
+    }
+  }
+  function redElectricaNucleo(nucleo) {
+    const u = nucleo.centro[0], v = nucleo.centro[1], cima = 9.35 + (nucleo.niveles - 1) * 3;
+    tuberia(gInfraElec, [nucleo.origen, [u, v, 1], [u, v, 8.1]], INFRA_COLOR.electrica, 0.02, 1);
+    tuberia(gInfraElec, [[u, v, 8.1], [u, v, cima]], INFRA_COLOR.electrica, 0.022, 2);
+    ramalesPorNivel(gInfraElec, nucleo, INFRA_COLOR.electrica, [0, 0], 1, 2.7, 0.82, 0.072);
+  }
+  function redHidraulicaNucleo(nucleo) {
+    const u = nucleo.centro[0], v = nucleo.centro[1], cima = 9.35 + (nucleo.niveles - 1) * 3;
+    const pot = [u - 0.34, v], tra = [u + 0.34, v], gri = [u, v - 0.34], neg = [u, v + 0.34];
+    tuberia(gInfraHidro, [nucleo.origen, [pot[0], pot[1], 1], [pot[0], pot[1], 8.1]], INFRA_COLOR.potable, 0.019, 1);
+    tuberia(gInfraHidro, [[pot[0], pot[1], 8.1], [pot[0], pot[1], cima]], INFRA_COLOR.potable, 0.022, 2);
+    tuberia(gInfraHidro, [[tra[0], tra[1], 8.1], [tra[0], tra[1], cima]], INFRA_COLOR.tratada, 0.021, 2);
+    tuberia(gInfraHidro, [[gri[0], gri[1], cima], [gri[0], gri[1], 8.1]], INFRA_COLOR.gris, 0.021, 2);
+    tuberia(gInfraHidro, [[neg[0], neg[1], cima], [neg[0], neg[1], 8.1]], INFRA_COLOR.negra, 0.02, 2);
+    trazoInfra(gInfraHidro, [nucleo.origen, [tra[0], tra[1], 1], [tra[0], tra[1], 8.1]], INFRA_COLOR.tratada, 0.065, 0.48);
+    trazoInfra(gInfraHidro, [[gri[0], gri[1], 8.1], [gri[0], gri[1], 1], nucleo.origen], INFRA_COLOR.gris, 0.06, 0.42);
+    trazoInfra(gInfraHidro, [[neg[0], neg[1], 8.1], [neg[0], neg[1], 1], nucleo.origen], INFRA_COLOR.negra, 0.06, 0.42);
+    ramalesPorNivel(gInfraHidro, nucleo, INFRA_COLOR.potable, [-0.34, 0], -1, 1.65, 0.58);
+    ramalesPorNivel(gInfraHidro, nucleo, INFRA_COLOR.tratada, [0.34, 0], 1, 1.65, 0.58);
+    ramalesPorNivel(gInfraHidro, nucleo, INFRA_COLOR.gris, [0, -0.34], -1, 1.35, 0.5);
+    ramalesPorNivel(gInfraHidro, nucleo, INFRA_COLOR.negra, [0, 0.34], 1, 1.35, 0.5);
+  }
+  function rawGeo(a) {
+    const p = new Float32Array(a.length);
+    for (let i = 0; i < a.length; i += 3) { const w = W(a[i], a[i + 1], a[i + 2]); p[i] = w[0]; p[i + 1] = w[1]; p[i + 2] = w[2]; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.computeVertexNormals(); return g;
+  }
+  if (INFRA) {
+    const E = INFRA.electrica, SUE = E.subestacion;
+    cajaInfra(gInfraElec, SUE.caja, SUE.nivel, SUE.nivel + SUE.altura, INFRA_COLOR.electrica, 0.3);
+    cajaInfra(gInfraElec, [511.5, 472.5, 514.2, 475.8], -3.25, -0.85, 0xb88b32, 0.88);
+    cajaInfra(gInfraElec, [514.8, 472.5, 519.8, 473.6], -3.25, -1.0, 0xd0b05f, 0.88);
+    cajaInfra(gInfraElec, [516.8, 474.4, 520.3, 478.3], -3.25, -1.0, 0x9c8352, 0.88);
+    rotuloInfra(gInfraElec, 'CFE · acometida norte', E.acometida, INFRA_COLOR.electrica);
+    rotuloInfra(gInfraElec, 'Subestación · 1,500 kVA preliminar', [516, 475.5, -0.1], INFRA_COLOR.electrica);
+    rotuloInfra(gInfraElec, 'Planta de emergencia · 500 kW', [518.5, 476.5, -1], INFRA_COLOR.electrica);
+    E.postes.forEach((p, i) => {
+      const q = W(p[0], p[1], 0.25), poste = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, p[2], 8), materialInfra(INFRA_COLOR.electrica, 0.88));
+      poste.position.set(q[0], q[1] + p[2] / 2, q[2]); poste.renderOrder = 8; gInfraElec.add(poste);
+      if (!i) rotuloInfra(gInfraElec, 'Alumbrado del paisaje', [p[0], p[1], p[2] + 0.8], INFRA_COLOR.electrica);
+    });
+    E.rutas.forEach(r => tuberia(gInfraElec, r.puntos, INFRA_COLOR.electrica, r.tipo === 'red' ? 0.018 : 0.028));
+    E.nucleos_vivienda.concat(E.nucleos_comercio).forEach(redElectricaNucleo);
+
+    const H = INFRA.hidrosanitaria, CP = H.cisterna_potable, B = H.bombas;
+    cajaInfra(gInfraHidro, CP.caja, CP.nivel - CP.profundidad, CP.nivel, INFRA_COLOR.potable, 0.34);
+    cajaInfra(gInfraHidro, B.caja, B.nivel, B.nivel + B.altura, 0x648da5, 0.54);
+    rotuloInfra(gInfraHidro, 'Cisterna potable · 550 m³', [464, 355, -3.2], INFRA_COLOR.potable);
+    rotuloInfra(gInfraHidro, 'Cuarto de bombas · 40 m²', [478, 352, -0.2], 0x648da5);
+    H.humedales.forEach(h => {
+      const vertical = h.tipo === 'vertical', color = vertical ? INFRA_COLOR.gris : INFRA_COLOR.tratada;
+      cajaInfra(gInfraHidro, h.caja, -1.1, 0.4, color, 0.44);
+      if (vertical) rotuloInfra(gInfraHidro, 'Paquete ' + h.paquete + ' · V + H · 96 m²', [(h.caja[0] + h.caja[2]) / 2, (h.caja[1] + h.caja[3]) / 2, 1.25], color);
+    });
+    const lago = new THREE.Mesh(new THREE.CylinderGeometry(10.5, 10.5, 0.18, 48), materialInfra(INFRA_COLOR.tratada, 0.42));
+    lago.position.set(...W(H.laguna.centro[0], H.laguna.centro[1], H.laguna.centro[2])); lago.renderOrder = 8; gInfraHidro.add(lago);
+    rotuloInfra(gInfraHidro, 'Laguna · almacenamiento de agua tratada', [490.9, 405, 2.2], INFRA_COLOR.tratada);
+    if (MERC && MERC.sur && MERC.sur.bio) {
+      const base = rawGeo(MERC.sur.bio), mat = materialInfra(INFRA_COLOR.negra, 0.78);
+      const b1 = new THREE.Mesh(base, mat), b2 = new THREE.Mesh(base.clone(), mat.clone());
+      b1.renderOrder = b2.renderOrder = 8;
+      b2.geometry.translate(H.biodigestores.desplazamiento_segundo[0], H.biodigestores.desplazamiento_segundo[2], -H.biodigestores.desplazamiento_segundo[1]);
+      gInfraHidro.add(b1, b2);
+      rotuloInfra(gInfraHidro, '2 biodigestores · 35.8 m³ c/u', [527.5, 330.6, 2.1], INFRA_COLOR.negra);
+    }
+    rotuloInfra(gInfraHidro, 'Suministro público', H.toma_publica, INFRA_COLOR.potable);
+    H.rutas.forEach(r => tuberia(gInfraHidro, r.puntos, INFRA_COLOR[r.agua], r.agua === 'pluvial' ? 0.034 : 0.024));
+    H.nucleos.forEach(redHidraulicaNucleo);
+  }
+  function mueveInfra(ms) {
+    const eje = new THREE.Vector3(0, 1, 0);
+    INFRA_RUTAS.forEach(r => {
+      if (!r.grupo.visible) return;
+      r.flechas.forEach(f => {
+        const t = (f.fase + ms * 0.001 * r.velocidad) % 1, p = r.curva.getPointAt(t), d = r.curva.getTangentAt(Math.min(0.999, t)).normalize();
+        f.m.position.copy(p); f.m.quaternion.setFromUnitVectors(eje, d);
+      });
+    });
+    if (gInfraElec.visible || gInfraHidro.visible) pide();
+  }
+
+  /* ===== 14. Mapa Nolli =====
      La planta baja como figura y fondo, con lo que hay ahora: el espacio
      público en blanco (calles, banquetas, el piso libre, la plaza, el interior
      de las naves y de arte y cultura) y lo construido o privado en negro: los
@@ -2109,7 +2246,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   }
 
   /* ----- capas ----- */
-  const capas = { modulos: !!MOD, paisaje: !!PAI, estructura: false, sol: false, flujos: false, arboles: false, postes: false, personas: false, accesos: false, nolli: false, planta: false, corte: false, esquema: false };
+  const capas = { modulos: !!MOD, paisaje: !!PAI, estructura: false, sol: false, flujos: false, arboles: false, postes: false, personas: false, accesos: false,
+    nolli: false, planta: false, corte: false, esquema: false, 'instalacion-electrica': false, 'instalacion-hidraulica': false };
   function visibles() {
     // Nolli: sólo la figura y fondo (más los accesos y las personas, si están)
     const n = capas.nolli;
@@ -2124,6 +2262,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     gPers.visible = capas.personas;
     gAcc.visible = capas.accesos;
     gEstAcc.visible = !n && ESC === 'estacionamiento' && !ocultos.has('estacionamiento');
+    gInfraElec.visible = !n && !!capas['instalacion-electrica'];
+    gInfraHidro.visible = !n && !!capas['instalacion-hidraulica'];
     gNolli.visible = n;
     // lo que se ocultó desde el menú de lo propuesto
     piezas.forEach(p => { if (ocultos.has(p.ap)) p.g.visible = false; });
@@ -2142,7 +2282,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (!aisl) return;
     raizG.children.forEach(o => { o.visible = aisl.grupos.has(o); });
     aisl.partes.forEach(pt => pt.objs.forEach(o => { o.visible = !pt.oculto; }));
-    [gSol, gPers, gAcc, gEstAcc, gNolli, gCorte].forEach(g => { g.visible = false; });
+    [gSol, gPers, gAcc, gEstAcc, gInfraElec, gInfraHidro, gNolli, gCorte].forEach(g => { g.visible = false; });
     capaRot.classList.remove('con-sol');
   }
 
@@ -2316,6 +2456,10 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   function capa(nombre, si) {
     const era = capas[nombre];
     capas[nombre] = !!si;
+    if (nombre === 'instalacion-electrica' || nombre === 'instalacion-hidraulica') {
+      infraAct = si ? nombre : (infraAct === nombre ? null : infraAct);
+      visibles(); aplicaEstilo(); mueveInfra(ultimoMs || performance.now()); return;
+    }
     if (nombre === 'color') { conColor = !!si; aplicaEstilo(); return; }
     if (nombre === 'esquema') { conEsquema = !!si; aplicaEstilo(); return; }
     if (nombre === 'estructura' && !si && enEstr) { enEstr = false; aplicaEstilo(); }
@@ -2656,7 +2800,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     depura: () => ({ escena, capas }),   // para revisar desde la consola
     preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); },
     contextoListo: () => !ext.listo || ext.listo(), separa,
-    fluye(ms) { if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
+    fluye(ms) { mueveInfra(ms); if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
     minimapa: G.minimapa, limitesElevacion: [EL_MIN, EL_MAX], limitesDentro: EL_DENTRO, dentro, pasea, escena: ESC, tipos: MOD ? MOD.tipos : [],
     aumento: () => 1, azimut: () => AZ, elevacion: () => EL, estilo: cambiaEstilo, perspectiva, estilos: Object.keys(ESTILOS), motor: '3d'
   };

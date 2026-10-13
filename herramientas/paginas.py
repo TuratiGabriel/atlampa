@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261013c'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261013f'      # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -46,6 +46,8 @@ ICONOS = {
     'perspectiva': '<path d="m12 2 9 5v10l-9 5-9-5V7l9-5Z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
     'planta': '<rect x="3" y="3" width="18" height="18"/><path d="M8 3v8h8V3M8 21v-6h5"/>',
     'nolli': '<path d="M3 3h7v7H3zM14 3h7v4h-7zM14 11h7v10h-7zM3 14h7v7H3z"/>',
+    'instalacion-electrica': '<path d="m13 2-7 11h5l-1 9 8-12h-5l0-8Z"/><path d="M4 4h3M17 20h3"/>',
+    'instalacion-hidraulica': '<path d="M12 2C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-13Z"/><path d="M9 16c.5 1.5 1.5 2 3 2"/>',
     'clay': '<circle cx="12" cy="12" r="8"/><path d="M8 16c2-4 4-6 8-8"/>',
     'rayado': '<path d="M4 8h16M4 12h16M4 16h16"/><rect x="3" y="3" width="18" height="18" rx="2"/>',
     'plano': '<rect x="4" y="4" width="16" height="16"/>',
@@ -221,11 +223,22 @@ PLANTILLA = '''<!doctype html>
     </details>
     <details class="hud-menu" name="hud">
       <summary class="hud-menu__t">{icon_vista}<span>Vista</span></summary>
-      <div class="hud-panel">
+      <div class="hud-panel hud-panel--vista">
         <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">{icon_color}<span>Color</span></button>
         <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="false">{icon_perspectiva}<span>Perspectiva</span></button>
         <button class="hud-op" type="button" data-capa="planta" aria-pressed="false">{icon_planta}<span>Planta</span></button>
         <button class="hud-op" type="button" data-capa="nolli" aria-pressed="false">{icon_nolli}<span>Mapa Nolli</span></button>
+        <p class="hud-panel__t">Instalaciones</p>
+        <button class="hud-op hud-op--radio" type="button" data-capa="instalacion-electrica" aria-pressed="false">{icon_instalacion_electrica}<span>Instalación eléctrica</span></button>
+        <button class="hud-op hud-op--radio" type="button" data-capa="instalacion-hidraulica" aria-pressed="false">{icon_instalacion_hidraulica}<span>Instalación hidro-sanitaria y pluvial</span></button>
+        <ul class="hud-infra-leyenda" aria-label="Tipos de agua">
+          <li><i style="--infra:#4b82a8"></i>Potable</li>
+          <li><i style="--infra:#76b5c7"></i>Pluvial</li>
+          <li><i style="--infra:#8c9394"></i>Aguas grises</li>
+          <li><i style="--infra:#504844"></i>Aguas negras</li>
+          <li><i style="--infra:#4d9788"></i>Agua tratada</li>
+          <li><i style="--infra:#78945f"></i>Riego</li>
+        </ul>
         <p class="hud-panel__t">Estilo</p>
         <button class="hud-op hud-op--radio" type="button" data-estilo="clay" aria-pressed="true">{icon_clay}<span>Clay</span></button>
         <button class="hud-op hud-op--radio" type="button" data-estilo="rayado" aria-pressed="false">{icon_rayado}<span>Rayado</span></button>
@@ -264,6 +277,7 @@ PLANTILLA = '''<!doctype html>
 <script src="atlampa-estacionamiento.js?v={v}"></script>
 <script src="atlampa-paisaje.js?v={v}"></script>
 <script src="atlampa-mercado.js?v={v}"></script>
+<script src="atlampa-infraestructura.js?v={v}"></script>
 <script src="atlampa-geo.js?v={v}"></script>
 <script src="atlampa-pagina.js?v={v}"></script>
 </body>
@@ -317,6 +331,8 @@ def main():
             icon_vista=icono('vista'), icon_leyenda=icono('leyenda'), icon_predio=opcion_icono('predio'),
             icon_color=opcion_icono('color'), icon_perspectiva=opcion_icono('perspectiva'),
             icon_planta=opcion_icono('planta'), icon_nolli=opcion_icono('nolli'), icon_clay=opcion_icono('clay'),
+            icon_instalacion_electrica=opcion_icono('instalacion-electrica'),
+            icon_instalacion_hidraulica=opcion_icono('instalacion-hidraulica'),
             icon_rayado=opcion_icono('rayado'), icon_plano=opcion_icono('plano'))
         ruta = os.path.join(RAIZ, pagina(clave))
         with open(ruta, 'w', encoding='utf-8', newline='\n') as f:
