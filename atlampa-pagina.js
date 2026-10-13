@@ -581,8 +581,13 @@
       fichaAntes = f.innerHTML;
       var M = window.ATLAMPA_MERCADO, r = M && M.resumen, c = M && M.cinta, datos = [];
       if ((ap === 'comercio' || ap === 'nave-norte') && r) {
-        datos = [r.puestos + ' puestos de 2.5 × 2 × 3.0 m en ' + Object.keys(r.bloques || {}).length + ' bloques', r.mesas + ' mesas en los comedores',
+        var pre = ap === 'comercio' ? 'Nave norte: ' : '';   // (en el mercado aislado hay dos naves: se dice de cuál)
+        datos = [pre + r.puestos + ' puestos de 2.5 × 2 × 3.0 m en ' + Object.keys(r.bloques || {}).length + ' bloques', r.mesas + ' mesas en los comedores',
           'Plataformas de +1.42 a +2.40 (suben al sur)', 'Jardín ' + Math.round(r.jardin_m2) + ' m² · hoyo ' + Math.round(r.hoyo_m2) + ' m²'];
+        if (ap === 'comercio' && r.sur) {
+          datos.push('Nave sur: ' + r.sur.puestos + ' puestos en la planta alta · acuaponia ' + Math.round(r.sur.acuaponia_m2) + ' m²');
+          if (r.sur.cubierta) datos.push('Nave sur: cubierta propuesta, valles +' + r.sur.cubierta.valle_z.toFixed(2) + ' · cumbrera +' + r.sur.cubierta.cumbre_z.toFixed(2));
+        }
         if (c) datos.push('Cinta del aro: ' + Math.round(c.largo) + ' m al ' + Math.max.apply(null, c.pendientes).toFixed(1) + ' %');
         datos.push('Fachada al aro: vidrio (por definir)');
       }

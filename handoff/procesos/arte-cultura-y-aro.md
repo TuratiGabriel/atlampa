@@ -16,5 +16,5 @@
 - **El aro y arte y cultura son uno:** el aro se ensancha sobre la azotea de cultura (`G.ponPlataforma(CD.azotea)`, tablas EXT/INT
   por medio grado) y la losa RF de cultura ya no se dibuja. El "chipote" anterior se quitó.
 - Color propio `#f2c14e`. Nunca se apaga al inspeccionar o resaltar.
-- Corta las naves en r 47. Dentro van patios de humedales, pendiente de Gabriel.
+- Corta las naves en r 47. Dentro van los patios del aro: área abierta permeable de tezontle con arriates y bancas «onda» (Gabriel, 2026-10-12; ver `mercado.md`).
 - En `Diag::ring` hay una curva 3D de Gabriel sin usar.
