@@ -357,6 +357,10 @@
   function datosDesdePrograma(doc) {
     var f = doc.figuras, v = f.vivienda, social = v.tipologias.filter(function (t) { return /social/i.test(t.tipo); })
       .reduce(function (n, t) { return n + t.deptos; }, 0);
+    var mercado = window.ATLAMPA_MERCADO && window.ATLAMPA_MERCADO.resumen;
+    var puestosNorte = mercado && Number.isFinite(mercado.puestos) ? mercado.puestos : f.comercio.puestos;
+    var puestosSur = mercado && mercado.sur && Number.isFinite(mercado.sur.puestos) ? mercado.sur.puestos : 0;
+    var puestosComercio = puestosNorte + puestosSur;
     var viviendaConstruida = v.m2_vendible + v.amenidades_m2 + v.extra_m2 + v.sin_asignar_m2;
     var potencial = f.potencial.construido_m2;
     var aroK = Object.keys(potencial).filter(function (k) { return /^aro /.test(k); })[0];
@@ -391,14 +395,16 @@
         notas: ['“Media / no social” es total menos la tipología A social; Git no clasifica expresamente B, C y D como vivienda media.']
       },
       comercio: {
-        titulo: 'Comercio', subtitulo: 'Mercado y naves', fuente: fuenteGit,
+        titulo: 'Comercio', subtitulo: 'Mercado y naves', fuente: fuenteGit + ' · atlampa-mercado.js',
         metricas: [metrica('Naves', f.comercio.naves_total_m2, 'm²'), metrica('Plataformas', f.comercio.plataformas_m2, 'm²'),
-          metrica('Puestos', f.comercio.puestos), metrica('Puesto nominal', f.comercio.puesto_nominal_m2, 'm²')],
+          metrica('Puestos', puestosComercio), metrica('Puesto nominal', f.comercio.puesto_nominal_m2, 'm²')],
         tablas: [tabla('Superficies y capacidad', ['Concepto', 'Dato'], [
           ['Nave norte', numero(f.comercio.naves_m2[0]) + ' m²'], ['Nave sur', numero(f.comercio.naves_m2[1]) + ' m²'],
+          ['Puestos nave norte', numero(puestosNorte)], ['Puestos nave sur', numero(puestosSur)],
           ['Patios', numero(f.comercio.patios.m2) + ' m²'], ['Jardín', numero(f.comercio.jardin_m2) + ' m²'],
           ['Bancas', numero(f.comercio.patios.bancas)], ['Plazas sentado', numero(f.comercio.patios.plazas_sentado)]
-        ])]
+        ])],
+        notas: ['El total suma los 31 puestos de la nave norte y los 63 puestos de la planta alta sur registrados en el modelo detallado del mercado.']
       },
       industria: {
         titulo: 'Industria', subtitulo: 'Nave industrial', fuente: fuenteGit,
@@ -526,10 +532,10 @@
   actualizaDatos();
   function filasPartes(partes) {
     var mueven = partes.filter(function (pt) { return pt.mueve; });
-    var h = mueven.length ? '<button class="hud-op" type="button" data-despiece aria-pressed="' + mueven.every(function (pt) { return pt.desplazado; }) + '">Despiece (todas)</button><p class="hud-panel__t">Cada parte</p>' : '';
+    var h = mueven.length ? '<button class="hud-op" type="button" data-despiece aria-pressed="' + mueven.every(function (pt) { return pt.desplazado; }) + '">' + iconoOpcion('despiece') + '<span>Despiece (todas)</span></button><p class="hud-panel__t">Cada parte</p>' : '';
     return h + partes.map(function (pt) {
       return '<div class="hud-fila' + (pt.oculto ? ' es-oculta' : '') + '">' +
-        '<span class="hud-fila__t">' + esc(pt.nombre) + '</span>' +
+        '<span class="hud-fila__t">' + iconoOpcion('parte') + '<span>' + esc(pt.nombre) + '</span></span>' +
         '<button class="hud-acc" type="button" data-parte-oculta="' + pt.id + '" aria-pressed="' + pt.oculto + '">' + (pt.oculto ? 'Mostrar' : 'Ocultar') + '</button>' +
         (pt.mueve ? '<button class="hud-acc" type="button" data-parte-mueve="' + pt.id + '" aria-pressed="' + pt.desplazado + '">' + (pt.desplazado ? 'Regresar' : 'Desplazar') + '</button>' : '') + '</div>';
     }).join('');
@@ -544,15 +550,27 @@
       : '<path d="M2.1 12a10.8 10.8 0 0 1 19.8 0 10.8 10.8 0 0 1-19.8 0Z"/><circle cx="12" cy="12" r="3"/>';
     return '<svg class="hud-menu__icon" viewBox="0 0 24 24" aria-hidden="true">' + p + '</svg>';
   }
+  function iconoOpcion(nombre) {
+    var trazos = {
+      color: '<path d="M12 3a9 9 0 1 0 0 18c1.7 0 2.2-1.4 1.2-2.5-.8-.9-.1-2.5 1.2-2.5H17a4 4 0 0 0 4-4c0-5-4-9-9-9Z"/>',
+      perspectiva: '<path d="m12 2 9 5v10l-9 5-9-5V7l9-5Z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
+      clay: '<circle cx="12" cy="12" r="8"/><path d="M8 16c2-4 4-6 8-8"/>',
+      rayado: '<path d="M4 8h16M4 12h16M4 16h16"/><rect x="3" y="3" width="18" height="18" rx="2"/>',
+      plano: '<rect x="4" y="4" width="16" height="16"/>',
+      despiece: '<path d="m12 3 8 4-8 4-8-4 8-4Z"/><path d="m4 13 8 4 8-4M12 11v6"/>',
+      parte: '<path d="M4 4h7v7H4zM13 13h7v7h-7zM14 4h6v6M4 14h6v6"/>'
+    };
+    return '<svg class="hud-op__icon" viewBox="0 0 24 24" aria-hidden="true">' + trazos[nombre] + '</svg>';
+  }
   // la barra de menús del aislado y la ficha (con los datos del uso, si hay)
   function barraAislado(ap, partes) {
     var nav = document.createElement('nav');
     nav.className = 'hud-barra hud-barra--aislado';
     nav.setAttribute('aria-label', 'Menús del aislado');
-    var vista = '<button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="' + prendida('color') + '">Color</button>' +
-      '<button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="' + perspAct + '">Perspectiva</button>' +
+    var vista = '<button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="' + prendida('color') + '">' + iconoOpcion('color') + '<span>Color</span></button>' +
+      '<button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="' + perspAct + '">' + iconoOpcion('perspectiva') + '<span>Perspectiva</span></button>' +
       '<p class="hud-panel__t">Estilo</p>' +
-      ['clay', 'rayado', 'plano'].map(function (e) { var n = e === 'clay' ? 'Clay' : e === 'rayado' ? 'Rayado' : 'Plano'; return '<button class="hud-op hud-op--radio" type="button" data-estilo="' + e + '" aria-pressed="' + (estiloAct === e) + '">' + n + '</button>'; }).join('');
+      ['clay', 'rayado', 'plano'].map(function (e) { var n = e === 'clay' ? 'Clay' : e === 'rayado' ? 'Rayado' : 'Plano'; return '<button class="hud-op hud-op--radio" type="button" data-estilo="' + e + '" aria-pressed="' + (estiloAct === e) + '">' + iconoOpcion(e) + '<span>' + n + '</span></button>'; }).join('');
     nav.innerHTML = (partes.length ? '<details class="hud-menu" name="hud"><summary class="hud-menu__t">' + iconoMenu('partes') + '<span>Partes</span></summary><div class="hud-panel hud-panel--partes">' + filasPartes(partes) + '</div></details>' : '') +
       '<details class="hud-menu" name="hud"><summary class="hud-menu__t">' + iconoMenu('vista') + '<span>Vista</span></summary><div class="hud-panel">' + vista + '</div></details>' +
       '<button class="hud-salir" type="button" data-aisla-sale>Salir <span aria-hidden="true">✕</span></button>';
