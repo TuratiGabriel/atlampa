@@ -1425,9 +1425,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (rn) {
       const c = rn.c, vb = c[1] + 5.3;
       const cA = [c[0] + ri - re, vb], ent = arco(cA, re, angV(cA, re, GU.n), 0);
-      rutas.push({ bloque: 'norte', puntos: [[ent[0][0], calleN], ...ent, [c[0] + ri, c[1]]] });
+      rutas.push({ bloque: 'norte', puntos: [[ent[0][0], calleN], ...ent, [c[0] + ri, c[1]]].reverse() });
       const cB = [c[0] + 2 * re, vb], sal = arco(cB, re, 180, 180 - angV(cB, re, GU.n));
-      rutas.push({ bloque: 'norte', puntos: [[c[0] + re, c[1]], [c[0] + re, vb], ...sal, [sal[sal.length - 1][0], calleN]] });
+      rutas.push({ bloque: 'norte', puntos: [[c[0] + re, c[1]], [c[0] + re, vb], ...sal, [sal[sal.length - 1][0], calleN]].reverse() });
     }
     if (rs) {
       const c = rs.c, vb = c[1] - 5.2;
