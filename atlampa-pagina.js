@@ -264,6 +264,7 @@
     [].forEach.call(document.querySelectorAll('[data-resalta]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-resalta') === resAct)); });
     var ap = PARTE_DE[resAct] || resAct;
     if (ocultos[ap]) ponOculta(ap, false);
+    actualizaDatos();
   }
 
 
@@ -298,6 +299,7 @@
     // la nave norte se abre de una vez (cubierta arriba, muros abajo)
     if (ap === 'nave-norte') partes = dib.despiece(true);
     barraAislado(ap, partes);
+    actualizaDatos();
   }
   function saleAislado() {
     if (!aislado) return;
@@ -313,8 +315,175 @@
     var f = document.querySelector('[data-ficha]');
     if (f && fichaAntes !== null) f.innerHTML = fichaAntes;
     fichaAntes = null;
+    actualizaDatos();
   }
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  /* ---------- Datos físicos ----------
+     El punto blanco abre una ficha opcional sobre el modelo. Los datos de
+     Git mandan; el análisis financiero sólo completa el área verde, ausente
+     en programa/programa.json. */
+  var catalogoDatos = null, datosAbiertos = false, focoDatos = null;
+  var datosBoton = document.createElement('button');
+  datosBoton.className = 'hud-dato-punto';
+  datosBoton.type = 'button';
+  datosBoton.setAttribute('aria-expanded', 'false');
+  datosBoton.innerHTML = '<span aria-hidden="true"></span>';
+  var datosCapa = document.createElement('div');
+  datosCapa.className = 'hud-datos-capa';
+  datosCapa.hidden = true;
+  datosCapa.innerHTML = '<button class="hud-datos-fondo" type="button" aria-label="Cerrar datos"></button>' +
+    '<section class="hud-datos-panel" role="dialog" aria-modal="true" aria-labelledby="hud-datos-titulo">' +
+    '<button class="hud-datos-cerrar" type="button" aria-label="Cerrar">&#215;</button>' +
+    '<div data-datos-contenido></div></section>';
+  pagina.appendChild(datosBoton);
+  pagina.appendChild(datosCapa);
+
+  function numero(n) { return new Intl.NumberFormat('es-MX').format(n); }
+  function metrica(etiqueta, valor, unidad, complemento) {
+    return { etiqueta: etiqueta, valor: numero(valor), unidad: unidad || '', complemento: !!complemento };
+  }
+  function tabla(titulo, columnas, filas) { return { titulo: titulo, columnas: columnas, filas: filas }; }
+  function datosDesdePrograma(doc) {
+    var f = doc.figuras, v = f.vivienda, social = v.tipologias.filter(function (t) { return /social/i.test(t.tipo); })
+      .reduce(function (n, t) { return n + t.deptos; }, 0);
+    var viviendaConstruida = v.m2_vendible + v.amenidades_m2 + v.extra_m2 + v.sin_asignar_m2;
+    var potencial = f.potencial.construido_m2;
+    var aroK = Object.keys(potencial).filter(function (k) { return /^aro /.test(k); })[0];
+    var totalFisico = f.potencial.sobre_piso_m2 + f.potencial.sotanos_m2;
+    var fuenteGit = 'Git · programa/programa.json';
+    return {
+      general: {
+        titulo: 'Proyecto completo', subtitulo: 'Magnitudes físicas', fuente: fuenteGit + ' · área verde: Excel, 03_Programa_Usos',
+        metricas: [metrica('Predio', f.predio_m2, 'm²'), metrica('Sobre piso', f.potencial.sobre_piso_m2, 'm²'),
+          metrica('Con sótanos', totalFisico, 'm²'), metrica('Viviendas', v.deptos),
+          metrica('Estacionamiento', f.estacionamiento.cajones_total, 'cajones'), metrica('Área libre', f.publico.libre_m2, 'm²')],
+        tablas: [tabla('Programa', ['Uso', 'Dato principal'], [
+          ['Vivienda', numero(viviendaConstruida) + ' m² proyectados'],
+          ['Comercio', numero(f.comercio.naves_total_m2) + ' m² de naves'],
+          ['Industria', numero(f.industria.huella_m2) + ' m² de huella'],
+          ['Arte y cultura', numero(f.cultura.construido_m2) + ' m² construidos'],
+          ['Aro', numero(potencial[aroK]) + ' m² de losa'],
+          ['Área verde', '4,000 m² · complemento Excel']
+        ])],
+        notas: ['El total físico mostrado suma la proyección sobre piso y los sótanos del repositorio.', 'El aro puede traslapar el área de cultura.', 'El área verde programada complementa un campo que no existe con esa definición en Git.']
+      },
+      vivienda: {
+        titulo: 'Vivienda', subtitulo: 'Programa habitacional', fuente: fuenteGit,
+        metricas: [metrica('Construcción proyectada', viviendaConstruida, 'm²'), metrica('Viviendas', v.deptos),
+          metrica('Social', social), metrica('Media / no social', v.deptos - social)],
+        tablas: [tabla('Tipologías', ['Tipo', 'Departamentos', 'm² por unidad', 'm²'], v.tipologias.map(function (t) {
+          return [t.tipo, numero(t.deptos), numero(t.m2_c_u), numero(t.m2)];
+        })), tabla('Áreas complementarias', ['Concepto', 'm²'], [
+          ['Vendible', numero(v.m2_vendible)], ['Amenidades', numero(v.amenidades_m2)],
+          ['Área extra', numero(v.extra_m2)], ['Sin asignar', numero(v.sin_asignar_m2)]
+        ])],
+        notas: ['“Media / no social” es total menos la tipología A social; Git no clasifica expresamente B, C y D como vivienda media.']
+      },
+      comercio: {
+        titulo: 'Comercio', subtitulo: 'Mercado y naves', fuente: fuenteGit,
+        metricas: [metrica('Naves', f.comercio.naves_total_m2, 'm²'), metrica('Plataformas', f.comercio.plataformas_m2, 'm²'),
+          metrica('Puestos', f.comercio.puestos), metrica('Puesto nominal', f.comercio.puesto_nominal_m2, 'm²')],
+        tablas: [tabla('Superficies y capacidad', ['Concepto', 'Dato'], [
+          ['Nave norte', numero(f.comercio.naves_m2[0]) + ' m²'], ['Nave sur', numero(f.comercio.naves_m2[1]) + ' m²'],
+          ['Patios', numero(f.comercio.patios.m2) + ' m²'], ['Jardín', numero(f.comercio.jardin_m2) + ' m²'],
+          ['Bancas', numero(f.comercio.patios.bancas)], ['Plazas sentado', numero(f.comercio.patios.plazas_sentado)]
+        ])]
+      },
+      industria: {
+        titulo: 'Industria', subtitulo: 'Nave industrial', fuente: fuenteGit,
+        metricas: [metrica('Huella', f.industria.huella_m2, 'm²'), metrica('Altura máxima', f.industria.z_m[1], 'm')],
+        notas: ['El repositorio considera un nivel para la proyección; los niveles definitivos están por confirmar.']
+      },
+      cultura: {
+        titulo: 'Arte y cultura', subtitulo: 'Pabellones y plaza', fuente: fuenteGit,
+        metricas: [metrica('Construcción', f.cultura.construido_m2, 'm²'), metrica('Huella', f.cultura.huella_m2, 'm²'),
+          metrica('Plaza cultural', f.cultura.plaza_m2, 'm²'), metrica('Lámina de referencia', f.cultura.lamina_m2, 'm²')]
+      },
+      aro: {
+        titulo: 'Aro', subtitulo: 'Losa elevada', fuente: fuenteGit,
+        metricas: [metrica('Losa anular', potencial[aroK], 'm²')],
+        notas: ['La superficie puede traslapar el área construida de arte y cultura.']
+      },
+      paisajismo: {
+        titulo: 'Paisajismo', subtitulo: 'Espacio libre y vegetación', fuente: fuenteGit + ' · complemento físico del Excel',
+        metricas: [metrica('Área libre', f.publico.libre_m2, 'm²'), metrica('Área libre', f.publico.pct, '%'),
+          metrica('Laguna', f.paisaje.laguna_m2, 'm²'), metrica('Árboles', f.arboles.total),
+          metrica('Área verde programada', 4000, 'm²', true)],
+        notas: ['El área verde programada es el único complemento tomado de 03_Programa_Usos del análisis financiero.']
+      },
+      estacionamiento: {
+        titulo: 'Estacionamiento', subtitulo: 'Dos bloques subterráneos', fuente: fuenteGit,
+        metricas: [metrica('Superficie estimada', f.potencial.sotanos_m2, 'm²'), metrica('Cajones', f.estacionamiento.cajones_total),
+          metrica('Por sótano', f.estacionamiento.cajones_por_sotano, 'cajones'), metrica('Sótanos', f.estacionamiento.sotanos),
+          metrica('Entrepiso', f.estacionamiento.entrepiso_m, 'm')]
+      }
+    };
+  }
+  function claveDatosActual() {
+    var a = aislado === 'nave-norte' ? 'comercio' : aislado;
+    if (a) return a;
+    if (resAct === 'modulos') return 'vivienda';
+    if (resAct === 'espacio') return 'paisajismo';
+    if (catalogoDatos && catalogoDatos[resAct]) return resAct;
+    return catalogoDatos && catalogoDatos[ESCENA] ? ESCENA : 'general';
+  }
+  function pintaDatos() {
+    var c = document.querySelector('[data-datos-contenido]');
+    if (!c) return;
+    if (!catalogoDatos) {
+      c.innerHTML = '<p class="hud-datos-kicker">Datos físicos</p><h2 class="hud-datos-titulo" id="hud-datos-titulo">Cargando datos</h2>';
+      return;
+    }
+    var d = catalogoDatos[claveDatosActual()] || catalogoDatos.general;
+    var metricas = d.metricas.map(function (m) {
+      return '<div class="hud-datos-metrica' + (m.complemento ? ' es-complemento' : '') + '"><dt>' + esc(m.etiqueta) + '</dt><dd>' + esc(m.valor) + (m.unidad ? '<span>' + esc(m.unidad) + '</span>' : '') + '</dd></div>';
+    }).join('');
+    var tablas = (d.tablas || []).map(function (t) {
+      return '<section class="hud-datos-seccion"><h3>' + esc(t.titulo) + '</h3><div class="hud-datos-tabla-wrap"><table><thead><tr>' +
+        t.columnas.map(function (x) { return '<th>' + esc(x) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        t.filas.map(function (fila) { return '<tr>' + fila.map(function (x) { return '<td>' + esc(x) + '</td>'; }).join('') + '</tr>'; }).join('') +
+        '</tbody></table></div></section>';
+    }).join('');
+    var notas = (d.notas || []).map(function (n) { return '<p class="hud-datos-nota">' + esc(n) + '</p>'; }).join('');
+    c.innerHTML = '<p class="hud-datos-kicker">' + esc(d.subtitulo) + '</p><h2 class="hud-datos-titulo" id="hud-datos-titulo">' + esc(d.titulo) + '</h2>' +
+      '<dl class="hud-datos-metricas">' + metricas + '</dl>' + tablas + notas + '<p class="hud-datos-fuente">Fuente: ' + esc(d.fuente) + '</p>';
+  }
+  function actualizaDatos() {
+    var nombres = { general: 'proyecto completo', vivienda: 'vivienda', comercio: 'comercio', industria: 'industria', cultura: 'arte y cultura', aro: 'aro', paisajismo: 'paisajismo', estacionamiento: 'estacionamiento' };
+    var nombre = nombres[claveDatosActual()] || 'proyecto completo';
+    datosBoton.title = 'Ver datos de ' + nombre;
+    datosBoton.setAttribute('aria-label', 'Ver datos de ' + nombre);
+    if (datosAbiertos) pintaDatos();
+  }
+  function abreDatos() {
+    focoDatos = document.activeElement;
+    datosAbiertos = true;
+    datosCapa.hidden = false;
+    datosBoton.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('con-datos');
+    pintaDatos();
+    datosCapa.querySelector('.hud-datos-cerrar').focus();
+  }
+  function cierraDatos() {
+    if (!datosAbiertos) return;
+    datosAbiertos = false;
+    datosCapa.hidden = true;
+    datosBoton.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('con-datos');
+    if (focoDatos && focoDatos.focus) focoDatos.focus();
+  }
+  datosBoton.addEventListener('click', abreDatos);
+  datosCapa.querySelector('.hud-datos-fondo').addEventListener('click', cierraDatos);
+  datosCapa.querySelector('.hud-datos-cerrar').addEventListener('click', cierraDatos);
+  fetch('programa/programa.json', { credentials: 'same-origin' }).then(function (r) {
+    if (!r.ok) throw new Error(r.status);
+    return r.json();
+  }).then(function (doc) { catalogoDatos = datosDesdePrograma(doc); actualizaDatos(); }, function () {
+    datosBoton.hidden = true;
+    console.error('No se pudieron cargar los datos físicos de programa/programa.json');
+  });
+  actualizaDatos();
   function filasPartes(partes) {
     var mueven = partes.filter(function (pt) { return pt.mueve; });
     var h = mueven.length ? '<button class="hud-op" type="button" data-despiece aria-pressed="' + mueven.every(function (pt) { return pt.desplazado; }) + '">Despiece (todas)</button><p class="hud-panel__t">Cada parte</p>' : '';
@@ -370,7 +539,8 @@
   // Esc: cierra el menú; aislado, sale
   document.addEventListener('keydown', function (ev) {
     if (ev.key !== 'Escape') return;
-    if (document.querySelector('.hud-menu[open]')) cierraMenus();
+    if (datosAbiertos) cierraDatos();
+    else if (document.querySelector('.hud-menu[open]')) cierraMenus();
     else if (aislado && !yendo) saleAislado();
   });
   document.addEventListener('click', function (ev) {
@@ -469,6 +639,7 @@
   function ir(ap, desdeHistoria) {
     if (yendo || !PAGINAS[ap]) return;
     if (ap === ESCENA) return;
+    cierraDatos();
     guarda('atlampa-camara', { az: azMeta, el: elMeta });
     if (quieto.matches || location.protocol === 'file:' || !window.fetch || !window.DOMParser) { salta(ap); return; }
     if (aislado) saleAislado();
