@@ -333,11 +333,21 @@
   datosCapa.className = 'hud-datos-capa';
   datosCapa.hidden = true;
   datosCapa.innerHTML = '<button class="hud-datos-fondo" type="button" aria-label="Cerrar datos"></button>' +
+    '<div class="hud-datos-barrido" aria-hidden="true"></div>' +
     '<section class="hud-datos-panel" role="dialog" aria-modal="true" aria-labelledby="hud-datos-titulo">' +
     '<button class="hud-datos-cerrar" type="button" aria-label="Cerrar">&#215;</button>' +
     '<div data-datos-contenido></div></section>';
   pagina.appendChild(datosBoton);
   pagina.appendChild(datosCapa);
+  var datosBarrido = datosCapa.querySelector('.hud-datos-barrido');
+  for (var dp = 0; dp < 64; dp++) {
+    var puntoDatos = document.createElement('i');
+    puntoDatos.style.setProperty('--a', (dp * 360 / 64) + 'deg');
+    puntoDatos.style.setProperty('--i', dp);
+    puntoDatos.style.setProperty('--entra', (dp * 3) + 'ms');
+    puntoDatos.style.setProperty('--sale', ((63 - dp) * 2) + 'ms');
+    datosBarrido.appendChild(puntoDatos);
+  }
 
   function numero(n) { return new Intl.NumberFormat('es-MX').format(n); }
   function metrica(etiqueta, valor, unidad, complemento) {
@@ -456,26 +466,53 @@
     datosBoton.setAttribute('aria-label', 'Ver datos de ' + nombre);
     if (datosAbiertos) pintaDatos();
   }
+  var datosAnimTimer = null;
   function abreDatos() {
+    if (datosAbiertos) return;
+    clearTimeout(datosAnimTimer);
     focoDatos = document.activeElement;
     datosAbiertos = true;
     datosCapa.hidden = false;
+    datosCapa.classList.remove('saliendo');
+    pintaDatos();
+    var rb = datosBoton.getBoundingClientRect(), rp = datosCapa.querySelector('.hud-datos-panel').getBoundingClientRect();
+    var dx = rb.left + rb.width / 2, dy = rb.top + rb.height / 2;
+    var px = dx - rp.left, py = dy - rp.top;
+    var radioPanel = Math.max(Math.hypot(px, py), Math.hypot(rp.width - px, py),
+      Math.hypot(px, rp.height - py), Math.hypot(rp.width - px, rp.height - py)) + 12;
+    var radioVista = Math.max(Math.hypot(dx, dy), Math.hypot(innerWidth - dx, dy),
+      Math.hypot(dx, innerHeight - dy), Math.hypot(innerWidth - dx, innerHeight - dy)) + 12;
+    datosCapa.style.setProperty('--datos-panel-x', px + 'px');
+    datosCapa.style.setProperty('--datos-panel-y', py + 'px');
+    datosCapa.style.setProperty('--datos-panel-r', radioPanel + 'px');
+    datosBarrido.style.left = dx + 'px';
+    datosBarrido.style.top = dy + 'px';
+    datosBarrido.style.setProperty('--radio', radioVista + 'px');
+    void datosCapa.offsetWidth;
+    datosCapa.classList.add('entrando');
+    datosCapa.setAttribute('aria-hidden', 'false');
     datosBoton.setAttribute('aria-expanded', 'true');
     document.body.classList.add('con-datos');
-    pintaDatos();
     datosCapa.querySelector('.hud-datos-cerrar').focus();
+    datosAnimTimer = setTimeout(function () { datosCapa.classList.remove('entrando'); }, 1100);
   }
-  function cierraDatos() {
+  function cierraDatos(inmediato) {
     if (!datosAbiertos) return;
+    clearTimeout(datosAnimTimer);
     datosAbiertos = false;
-    datosCapa.hidden = true;
     datosBoton.setAttribute('aria-expanded', 'false');
     document.body.classList.remove('con-datos');
+    datosCapa.classList.remove('entrando');
+    datosCapa.classList.add('saliendo');
+    datosCapa.setAttribute('aria-hidden', 'true');
+    var terminaCierre = function () { datosCapa.hidden = true; datosCapa.classList.remove('saliendo'); };
+    if (inmediato || quieto.matches) terminaCierre();
+    else datosAnimTimer = setTimeout(terminaCierre, 720);
     if (focoDatos && focoDatos.focus) focoDatos.focus();
   }
   datosBoton.addEventListener('click', abreDatos);
-  datosCapa.querySelector('.hud-datos-fondo').addEventListener('click', cierraDatos);
-  datosCapa.querySelector('.hud-datos-cerrar').addEventListener('click', cierraDatos);
+  datosCapa.querySelector('.hud-datos-fondo').addEventListener('click', function () { cierraDatos(false); });
+  datosCapa.querySelector('.hud-datos-cerrar').addEventListener('click', function () { cierraDatos(false); });
   fetch('programa/programa.json', { credentials: 'same-origin' }).then(function (r) {
     if (!r.ok) throw new Error(r.status);
     return r.json();
@@ -639,7 +676,7 @@
   function ir(ap, desdeHistoria) {
     if (yendo || !PAGINAS[ap]) return;
     if (ap === ESCENA) return;
-    cierraDatos();
+    cierraDatos(true);
     guarda('atlampa-camara', { az: azMeta, el: elMeta });
     if (quieto.matches || location.protocol === 'file:' || !window.fetch || !window.DOMParser) { salta(ap); return; }
     if (aislado) saleAislado();
