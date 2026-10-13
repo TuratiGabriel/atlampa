@@ -348,8 +348,12 @@
       fichaAntes = f.innerHTML;
       var M = window.ATLAMPA_MERCADO, r = M && M.resumen, c = M && M.cinta, datos = [];
       if ((ap === 'comercio' || ap === 'nave-norte') && r) {
-        datos = [r.puestos + ' puestos de 2.5 × 2 × 3.0 m en ' + Object.keys(r.bloques || {}).length + ' bloques', r.mesas + ' mesas en los comedores',
-          'Plataformas de +1.42 a +2.40 (suben al sur)', 'Jardín ' + Math.round(r.jardin_m2) + ' m² · hoyo ' + Math.round(r.hoyo_m2) + ' m²'];
+        var su = r.sur || {}, lo = r.locales || {};
+        var fondas = ((lo.PB_fonda_del_jardin || 0) + (lo.P2_racimos || 0)) / 4 + (su.racimos_pb || 0) + (su.racimos_pa || 0);
+        datos = [(r.puestos + (su.puestos_pb || 0) + (su.puestos || 0)) + ' locales (norte ' + r.puestos + ' · sur PB ' + (su.puestos_pb || 0) + ' · sur PA ' + (su.puestos || 0) + ')',
+          'Manzanas cortas en aparejo · ' + fondas + ' fondas con barra',
+          'Norte: P1 y P3 a +4.28 · P2 a +2.40 con gradería al jardín', 'Jardín ' + Math.round(r.jardin_m2) + ' m² · hoyo ' + Math.round(r.hoyo_m2) + ' m² · tragaluces sobre la P2'];
+        if (su.acuaponia_m2) datos.push('Acuaponia: vitrina de ' + Math.round(su.acuaponia_m2) + ' m²');
         if (c) datos.push('Cinta del aro: ' + Math.round(c.largo) + ' m al ' + Math.max.apply(null, c.pendientes).toFixed(1) + ' %');
         datos.push('Fachada al aro: vidrio (por definir)');
       }

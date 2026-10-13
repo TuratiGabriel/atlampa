@@ -604,9 +604,12 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
      si tiene hacia dónde, se desplaza (despiece). objs: los grupos que mueve;
      dir: [x, y, z] en m (mundo) o, por grupo, en su userData.dir. */
   const PARTES = {};
-  function parte(ap, id, nombre, objs, dir, oculta) {
-    (PARTES[ap] = PARTES[ap] || []).push({ id, nombre, objs, dir: dir || null, oculta: !!oculta, oculto: !!oculta, desplazado: false, k: 0 });
+  function parte(ap, id, nombre, objs, dir, oculta, grupo) {
+    (PARTES[ap] = PARTES[ap] || []).push({ id, nombre, objs, dir: dir || null, oculta: !!oculta, oculto: !!oculta, desplazado: false, k: 0, grupo: !!grupo });
   }
+  // (2026-10-12, Gabriel: «poder apagar toda la cubierta de una y todas las paredes de una»): una parte-grupo junta
+  // grupos que también tienen su parte propia; sólo se oculta (no se desplaza) y basta con que una de las dos esté oculta
+  const parteGrupo = (ap, id, nombre, objs) => { if (objs.length) parte(ap, id, nombre, objs, null, false, true); };
   // Aristas de croquis: cada arista en dos trazos a mano (un poco chuecos, con
   // un quiebre a la mitad) que se pasan de las esquinas, como en un dibujo.
   const CROQUIS = ['nave', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'proyecto', 'vidrio'];
@@ -975,6 +978,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
         return { id: 'cubierta-' + k, nombre: 'Cubierta · ' + NAVE_N[k[0]] + ' · faldón ' + (j + 1) + (s ? ' (cae al ' + (s < 0 ? 'oeste' : 'este') + ')' : ''), c: geos(geo(ct[k]), 'nave', false, cl[k] ? lineas(cl[k]) : null) };
       });
       if (MERCADO.acero) r.acero = geos(geo(MERCADO.acero), 'nave', false, lineas(MERCADO.aceroL));
+      // tragaluces de la nave norte (2026-10-12): vidrio sobre la cubierta, en el lenguaje del hoyo
+      if (MERCADO.tragaluz && MERCADO.tragaluz.length) r.tragaluz = geos(geo(MERCADO.tragaluz), 'vidrio', false, lineas(MERCADO.tragaluzL));
       if (MERCADO.vivienda && MERCADO.vivienda.length) r.vivienda = geos(geo(MERCADO.vivienda), 'modulo', false, lineas(MERCADO.viviendaL));
       // la planta alta de la nave sur (Rhino): ahí llega el descanso de la cinta del aro
       if (MERCADO.pa && MERCADO.pa.length) r.pa = geos(geo(MERCADO.pa), 'nave', false, lineas(MERCADO.paL));
@@ -996,7 +1001,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       if (P3) {
         r.p3 = {};
         [['piso', 'predio', 30], ['resto', 'predio', 30], ['zanja', 'filtro', 30], ['jardin', 'tezontle', 30], ['agua', 'agua', 1],
-          ['plataforma', 'nave', 30], ['escalera', 'nave', 30], ['local', 'modcom', 30], ['mesa', 'nave', 30], ['banca', 'nave', 30], ['humedal', 'nave', 30], ['agua_p', 'agua', 1]].forEach(([k, papel, umbral]) => {
+          ['plataforma', 'nave', 30], ['escalera', 'nave', 30], ['local', 'modcom', 30], ['mesa', 'nave', 30], ['banca', 'nave', 30], ['humedal', 'nave', 30], ['agua_p', 'agua', 1], ['arriate', 'tezontle', 30]].forEach(([k, papel, umbral]) => {
           if (P3[k]) r.p3[k] = geos(geo(P3[k]), papel, P3[k + 'L'] ? false : umbral, P3[k + 'L'] ? lineas(P3[k + 'L']) : null);
         });
         ['lamina', 'baranda', 'junco', 'pasto'].forEach(k => { if (P3[k + 'L']) r.p3[k] = lineas(P3[k + 'L']).geo(); });
@@ -1006,7 +1011,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       if (SU) {
         r.sur = {};
         [['piso', 'predio'], ['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['pa', 'nave'], ['local', 'modcom'],
-          ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle'], ['columna', 'nave'], ['escalera', 'nave']].forEach(([k, papel]) => {
+          ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle'], ['columna', 'nave'], ['escalera', 'nave'], ['cubo', 'modcom'], ['local_pb', 'modcom'], ['mesa_pb', 'nave'], ['jardinera', 'tezontle']].forEach(([k, papel]) => {
           if (SU[k]) r.sur[k] = geos(geo(SU[k]), papel, SU[k + 'L'] ? false : (k === 'agua' ? 1 : 30), SU[k + 'L'] ? lineas(SU[k + 'L']) : null);
         });
         ['baranda', 'pasto', 'planta'].forEach(k => { if (SU[k + 'L']) r.sur[k + 'Lin'] = lineas(SU[k + 'L']).geo(); });
@@ -1019,6 +1024,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const murosG = MG.muros.map(m => { const g = sub(gMur, m.dir.map(x => x * 7)); g.userData.norte = m.id[5] === 'n'; ponGeos(g, m.c, 'nave', 'comercio'); return g; });
     const gCub = pieza('mercado-cubierta', 'comercio', 0.4);
     const cubG = MG.cubiertas.map(m => { const g = sub(gCub, [0, 9, 0]); g.userData.norte = m.id[9] === 'n'; ponGeos(g, m.c, 'nave', 'comercio'); return g; });
+    const tragG = MG.tragaluz ? sub(gCub, [0, 9, 0]) : null;
+    if (tragG) { tragG.userData.norte = true; ponGeos(tragG, MG.tragaluz, 'vidrio', 'comercio'); }
     // la retícula de acero que rigidiza la nave norte (y sobre la que va la cubierta)
     const gAce = MG.acero ? pieza('mercado-acero', 'comercio', 0.38) : null;
     if (gAce) ponGeos(gAce, MG.acero, 'nave', 'comercio', true);
@@ -1048,7 +1055,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       pone(gA, 'plataforma', 'nave', 'comercio');
       pone(gA, 'escalera', 'nave', 'comercio');   // (las contrahuellas)
       pone(gL, 'local', 'modcom', 'comercio');     // puestos y baños
-      pone(gL, 'mesa', 'nave', 'comercio');        // comedores
+      pone(gL, 'mesa', 'nave', 'comercio');        // barras, bancos de las fondas y barras-mirador
+      pone(gL, 'arriate', 'tezontle', 'comercio'); // arriates y la jardinera de la orilla de la P2
       // patios del aro: bancas, bordillo del estanque y su agua
       if (Q.banca || Q.humedal) { gT = pieza('mercado-patios', 'comercio', 0.06); pone(gT, 'banca', 'nave', 'comercio'); pone(gT, 'humedal', 'nave', 'comercio'); pone(gT, 'agua_p', 'agua', 'comercio'); }
       const pl = (k, nombre, color, colorColor, g) => { if (Q[k]) ponLineas(g, Q[k], nombre, color, colorColor, 'comercio'); };
@@ -1072,7 +1080,10 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     }
     // aislando el mercado: sus partes (las que se desplazan, hacia dónde)
     // cada cubierta (por nave y faldón) y cada muro (por nave y lado), sueltos
+    parteGrupo('comercio', 'cubierta-toda', 'Toda la cubierta (con tragaluces)', cubG.concat(tragG ? [tragG] : []));
+    parteGrupo('comercio', 'muros-todos', 'Todos los muros (y el vidrio del aro)', murosG.concat(vidG));
     MG.cubiertas.forEach((m, i) => parte('comercio', m.id, m.nombre, [cubG[i]]));
+    if (tragG) parte('comercio', 'tragaluces', 'Tragaluces (vidrio)', [tragG]);
     MG.muros.forEach((m, i) => parte('comercio', m.id, m.nombre, [murosG[i]]));
     if (vidG.length) parte('comercio', 'vidrio', 'Fachada al aro (vidrio)', vidG);
     if (gAce) parte('comercio', 'acero', 'Estructura de acero', [gAce], [0, 4.5, 0]);
@@ -1087,13 +1098,13 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const Q = MG.sur, pb = pieza('mercado-sur-pb', 'comercio', 0.07), pa = pieza('mercado-sur-pa', 'comercio', 0.32);
       const pon = (g, k, papel) => Q[k] ? ponGeos(g, Q[k], papel, 'comercio') : null;
       const piso = pon(pb, 'piso', 'predio'); if (piso) suelos.push(piso);
-      [['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['columna', 'nave'], ['escalera', 'nave']].forEach(([k, papel]) => pon(pb, k, papel));
+      [['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['columna', 'nave'], ['escalera', 'nave'], ['cubo', 'modcom'], ['local_pb', 'modcom'], ['mesa_pb', 'nave'], ['jardinera', 'tezontle']].forEach(([k, papel]) => pon(pb, k, papel));
       [['pa', 'nave'], ['local', 'modcom'], ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle']].forEach(([k, papel]) => pon(pa, k, papel));
       if (Q.barandaLin) ponLineas(pa, Q.barandaLin, 'columna-baranda', 0xffffff, null, 'comercio');
       if (Q.pastoLin) ponLineas(pa, Q.pastoLin, 'pasto', 0xffffff, PROGRAMA.verde, 'comercio');
       if (Q.plantaLin) ponLineas(pb, Q.plantaLin, 'pasto', 0xffffff, PROGRAMA.verde, 'comercio');
-      parte('comercio', 'sur-pa', 'Nave sur · planta alta (puestos, comedores, baños)', [pa], [0, 5, 0]);
-      parte('comercio', 'sur-pb', 'Nave sur · planta baja (carga, biodigestor, acuaponia)', [pb]);
+      parte('comercio', 'sur-pa', 'Nave sur · planta alta (locales, fondas, terraza, baños)', [pa], [0, 5, 0]);
+      parte('comercio', 'sur-pb', 'Nave sur · planta baja (mercado, patio de luz, servicio, vitrina de acuaponia)', [pb]);
     }
     if (gViv) parte('comercio', 'vivienda', 'Columnas de la vivienda', [gViv], null, true);
 
@@ -1105,7 +1116,10 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     [gAce, gA, gL, gV, gP].forEach(g => { if (g) g.userData.norte = true; });   // (paso 3 y acero: todo de la nave norte)
     vidG.forEach(g => { g.userData.norte = g.userData.dir[2] > 0; });          // (el vidrio norte se va hacia el sur, al centro del aro: +z)
     const caja3 = new THREE.Box3();
+    parteGrupo('nave-norte', 'cubierta-toda', 'Toda la cubierta (con tragaluces)', cubG.filter(g => g.userData.norte).concat(tragG ? [tragG] : []));
+    parteGrupo('nave-norte', 'muros-todos', 'Todos los muros (y el vidrio del aro)', murosG.filter(g => g.userData.norte).concat(vidG.filter(g => g.userData.norte)));
     MG.cubiertas.forEach((m, i) => { if (cubG[i].userData.norte) parte('nave-norte', m.id, m.nombre, [cubG[i]], [0, SUBE_CUBIERTA, 0]); });
+    if (tragG) parte('nave-norte', 'tragaluces', 'Tragaluces (vidrio)', [tragG], [0, SUBE_CUBIERTA, 0]);
     MG.muros.forEach((m, i) => {
       if (!murosG[i].userData.norte) return;
       caja3.setFromObject(murosG[i]);
@@ -1413,6 +1427,44 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       ponLineas(g, lr, 'rampa-borde', 0xffffff, PROGRAMA.est, 'estacionamiento');
       estRampas.push(g);
     }
+  }
+
+  /* (2026-10-12, Gabriel: «es imprescindible que salga la entrada vehicular del estacionamiento nuevo»): las bocas de las
+     rampas en planta baja (EST.accesos, del DWG de André) en todas las escenas, no sólo en la del estacionamiento: el
+     carril (el piso entre los dos muros de cada arco), sus muros a 0.90 y la boca de la helicoidal. Del DWG sólo se toman
+     los trazos a menos de 26 m del centro de una rampa (lo demás de esa capa son otros muros de planta baja). */
+  const gEstEnt = pieza('estacionamiento-entradas', 'estacionamiento', 0.05);
+  if (EST && EST.accesos && EST.rampas.length) {
+    const ACC = EST.accesos.map(a => a[0] === 'a' && a[5] < a[4] ? a.slice(0, 5).concat([a[5] + 360]) : a);
+    const cerca = (u, v) => EST.rampas.some(r => Math.hypot(u - r.c[0], v - r.c[1]) < 26);
+    const Z0 = 0.2, ZM = 1.1, m = new Malla(), piso = new Malla(), l = new Lineas();
+    const pts = a => { const n = Math.max(6, Math.ceil(Math.abs(a[5] - a[4]) / 4)); return Array.from({ length: n + 1 }, (_, i) => { const t = (a[4] + (a[5] - a[4]) * i / n) * RAD; return [a[1] + Math.cos(t) * a[3], a[2] + Math.sin(t) * a[3]]; }); };
+    const muro = p => { for (let i = 1; i < p.length; i++) { const a = p[i - 1], b = p[i]; m.quad(W(a[0], a[1], Z0), W(b[0], b[1], Z0), W(b[0], b[1], ZM), W(a[0], a[1], ZM)); l.seg(W(a[0], a[1], ZM), W(b[0], b[1], ZM)); } };
+    const arcos = ACC.filter(a => a[0] === 'a' && pts(a).every(q => cerca(q[0], q[1])));
+    arcos.forEach(a => muro(pts(a)));
+    ACC.filter(a => a[0] === 'l' && cerca(a[1], a[2]) && cerca(a[3], a[4])).forEach(a => muro([[a[1], a[2]], [a[3], a[4]]]));
+    // el carril: entre la cara de adentro (r ≈ 8.9) y la de afuera (r ≈ 13.0) de los muros de cada centro, donde coinciden
+    const porCentro = {};
+    arcos.forEach(a => { const k = Math.round(a[1] / 2) + ',' + Math.round(a[2] / 2); (porCentro[k] = porCentro[k] || []).push(a); });
+    Object.values(porCentro).forEach(as => {
+      if (as.length < 3) return;
+      as.sort((x, y) => x[3] - y[3]);
+      const ai = as[1], ae = as[as.length - 2], t0 = Math.max(ai[4], ae[4]), t1 = Math.min(ai[5], ae[5]);
+      if (t1 - t0 < 1) return;
+      const n = Math.ceil((t1 - t0) / 3), P = (r, t) => W(ai[1] + Math.cos(t) * r, ai[2] + Math.sin(t) * r, Z0 + 0.01);
+      for (let i = 0; i < n; i++) {
+        const a0 = (t0 + (t1 - t0) * i / n) * RAD, a1 = (t0 + (t1 - t0) * (i + 1) / n) * RAD;
+        piso.quad(P(ai[3], a0), P(ae[3], a0), P(ae[3], a1), P(ai[3], a1));
+      }
+    });
+    // la boca de la helicoidal: sus dos carriles a ras de piso y el muro del centro
+    EST.rampas.forEach(r => {
+      [r.r[0], r.r[1]].forEach(rad => l.poli(circ(r.c, rad, 64).map(q => W(q[0], q[1], Z0 + 0.02)), true));
+      const c = circ(r.c, r.r[0], 32); muro(c.concat([c[0]]));
+    });
+    if (piso.p.length) pon(gEstEnt, piso, 'rampa', 'estacionamiento', false);
+    if (m.p.length) pon(gEstEnt, m, 'est', 'estacionamiento');
+    ponLineas(gEstEnt, l, 'est-entrada', 0xffffff, PROGRAMA.est, 'estacionamiento');
   }
 
   // fuera de su apartado el estacionamiento no se ve (está bajo el piso); en
@@ -2041,7 +2093,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   function aislaVisibles() {
     if (!aisl) return;
     raizG.children.forEach(o => { o.visible = aisl.grupos.has(o); });
-    aisl.partes.forEach(pt => pt.objs.forEach(o => { o.visible = !pt.oculto; }));
+    const apagados = new Set();
+    aisl.partes.forEach(pt => { if (pt.oculto) pt.objs.forEach(o => apagados.add(o)); });
+    aisl.partes.forEach(pt => pt.objs.forEach(o => { o.visible = !apagados.has(o); }));
     [gSol, gPers, gAcc, gEstAcc, gNolli, gCorte].forEach(g => { g.visible = false; });
     capaRot.classList.remove('con-sol');
   }
@@ -2409,7 +2463,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (ap === 'estacionamiento') return [gEst];
     return piezas.filter(p => p.ap === ap && !p.g.userData.oculto).map(p => p.g);
   }
-  const mueve3 = pt => !!(pt.dir || pt.objs.some(o => o.userData.dir));
+  const mueve3 = pt => !pt.grupo && !!(pt.dir || pt.objs.some(o => o.userData.dir));
   // (la de la parte manda: un mismo grupo se mueve distinto en el mercado y en la nave norte abierta)
   function dirDe(pt, o) { return pt.dir || o.userData.dir || [0, 0, 0]; }
   // dónde va cada grupo de una parte: el despiece (dir · k)
@@ -2417,7 +2471,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   // la caja (u, v, z) de lo que se ve de lo aislado (con las partes donde estén o donde van a quedar)
   function cajaAislado(final) {
     const b = new THREE.Box3(), bb = new THREE.Box3(), guarda = [];
-    if (final) aisl.partes.forEach(pt => pt.objs.forEach(o => { guarda.push([o, o.position.clone()]); coloca(pt, o, pt.desplazado ? 1 : 0); }));
+    if (final) aisl.partes.forEach(pt => { if (!pt.grupo) pt.objs.forEach(o => { guarda.push([o, o.position.clone()]); coloca(pt, o, pt.desplazado ? 1 : 0); }); });
     aisl.grupos.forEach(g => {
       g.updateMatrixWorld(true);
       g.traverse(o => {
@@ -2472,6 +2526,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       if (muerto || tok !== despTok || !aisl) return;
       const t = Math.min(1, (ms - t0) / 750), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       aisl.partes.forEach((pt, i) => {
+        if (pt.grupo) return;
         pt.k = de[i] + ((pt.desplazado ? 1 : 0) - de[i]) * e;
         pt.objs.forEach(o => coloca(pt, o, pt.k));
       });
