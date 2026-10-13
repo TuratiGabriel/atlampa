@@ -36,7 +36,8 @@ Ejes compositivos: el de la vivienda pasa por el aro; el segundo va de las naves
    modelo sin pisar nada.
 2. **Un script por programa** en `diagrama/herramientas/prepara-<programa>.py`. Lee el `.3dm` con **rhino3dm** (sin abrir Rhino),
    transforma al sistema del visor y **genera** `diagrama/atlampa-<programa>.js`. Los `.js` generados no se editan a mano.
-3. **El visor 3D** (`diagrama/`, Three.js) dibuja cada programa. La versión detallada sólo aparece en su apartado; la general no cambia.
+3. **El visor 3D** (`diagrama/`, Three.js) dibuja cada programa **con todo su detalle en todas las vistas**, la general y cada apartado:
+   lo que se sube no se simplifica (Gabriel, 2026-10-13: «ya necesitamos ponerle detalle»). En un apartado, lo ajeno se apaga, no se simplifica.
 4. **Propuesta propia en un bloque `PROPUESTA — todo editable`** del script: constantes con nombre, cada una con su origen.
    El usuario corrige números y tú regeneras.
 5. **Paso a paso:** primero lo existente tal cual, luego la estructura, al final el programa interior. Cada paso se verifica en el

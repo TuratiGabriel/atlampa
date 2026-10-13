@@ -32,7 +32,7 @@ Vercel no publica `*.3dm`, `herramientas/`, `handoff/` ni `.github/` (`.vercelig
 
 ## Cómo entra un programa
 1. Su script genera `window.ATLAMPA_<PROG>`.
-2. En `atlampa-3d.js`: `const X = ESC === '<apartado>' ? DATOS : null`. Arma con `pieza('<prog>-<parte>', '<programa>', orden)`
+2. En `atlampa-3d.js`: `const X = DATOS` (en todas las escenas, con todo su detalle; no lo condiciones a `ESC`). Arma con `pieza('<prog>-<parte>', '<programa>', orden)`
    y registra partes con `parte(...)`. Modelo a seguir: bloque `if (MERCADO)`.
 3. En `paginas.py` añade el script y la ficha, y sube `V`.
 
