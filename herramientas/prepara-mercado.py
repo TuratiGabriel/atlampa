@@ -90,6 +90,13 @@ Z_PISO, Z_VIGA, PERALTE, Z_PUNTAL = 0.2, 6.0, 0.5, 3.0
 COL, VIGA_B, PUNTAL, PAR = 0.30, 0.25, 0.15, 0.15                # secciones (m)
 JUNTA = 0.05                                                    # holgura con las columnas de la vivienda
 COLS_VIVIENDA = os.path.join(os.path.dirname(RAIZ), 'analisis', 'mercado', 'columnas_vivienda.json')
+# sin la carpeta del proyecto (colaboradores, sesiones en la nube): la copia que va en el repo, herramientas/columnas-vivienda.json
+COLS_REPO = os.path.join(AQUI, 'columnas-vivienda.json')
+
+
+def columnas_vivienda():
+    d = json.load(open(COLS_VIVIENDA if os.path.exists(COLS_VIVIENDA) else COLS_REPO, encoding='utf-8'))
+    return d['columnas'] if isinstance(d, dict) else d
 
 
 def malla_de(g):
@@ -382,7 +389,7 @@ def reticula(techo):
     """Acero del mercado (nave norte) y las columnas de la vivienda que lo cruzan.
     techo: triángulos originales de las cubiertas de la nave norte (para la altura)."""
     tris, lins = [], []
-    viv = [c for c in json.load(open(COLS_VIVIENDA)) if c['z0'] < 1 and adentro(c['u'], c['v'], 0)]
+    viv = [c for c in columnas_vivienda() if c['z0'] < 1 and adentro(c['u'], c['v'], 0)]
     rv = max(c['lado'] for c in viv) * math.sqrt(2) / 2 if viv else 0.3   # radio de la columna girada
     libre = rv + JUNTA + COL / 2                                          # de centro a centro, pegadas
     zc1 = Z_VIGA - PERALTE
@@ -1093,7 +1100,7 @@ def banos(S, L, pisos):
 
 
 def mercado_norte(m, capas):
-    viv = [c for c in json.load(open(COLS_VIVIENDA)) if c['z0'] < 1 and adentro(c['u'], c['v'], 0)]
+    viv = [c for c in columnas_vivienda() if c['z0'] < 1 and adentro(c['u'], c['v'], 0)]
     rng = random.Random(7)
     tan = math.tan(math.radians(LLUVIA_ANG))
     disco = Point(ARO).buffer(CORTE, 256)
