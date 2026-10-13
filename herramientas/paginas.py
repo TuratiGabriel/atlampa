@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261012h'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261012i'      # versión de los archivos (para que el navegador no use los viejos)
 
 SOTANOS = '''
       <div class="hud-grupo" role="group" aria-label="Sótanos">
@@ -124,6 +124,18 @@ LEYENDA = '''
           <li><i class="ad-leyenda__banqueta"></i>Banqueta</li>
           <li data-l="paisaje"><i class="ad-leyenda__agua"></i>Agua</li>'''
 
+ICONOS = {
+    'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
+    'capas': '<path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/>',
+    'diagramas': '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v5M5 17v-3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/>',
+    'vista': '<path d="M2.1 12a10.8 10.8 0 0 1 19.8 0 10.8 10.8 0 0 1-19.8 0Z"/><circle cx="12" cy="12" r="3"/>',
+    'leyenda': '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/>'
+}
+
+
+def icono(nombre):
+    return '<svg class="hud-menu__icon" viewBox="0 0 24 24" aria-hidden="true">%s</svg>' % ICONOS[nombre]
+
 PLANTILLA = '''<!doctype html>
 <html lang="es">
 <head>
@@ -152,26 +164,26 @@ PLANTILLA = '''<!doctype html>
 
   <nav class="hud-barra" aria-label="Menús">
     <details class="hud-menu" name="hud">
-      <summary class="hud-menu__t">Propuesto</summary>
+      <summary class="hud-menu__t">{icon_propuesto}<span>Propuesto</span></summary>
       <div class="hud-panel hud-panel--propuesto">
         <a class="hud-op hud-ir" href="index.html" data-ir="general">Predio completo</a>
 {propuesto}
       </div>
     </details>
     <details class="hud-menu" name="hud">
-      <summary class="hud-menu__t">Capas</summary>
+      <summary class="hud-menu__t">{icon_capas}<span>Capas</span></summary>
       <div class="hud-panel">
 {capas}
       </div>
     </details>
     <details class="hud-menu" name="hud">
-      <summary class="hud-menu__t">Diagramas</summary>
+      <summary class="hud-menu__t">{icon_diagramas}<span>Diagramas</span></summary>
       <div class="hud-panel">
 {diagramas}
       </div>
     </details>
     <details class="hud-menu" name="hud">
-      <summary class="hud-menu__t">Vista</summary>
+      <summary class="hud-menu__t">{icon_vista}<span>Vista</span></summary>
       <div class="hud-panel">
         <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">Color</button>
         <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="false">Perspectiva</button>
@@ -186,7 +198,7 @@ PLANTILLA = '''<!doctype html>
       </div>
     </details>
     <details class="hud-menu" name="hud">
-      <summary class="hud-menu__t">Leyenda</summary>
+      <summary class="hud-menu__t">{icon_leyenda}<span>Leyenda</span></summary>
       <div class="hud-panel">
         <ul class="ad-leyenda">{leyenda}
         </ul>
@@ -263,7 +275,9 @@ def main():
         html = PLANTILLA.format(
             clave=clave, v=V, titulo=a['titulo'], titulo_doc='Predio' if clave == 'general' else a['titulo'],
             desc=a['desc'], ruta=a.get('ruta', '/ ' + a['titulo']), capas=botones(CAPAS), diagramas=botones(DIAGRAMAS),
-            resalta=resalta, propuesto=propuesto(), leyenda=LEYENDA, ficha=ficha(a), ficha_oculta='' if a['datos'] else ' hidden')
+            resalta=resalta, propuesto=propuesto(), leyenda=LEYENDA, ficha=ficha(a), ficha_oculta='' if a['datos'] else ' hidden',
+            icon_propuesto=icono('propuesto'), icon_capas=icono('capas'), icon_diagramas=icono('diagramas'),
+            icon_vista=icono('vista'), icon_leyenda=icono('leyenda'))
         ruta = os.path.join(RAIZ, pagina(clave))
         with open(ruta, 'w', encoding='utf-8', newline='\n') as f:
             f.write(html)

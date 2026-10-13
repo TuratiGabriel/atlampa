@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlampa · Industria</title>
-<link rel="stylesheet" href="atlampa.css?v=20261012h">
-<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261012h">
+<link rel="stylesheet" href="atlampa.css?v=20261012i">
+<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261012i">
 <!-- Three.js del CDN (pendiente: copiarlo a lib/ para presentar sin internet) -->
 <script type="importmap">{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head>
@@ -26,7 +26,7 @@
 
   <nav class="hud-barra" aria-label="Menús">
     <details class="hud-menu" name="hud">
-      <summary class="hud-menu__t">Propuesto</summary>
+      <summary class="hud-menu__t"><svg class="hud-menu__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/></svg><span>Propuesto</span></summary>
       <div class="hud-panel hud-panel--propuesto">
         <a class="hud-op hud-ir" href="index.html" data-ir="general">Predio completo</a>
         <details class="hud-parte" name="hud-parte" data-parte="vivienda">
@@ -87,7 +87,7 @@
       </div>
     </details>
     <details class="hud-menu" name="hud">
-      <summary class="hud-menu__t">Capas</summary>
+      <summary class="hud-menu__t"><svg class="hud-menu__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/></svg><span>Capas</span></summary>
       <div class="hud-panel">
         <button class="hud-op" type="button" data-capa="modulos" aria-pressed="true">Módulos</button>
         <button class="hud-op" type="button" data-capa="paisaje" aria-pressed="true">Paisaje</button>
@@ -96,7 +96,7 @@
       </div>
     </details>
     <details class="hud-menu" name="hud">
-      <summary class="hud-menu__t">Diagramas</summary>
+      <summary class="hud-menu__t"><svg class="hud-menu__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v5M5 17v-3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/></svg><span>Diagramas</span></summary>
       <div class="hud-panel">
         <button class="hud-op" type="button" data-capa="accesos" aria-pressed="false">Accesos</button>
         <button class="hud-op" type="button" data-capa="personas" aria-pressed="false">Personas</button>
@@ -108,7 +108,7 @@
       </div>
     </details>
     <details class="hud-menu" name="hud">
-      <summary class="hud-menu__t">Vista</summary>
+      <summary class="hud-menu__t"><svg class="hud-menu__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.1 12a10.8 10.8 0 0 1 19.8 0 10.8 10.8 0 0 1-19.8 0Z"/><circle cx="12" cy="12" r="3"/></svg><span>Vista</span></summary>
       <div class="hud-panel">
         <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">Color</button>
         <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="false">Perspectiva</button>
@@ -130,7 +130,7 @@
       </div>
     </details>
     <details class="hud-menu" name="hud">
-      <summary class="hud-menu__t">Leyenda</summary>
+      <summary class="hud-menu__t"><svg class="hud-menu__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/></svg><span>Leyenda</span></summary>
       <div class="hud-panel">
         <ul class="ad-leyenda">
           <li><i class="ad-leyenda__espuela"></i>Espuela</li>
@@ -160,12 +160,12 @@
 
   <p class="ad-ayuda">Arrastrar (derecho o izquierdo): orbitar · Shift + arrastrar o botón central: mover · rueda: zoom al cursor · clic en una parte: entrar · doble clic: aislarla (en el vacío: encuadre)</p>
 </main>
-<script src="atlampa-datos.js?v=20261012h"></script>
-<script src="atlampa-modulos.js?v=20261012h"></script>
-<script src="atlampa-estacionamiento.js?v=20261012h"></script>
-<script src="atlampa-paisaje.js?v=20261012h"></script>
-<script src="atlampa-mercado.js?v=20261012h"></script>
-<script src="atlampa-geo.js?v=20261012h"></script>
-<script src="atlampa-pagina.js?v=20261012h"></script>
+<script src="atlampa-datos.js?v=20261012i"></script>
+<script src="atlampa-modulos.js?v=20261012i"></script>
+<script src="atlampa-estacionamiento.js?v=20261012i"></script>
+<script src="atlampa-paisaje.js?v=20261012i"></script>
+<script src="atlampa-mercado.js?v=20261012i"></script>
+<script src="atlampa-geo.js?v=20261012i"></script>
+<script src="atlampa-pagina.js?v=20261012i"></script>
 </body>
 </html>

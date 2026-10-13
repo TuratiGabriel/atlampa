@@ -106,7 +106,10 @@ const ESTILOS = {
 // colores del programa (lámina de usos), para el modo Color
 // (en tonos claros: sobre el fondo negro tienen que leerse)
 const PROGRAMA = { vivienda: '#ff5cb0', comercio: '#8a98ff', industria: '#d2d4d8', publico: '#ff6f63', cultura: '#c9a6ff', verde: '#a8e063', agua: '#8fd0ff', tez: '#ff9a6b', est: '#d2d4d8', aro: '#f2c14e', social: '#e8ff5a' };
-const CLAY_PROYECTO = '#1759d6';
+const CLAY_PROGRAMA = {
+  vivienda: '#dc3e8d', comercio: '#4056b5', industria: '#9da1a7', publico: '#dd554d', cultura: '#9271c9',
+  verde: '#77a350', agua: '#63a2bd', tez: '#b87855', est: '#9da1a7', aro: '#d1a536', social: '#a7b94a'
+};
 const CLAY_TINTA = {
   suelo: '#deded9', calle: '#cfd1d0', banqueta: '#dedfdb', predio: '#e6e5df', plaza: '#deded9',
   verde: '#b7bbb5', tezontle: '#c4c2bc', agua: '#aebbc1', filtro: '#b7bbb5', arbusto: '#9ea49e', copa: '#979d98',
@@ -533,9 +536,10 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   }
   const blanco = new THREE.Color(1, 1, 1);
   function tinta(papel) {
-    if (estilo === ESTILOS.clay && !conColor && !espacioAct) {
-      if (['nave', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'proyecto'].indexOf(papel) >= 0) return new THREE.Color(CLAY_PROYECTO);
-      if (papel === 'vidrio') return new THREE.Color('#7aa2dc');
+    if (estilo === ESTILOS.clay && !espacioAct) {
+      if (papel === 'vidrio') return new THREE.Color(conColor ? PROGRAMA.agua : '#789dc9');
+      const uso = PROG_DE[papel];
+      if (uso) return new THREE.Color(conColor ? PROGRAMA[uso] : CLAY_PROGRAMA[uso]);
       return new THREE.Color(CLAY_TINTA[papel] || '#aeb1af');
     }
     // el vidrio, siempre un poco azul (con Color, más)

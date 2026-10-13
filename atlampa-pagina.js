@@ -538,6 +538,12 @@
     var panel = document.querySelector('.hud-panel--partes');
     if (panel && partes) panel.innerHTML = filasPartes(partes);
   }
+  function iconoMenu(nombre) {
+    var p = nombre === 'partes'
+      ? '<path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/>'
+      : '<path d="M2.1 12a10.8 10.8 0 0 1 19.8 0 10.8 10.8 0 0 1-19.8 0Z"/><circle cx="12" cy="12" r="3"/>';
+    return '<svg class="hud-menu__icon" viewBox="0 0 24 24" aria-hidden="true">' + p + '</svg>';
+  }
   // la barra de menús del aislado y la ficha (con los datos del uso, si hay)
   function barraAislado(ap, partes) {
     var nav = document.createElement('nav');
@@ -547,8 +553,8 @@
       '<button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="' + perspAct + '">Perspectiva</button>' +
       '<p class="hud-panel__t">Estilo</p>' +
       ['clay', 'rayado', 'plano'].map(function (e) { var n = e === 'clay' ? 'Clay' : e === 'rayado' ? 'Rayado' : 'Plano'; return '<button class="hud-op hud-op--radio" type="button" data-estilo="' + e + '" aria-pressed="' + (estiloAct === e) + '">' + n + '</button>'; }).join('');
-    nav.innerHTML = (partes.length ? '<details class="hud-menu" name="hud"><summary class="hud-menu__t">Partes</summary><div class="hud-panel hud-panel--partes">' + filasPartes(partes) + '</div></details>' : '') +
-      '<details class="hud-menu" name="hud"><summary class="hud-menu__t">Vista</summary><div class="hud-panel">' + vista + '</div></details>' +
+    nav.innerHTML = (partes.length ? '<details class="hud-menu" name="hud"><summary class="hud-menu__t">' + iconoMenu('partes') + '<span>Partes</span></summary><div class="hud-panel hud-panel--partes">' + filasPartes(partes) + '</div></details>' : '') +
+      '<details class="hud-menu" name="hud"><summary class="hud-menu__t">' + iconoMenu('vista') + '<span>Vista</span></summary><div class="hud-panel">' + vista + '</div></details>' +
       '<button class="hud-salir" type="button" data-aisla-sale>Salir <span aria-hidden="true">✕</span></button>';
     var barra = document.querySelector('.hud-barra');
     barra.parentNode.insertBefore(nav, barra.nextSibling);
