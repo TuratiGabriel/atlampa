@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261013g'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261013h'      # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -113,9 +113,9 @@ APARTADOS = {
     'comercio': {
         'titulo': 'Comercio',
         'desc': 'Las dos naves de comercio, de techos a dos aguas con crujías de 17.97 m, cortadas por el círculo del aro.',
-        # (la sur: cubierta propuesta en prepara-mercado.py, Z_VALLE_S y Z_CUMBRE_S; la de Rhino no cabía sobre su planta alta)
-        'datos': ['Nave norte: 2 crujías · alero +6.20 · cumbrera +9.20', 'Nave sur: 3 crujías · alero +8.25 · cumbrera +9.80 (propuesta)',
-                  'Nave sur: planta alta a +4.28 con puestos y comedores'],
+        # (la sur: cubierta plegada en prepara-mercado.py, CUBIERTA_SUR; la de Rhino no cabía sobre su planta alta)
+        'datos': ['Nave norte: 2 crujías · alero +6.20 · cumbrera +9.20', 'Nave sur: 3 crujías · las mismas aguas, subidas y plegadas (+7.90 / +10.90)',
+                  'Nave sur: planta alta a +4.28 con manzanas y respiros'],
         'extra': '', 'leyenda': [],
     },
     'industria': {

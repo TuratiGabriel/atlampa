@@ -626,12 +626,19 @@
       fichaAntes = f.innerHTML;
       var M = window.ATLAMPA_MERCADO, r = M && M.resumen, c = M && M.cinta, datos = [];
       if ((ap === 'comercio' || ap === 'nave-norte') && r) {
-        var pre = ap === 'comercio' ? 'Nave norte: ' : '';   // (en el mercado aislado hay dos naves: se dice de cuál)
-        datos = [pre + r.puestos + ' puestos de 2.5 × 2 × 3.0 m en ' + Object.keys(r.bloques || {}).length + ' bloques', r.mesas + ' mesas en los comedores',
-          'Plataformas de +1.42 a +2.40 (suben al sur)', 'Jardín ' + Math.round(r.jardin_m2) + ' m² · hoyo ' + Math.round(r.hoyo_m2) + ' m²'];
-        if (ap === 'comercio' && r.sur) {
-          datos.push('Nave sur: ' + r.sur.puestos + ' puestos en la planta alta · acuaponia ' + Math.round(r.sur.acuaponia_m2) + ' m²');
-          if (r.sur.cubierta) datos.push('Nave sur: cubierta propuesta, valles +' + r.sur.cubierta.valle_z.toFixed(2) + ' · cumbrera +' + r.sur.cubierta.cumbre_z.toFixed(2));
+        var su = r.sur || {}, lo = r.locales || {};
+        var jardinNE = 'Jardín de la esquina NE ' + Math.round(r.jardin_m2) + ' m² (' + Math.round(r.jardin_abierto_m2 || 0) + ' abiertos, alero ' + (r.alero_m || 0).toFixed(2) + ')';
+        if (ap === 'nave-norte') {   // (la nave norte sola: no se cuela la sur)
+          datos = [r.puestos + ' locales', 'Sobre la retícula de vivienda: isla, portal y calle de las plantas con pórtico', jardinNE, 'Foro bajo el hoyo (con vidrio)'];
+        } else {
+          var fondas = ((lo.PB_fonda_del_jardin || 0) + (lo.P2_racimos || 0)) / 4 + (su.racimos_pa || 0) + (su.racimos_pb || 0);
+          datos = [(r.puestos + (su.puestos_pb || 0) + (su.puestos || 0)) + ' locales (norte ' + r.puestos + ' · sur PB ' + (su.puestos_pb || 0) + ' · sur PA ' + (su.puestos || 0) + ')',
+            'Sur: manzanas en aparejo · ' + (su.respiros || 0) + ' respiros (tsuboniwa abajo, puente entre copas arriba) · ' + fondas + ' fondas con barra',
+            'Jardín sur: ranura de doble altura sobre la franja (' + Math.round(su.ranura_m2 || 0) + ' m²) y esquina a doble altura (' + Math.round(su.doble_altura_m2 || 0) + ' m²)',
+            'Norte sobre la retícula de vivienda: isla, portal y calle de las plantas con pórtico',
+            jardinNE + ' · jardín sur ' + Math.round(su.jardin_sur_m2 || 0) + ' m²',
+            'Foro bajo el hoyo (con vidrio) · cubierta sur: las dos aguas en módulos a tres alturas' + (su.cubierta_dobleces ? ', ' + su.cubierta_dobleces.canal + ' en canal y ' + su.cubierta_dobleces.lomo + ' en lomo' : '')];
+          if (su.acuaponia_m2) datos.push('Acuaponia: vitrina de ' + Math.round(su.acuaponia_m2) + ' m²');
         }
         if (c) datos.push('Cinta del aro: ' + Math.round(c.largo) + ' m al ' + Math.max.apply(null, c.pendientes).toFixed(1) + ' %');
         datos.push('Fachada al aro: vidrio (por definir)');
