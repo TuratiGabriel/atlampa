@@ -2445,8 +2445,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
      (La página pone la axonometría: perspectiva(false).) */
   function gruposDe(ap) {
     if (ap === 'comercio' && MERCADO) return piezas.filter(p => /^mercado-|^cinta$/.test(p.g.name)).map(p => p.g);
-    // la nave norte abierta: el mercado sin la planta alta de la sur ni las columnas de la vivienda, y el aro (sin la cinta)
-    if (ap === 'nave-norte' && MERCADO) return piezas.filter(p => (/^mercado-/.test(p.g.name) && !/^mercado-(pa|vivienda)$/.test(p.g.name)) || (p.ap === 'aro' && p.g.name !== 'cinta')).map(p => p.g);
+    // la nave norte abierta: el mercado sin la nave sur (ni su planta baja, planta alta y acero) ni las columnas de la vivienda, y el aro (sin la cinta)
+    if (ap === 'nave-norte' && MERCADO) return piezas.filter(p => (/^mercado-/.test(p.g.name) && !/^mercado-(pa|vivienda|sur-.*)$/.test(p.g.name)) || (p.ap === 'aro' && p.g.name !== 'cinta')).map(p => p.g);
     if (ap === 'vivienda') return gMods.slice();
     if (ap === 'paisajismo') return [gPai, gPlantas];
     if (ap === 'estacionamiento') return [gEst];
