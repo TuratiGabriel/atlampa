@@ -19,6 +19,8 @@ están en Rhino/Contexto.3dm, 0.41 y 0.37 m más allá que en nuevos bloques, y
 OJO (2026-10-09): atlampa-3d-cultura.js trae cambios hechos directamente en
 él que este guion no tiene (la azotea no es losa: es el aro; rampas por fuera
 pegadas a la curva; sin la escalera X3). Correrlo los borra: pasarlos aquí antes.
+OJO (2026-10-13): DATA.mods, DATA.umb y lv.PAD también se cambiaron a mano con la
+distribución de la hoja de plantas v21 (modelo/arte_y_cultura_plantas.html).
 """
 import os
 import re
