@@ -105,7 +105,9 @@ body[data-escena="general"] .hud-ruta{ font-size:13px; }
   box-shadow:0 14px 38px rgba(28,32,38,.2);
   -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
   animation:hud-abre .18s var(--ease-ui);
+  scrollbar-width:none;
 }
+.hud-panel::-webkit-scrollbar{ width:0; height:0; }
 @keyframes hud-abre{ from{ opacity:0; transform:translateY(-4px); } }
 .hud-panel__t{ margin:8px 0 2px; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:rgba(154,154,154,.7); }
 
@@ -117,7 +119,16 @@ body[data-escena="general"] .hud-ruta{ font-size:13px; }
 }
 .hud-op::before{ content:""; position:absolute; right:2px; top:50%; width:7px; height:7px; margin-top:-4px; border:1px solid currentColor; border-radius:50%; opacity:.6; }
 .hud-op__icon{ width:18px; height:18px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
-.hud-op > span{ min-width:0; }
+.hud-op > span{ min-width:0; line-height:1.22; overflow-wrap:anywhere; }
+.hud-panel--vista{ min-width:260px; }
+.hud-infra-leyenda{
+  display:none; grid-template-columns:1fr 1fr; gap:5px 12px; margin:5px 0 2px; padding:8px 2px 2px;
+  border-top:1px solid rgba(255,255,255,.12); list-style:none; color:var(--muted);
+  font-family:var(--font-display); font-size:11px; letter-spacing:.04em;
+}
+.con-instalacion-hidraulica .hud-infra-leyenda{ display:grid; animation:hud-abre .18s var(--ease-ui); }
+.hud-infra-leyenda li{ display:flex; align-items:center; gap:7px; min-width:0; }
+.hud-infra-leyenda i{ width:14px; height:2px; flex:none; background:var(--infra); border-radius:1px; }
 .hud-op[aria-pressed="true"], .hud-op[aria-current]{ color:var(--fg); }
 .hud-op[aria-pressed="true"]::before, .hud-op[aria-current]::before{ background:currentColor; opacity:1; }
 .hud-ir::before{ border-radius:0; border-width:0 1px 1px 0; transform:rotate(-45deg); width:5px; height:5px; }
@@ -326,16 +337,17 @@ body.aislado .hud-barra:not(.hud-barra--aislado){ display:none; }
 .hud-dato-punto:focus-visible{ outline:1px solid var(--fg); outline-offset:3px; }
 .hud-dato-punto[aria-expanded="true"]::before{ transform:scale(.72); }
 
-.hud-datos-capa{ position:absolute; z-index:8; inset:0; display:grid; place-items:center; padding:64px var(--gutter) 32px; }
+.hud-datos-capa{ position:absolute; z-index:8; inset:0; display:grid; place-items:center end; padding:64px var(--gutter) 32px; }
 .hud-datos-capa[hidden]{ display:none; }
-.hud-datos-fondo{ position:absolute; z-index:0; inset:0; width:100%; height:100%; border:0; background:rgba(0,0,0,.42); -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px); cursor:default; }
+.hud-datos-fondo{ position:absolute; z-index:0; inset:0; width:100%; height:100%; border:0; background:rgba(0,0,0,.16); cursor:default; }
 .hud-datos-barrido{ position:absolute; z-index:1; left:50%; top:50%; width:0; height:0; pointer-events:none; --radio:min(75vw, 1080px); }
 .hud-datos-barrido i{ position:absolute; left:-1.5px; top:-1.5px; width:3px; height:3px; border-radius:50%; background:#fff; opacity:0; box-shadow:0 0 5px rgba(255,255,255,.75); }
 .hud-datos-panel{
-  position:relative; z-index:2; width:min(680px, calc(100vw - 2 * var(--gutter))); max-height:calc(100dvh - 96px); overflow:auto;
-  padding:28px 30px 24px; border:1px solid rgba(255,255,255,.34); border-radius:3px;
+  position:relative; z-index:2; width:min(420px, calc(100vw - 2 * var(--gutter))); max-height:calc(100dvh - 96px); overflow:auto;
+  padding:28px 24px 24px; border:1px solid rgba(255,255,255,.34); border-radius:3px;
   background:rgba(5,5,5,.9); box-shadow:0 18px 70px rgba(0,0,0,.5);
   -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); scrollbar-width:none; -ms-overflow-style:none;
+  overscroll-behavior:contain; touch-action:pan-y;
 }
 .hud-datos-panel::-webkit-scrollbar, .hud-datos-tabla-wrap::-webkit-scrollbar{ width:0; height:0; display:none; }
 .hud-datos-tabla-wrap{ scrollbar-width:none; -ms-overflow-style:none; }
@@ -377,7 +389,7 @@ body.aislado .hud-barra:not(.hud-barra--aislado){ display:none; }
 .hud-datos-cerrar:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
 .hud-datos-kicker{ margin:0 44px 5px 0; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
 .hud-datos-titulo{ margin:0 44px 22px 0; font-family:var(--font-display); font-size:28px; font-weight:400; line-height:1.05; letter-spacing:0; }
-.hud-datos-metricas{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); margin:0 0 24px; border-top:1px solid var(--trazo); border-left:1px solid var(--trazo); }
+.hud-datos-metricas{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); margin:0 0 24px; border-top:1px solid var(--trazo); border-left:1px solid var(--trazo); }
 .hud-datos-metrica{ min-width:0; padding:13px 12px 12px; border-right:1px solid var(--trazo); border-bottom:1px solid var(--trazo); }
 .hud-datos-metrica.es-complemento{ background:rgba(255,255,255,.045); }
 .hud-datos-metrica dt{ margin-bottom:6px; font-size:10px; line-height:1.25; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
@@ -393,11 +405,12 @@ body.aislado .hud-barra:not(.hud-barra--aislado){ display:none; }
 .hud-datos-nota{ margin:14px 0 0; font-size:10.5px; line-height:1.45; color:var(--muted); }
 .hud-datos-fuente{ margin:20px 0 0; padding-top:12px; border-top:1px solid var(--trazo); font-size:9.5px; line-height:1.4; letter-spacing:.03em; color:rgba(154,154,154,.72); }
 body.con-datos .hud-dato-punto{ opacity:0; pointer-events:none; }
+body.con-datos .hud-camara{ opacity:0; pointer-events:none; }
 
 @media (max-width:820px){
   .hud-dato-punto{ top:72px; right:14px; margin:0; }
   .hud-datos-capa{ padding:52px 12px 86px; align-items:start; }
-  .hud-datos-panel{ width:100%; max-height:calc(100dvh - 138px); padding:22px 18px 20px; }
+  .hud-datos-panel{ width:min(420px, 100%); max-height:calc(100dvh - 138px); padding:22px 18px 20px; }
   .hud-datos-titulo{ font-size:24px; }
   .hud-datos-metricas{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
   .hud-datos-metrica dd{ font-size:19px; }
