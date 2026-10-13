@@ -980,6 +980,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       if (MERCADO.acero) r.acero = geos(geo(MERCADO.acero), 'nave', false, lineas(MERCADO.aceroL));
       // tragaluces de la nave norte (2026-10-12): vidrio sobre la cubierta, en el lenguaje del hoyo
       if (MERCADO.tragaluz && MERCADO.tragaluz.length) r.tragaluz = geos(geo(MERCADO.tragaluz), 'vidrio', false, lineas(MERCADO.tragaluzL));
+      // (2026-10-13) la cubierta nueva de la nave sur: franjas de vidrio de los escalones y módulos altos translúcidos
+      if (MERCADO.tragaluz_s && MERCADO.tragaluz_s.length) r.tragaluz_s = geos(geo(MERCADO.tragaluz_s), 'vidrio', false, lineas(MERCADO.tragaluz_sL));
       if (MERCADO.vivienda && MERCADO.vivienda.length) r.vivienda = geos(geo(MERCADO.vivienda), 'modulo', false, lineas(MERCADO.viviendaL));
       // la planta alta de la nave sur (Rhino): ahí llega el descanso de la cinta del aro
       if (MERCADO.pa && MERCADO.pa.length) r.pa = geos(geo(MERCADO.pa), 'nave', false, lineas(MERCADO.paL));
@@ -1011,7 +1013,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       if (SU) {
         r.sur = {};
         [['piso', 'predio'], ['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['pa', 'nave'], ['local', 'modcom'],
-          ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle'], ['columna', 'nave'], ['escalera', 'nave'], ['cubo', 'modcom'], ['local_pb', 'modcom'], ['mesa_pb', 'nave'], ['jardinera', 'tezontle']].forEach(([k, papel]) => {
+          ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle'], ['columna', 'nave'], ['escalera', 'nave'], ['cubo', 'modcom'], ['local_pb', 'modcom'], ['mesa_pb', 'nave'], ['jardinera', 'tezontle'], ['jardin', 'tezontle']].forEach(([k, papel]) => {
           if (SU[k]) r.sur[k] = geos(geo(SU[k]), papel, SU[k + 'L'] ? false : (k === 'agua' ? 1 : 30), SU[k + 'L'] ? lineas(SU[k + 'L']) : null);
         });
         ['baranda', 'pasto', 'planta'].forEach(k => { if (SU[k + 'L']) r.sur[k + 'Lin'] = lineas(SU[k + 'L']).geo(); });
@@ -1026,6 +1028,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const cubG = MG.cubiertas.map(m => { const g = sub(gCub, [0, 9, 0]); g.userData.norte = m.id[9] === 'n'; ponGeos(g, m.c, 'nave', 'comercio'); return g; });
     const tragG = MG.tragaluz ? sub(gCub, [0, 9, 0]) : null;
     if (tragG) { tragG.userData.norte = true; ponGeos(tragG, MG.tragaluz, 'vidrio', 'comercio'); }
+    const tragSG = MG.tragaluz_s ? sub(gCub, [0, 9, 0]) : null;
+    if (tragSG) ponGeos(tragSG, MG.tragaluz_s, 'vidrio', 'comercio');
     // la retícula de acero que rigidiza la nave norte (y sobre la que va la cubierta)
     const gAce = MG.acero ? pieza('mercado-acero', 'comercio', 0.38) : null;
     if (gAce) ponGeos(gAce, MG.acero, 'nave', 'comercio', true);
@@ -1080,10 +1084,11 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     }
     // aislando el mercado: sus partes (las que se desplazan, hacia dónde)
     // cada cubierta (por nave y faldón) y cada muro (por nave y lado), sueltos
-    parteGrupo('comercio', 'cubierta-toda', 'Toda la cubierta (con tragaluces)', cubG.concat(tragG ? [tragG] : []));
+    parteGrupo('comercio', 'cubierta-toda', 'Toda la cubierta (con tragaluces)', cubG.concat(tragG ? [tragG] : [], tragSG ? [tragSG] : []));
     parteGrupo('comercio', 'muros-todos', 'Todos los muros (y el vidrio del aro)', murosG.concat(vidG));
     MG.cubiertas.forEach((m, i) => parte('comercio', m.id, m.nombre, [cubG[i]]));
     if (tragG) parte('comercio', 'tragaluces', 'Tragaluces (vidrio)', [tragG]);
+    if (tragSG) parte('comercio', 'tragaluces-sur', 'Cubierta sur: franjas de vidrio y módulos translúcidos', [tragSG]);
     MG.muros.forEach((m, i) => parte('comercio', m.id, m.nombre, [murosG[i]]));
     if (vidG.length) parte('comercio', 'vidrio', 'Fachada al aro (vidrio)', vidG);
     if (gAce) parte('comercio', 'acero', 'Estructura de acero', [gAce], [0, 4.5, 0]);
@@ -1098,7 +1103,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const Q = MG.sur, pb = pieza('mercado-sur-pb', 'comercio', 0.07), pa = pieza('mercado-sur-pa', 'comercio', 0.32);
       const pon = (g, k, papel) => Q[k] ? ponGeos(g, Q[k], papel, 'comercio') : null;
       const piso = pon(pb, 'piso', 'predio'); if (piso) suelos.push(piso);
-      [['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['columna', 'nave'], ['escalera', 'nave'], ['cubo', 'modcom'], ['local_pb', 'modcom'], ['mesa_pb', 'nave'], ['jardinera', 'tezontle']].forEach(([k, papel]) => pon(pb, k, papel));
+      [['anden', 'nave'], ['bio', 'filtro'], ['tanque', 'nave'], ['cama', 'nave'], ['agua', 'agua'], ['columna', 'nave'], ['escalera', 'nave'], ['cubo', 'modcom'], ['local_pb', 'modcom'], ['mesa_pb', 'nave'], ['jardinera', 'tezontle'], ['jardin', 'tezontle']].forEach(([k, papel]) => pon(pb, k, papel));
       [['pa', 'nave'], ['local', 'modcom'], ['mesa', 'nave'], ['muro', 'modcom'], ['tarima', 'nave'], ['maceta', 'tezontle']].forEach(([k, papel]) => pon(pa, k, papel));
       if (Q.barandaLin) ponLineas(pa, Q.barandaLin, 'columna-baranda', 0xffffff, null, 'comercio');
       if (Q.pastoLin) ponLineas(pa, Q.pastoLin, 'pasto', 0xffffff, PROGRAMA.verde, 'comercio');
@@ -1132,7 +1137,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (gL) parte('nave-norte', 'puestos', 'Puestos, comedores y baños', [gL]);
     if (gP) parte('nave-norte', 'piso', 'Piso, zanja y jardín', [gP]);
     if (gV) parte('nave-norte', 'verde', 'Vegetación', [gV]);
-    const sur = murosG.filter(g => !g.userData.norte).concat(cubG.filter(g => !g.userData.norte), vidG.filter(g => !g.userData.norte));
+    const sur = murosG.filter(g => !g.userData.norte).concat(cubG.filter(g => !g.userData.norte), vidG.filter(g => !g.userData.norte), tragSG ? [tragSG] : []);
     if (sur.length) parte('nave-norte', 'nave-sur', 'Nave sur', sur, null, true);
   } else NAVESG: {
     // la cara curva del corte del aro no es muro: va de vidrio (por ahora), con un parteluz en cada quiebre

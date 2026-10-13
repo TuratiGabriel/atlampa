@@ -349,10 +349,12 @@
       var M = window.ATLAMPA_MERCADO, r = M && M.resumen, c = M && M.cinta, datos = [];
       if ((ap === 'comercio' || ap === 'nave-norte') && r) {
         var su = r.sur || {}, lo = r.locales || {};
-        var fondas = ((lo.PB_fonda_del_jardin || 0) + (lo.P2_racimos || 0)) / 4 + (su.racimos_pb || 0) + (su.racimos_pa || 0);
+        var fondas = ((lo.PB_fonda_del_jardin || 0) + (lo.P2_racimos || 0)) / 4 + (su.barras || 0);
         datos = [(r.puestos + (su.puestos_pb || 0) + (su.puestos || 0)) + ' locales (norte ' + r.puestos + ' · sur PB ' + (su.puestos_pb || 0) + ' · sur PA ' + (su.puestos || 0) + ')',
-          'Manzanas cortas en aparejo · ' + fondas + ' fondas con barra',
-          'Norte: P1 y P3 a +4.28 · P2 a +2.40 con gradería al jardín', 'Jardín ' + Math.round(r.jardin_m2) + ' m² · hoyo ' + Math.round(r.hoyo_m2) + ' m² · tragaluces sobre la P2'];
+          'Sur: ' + ((su.clusters_pb || 0) + (su.clusters_pa || 0)) + ' clusters con trastiendas · ' + fondas + ' barras de comida · ' + (su.respiros || 0) + ' respiro',
+          'Norte sobre la retícula de vivienda: isla, portal y calle de las plantas con pórtico',
+          'Jardín de la esquina NE ' + Math.round(r.jardin_m2) + ' m² (' + Math.round(r.jardin_abierto_m2 || 0) + ' abiertos, alero ' + (r.alero_m || 0).toFixed(2) + ') · jardín sur ' + Math.round(su.jardin_sur_m2 || 0) + ' m²',
+          'Foro bajo el hoyo (con vidrio) · cubierta sur en módulos a tres alturas'];
         if (su.acuaponia_m2) datos.push('Acuaponia: vitrina de ' + Math.round(su.acuaponia_m2) + ' m²');
         if (c) datos.push('Cinta del aro: ' + Math.round(c.largo) + ' m al ' + Math.max.apply(null, c.pendientes).toFixed(1) + ' %');
         datos.push('Fachada al aro: vidrio (por definir)');

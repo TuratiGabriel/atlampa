@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261012j'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261013a'      # versión de los archivos (para que el navegador no use los viejos)
 
 SOTANOS = '''
       <div class="hud-grupo" role="group" aria-label="Sótanos">
