@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261013f'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261013g'      # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -113,7 +113,9 @@ APARTADOS = {
     'comercio': {
         'titulo': 'Comercio',
         'desc': 'Las dos naves de comercio, de techos a dos aguas con crujías de 17.97 m, cortadas por el círculo del aro.',
-        'datos': ['Nave sur: 3 crujías', 'Nave norte: 2 crujías', 'Alero +6.20 · cumbrera +9.20'],
+        # (la sur: cubierta propuesta en prepara-mercado.py, Z_VALLE_S y Z_CUMBRE_S; la de Rhino no cabía sobre su planta alta)
+        'datos': ['Nave norte: 2 crujías · alero +6.20 · cumbrera +9.20', 'Nave sur: 3 crujías · alero +8.25 · cumbrera +9.80 (propuesta)',
+                  'Nave sur: planta alta a +4.28 con puestos y comedores'],
         'extra': '', 'leyenda': [],
     },
     'industria': {
@@ -183,8 +185,8 @@ PLANTILLA = '''<!doctype html>
 <title>Atlampa · {titulo_doc}</title>
 <link rel="stylesheet" href="atlampa.css?v={v}">
 <link rel="stylesheet" href="atlampa-3d-ctx.css?v={v}">
-<!-- Three.js del CDN (pendiente: copiarlo a lib/ para presentar sin internet) -->
-<script type="importmap">{{"imports": {{"three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}}}</script>
+<!-- Three.js 0.170.0 y los complementos que se usan van en lib/ (sin CDN): el sitio funciona sin internet -->
+<script type="importmap">{{"imports": {{"three": "./lib/three-0.170.0.module.min.js", "three/addons/": "./lib/three-0.170.0-addons/"}}}}</script>
 </head>
 <body data-escena="{clave}">
 <!-- Generada por herramientas/paginas.py: no editar a mano. -->

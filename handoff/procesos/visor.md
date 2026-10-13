@@ -3,14 +3,17 @@
 ## Archivos
 | Archivo | Qué es |
 |---|---|
-| `atlampa-3d.js` | Motor Three.js 0.170 (CDN por importmap). Arma piezas, estilos, apartados, aislar y diagramas. |
+| `atlampa-3d.js` | Motor Three.js 0.170 (de `lib/`, por importmap). Arma piezas, estilos, apartados, aislar y diagramas. |
 | `atlampa-geo.js` | Geometría compartida: predio, aro, `G.pares`, recortes. |
-| `atlampa-contexto.js` | Motor SVG de respaldo (`?motor=svg`). Exporta `AtlampaContexto.geo`, que el 3D reutiliza. |
 | `atlampa-pagina.js` | Tablero. Cambia de apartado sin recargar (pushState) y conserva las capas en sessionStorage. |
 | `herramientas/paginas.py` | Genera `index.html` y cada apartado (ficha: título, desc, datos). No edites los HTML a mano. Tiene `V`, la versión que hay que subir. |
 | `herramientas/servidor.py` | Servidor local sin caché, puerto 8130 (`.claude/launch.json`). |
+| `herramientas/revisa.py` | Revisión antes de subir (< 1 s): conflictos, sintaxis, páginas al día, archivos que pide el sitio, `programa/` y, con `--base origin/master`, que `V` haya subido. Corre sola en cada PR (`.github/workflows/revisa.yml`). |
+| `lib/` | Three.js 0.170.0 y los complementos que se usan, copiados del paquete de npm. El sitio no depende de ningún CDN. |
 
-Three.js va por CDN. Recuérdale de vez en cuando al usuario que conviene descargarlo a `diagrama/lib/` para presentar sin internet.
+Three.js va en `lib/` (2026-10-13): el sitio funciona sin internet. Si un script necesita otro complemento (`three/addons/…`), cópialo de
+`three@0.170.0/examples/jsm/` a `lib/three-0.170.0-addons/` con la misma ruta; `revisa.py` avisa si falta.
+Vercel no publica `*.3dm`, `herramientas/`, `handoff/` ni `.github/` (`.vercelignore`).
 
 ## Tablero (igual en todas las páginas)
 - El modelo ocupa la pantalla completa.
@@ -33,6 +36,9 @@ Three.js va por CDN. Recuérdale de vez en cuando al usuario que conviene descar
 3. En `paginas.py` añade el script y la ficha, y sube `V`.
 
 ## Estilo (no inventes otro)
+**Ojo (2026-10-13):** con `interfaz-ux` («Renueva visor con estilo clay editorial») el tablero pasó a fondo claro y volúmenes con color.
+Lo de abajo es el estilo anterior y está por actualizar: antes de tocar el estilo, mira `atlampa.css` y la paleta de `atlampa-3d.js`.
+
 - Fondo negro. Volúmenes negros **sin relleno**, sólo aristas a mano (el trazo se pasa de las esquinas). Blanco a .72.
 - Jerarquía por línea: el proyecto grueso, lo que acompaña gris y delgado, el contexto más delgado.
 - **Nada transparente:** lo ajeno va opaco y apagado. Resaltar deja lo demás al 15 %.
