@@ -18,7 +18,7 @@ y su potencial construible (CAS, COS, CUS). Cada cifra muestra de qué archivo s
 2. Abre la carpeta con tu Claude (Claude Code, o pega `programa/CLAUDE.md` en tu chat) y pídele el cambio. Ejemplo:
    *«Lee programa/CLAUDE.md. El área de arte y cultura cambió a 1,350 m² según la lámina nueva; actualiza manual.json con su fuente.»*
 3. `python programa/validar.py` → «OK».
-4. Sube tu rama y abre un pull request con la plantilla. Gabriel lo integra y el sitio se actualiza solo.
+4. Sube **sólo tu rama** (`git push origin tu-rama`) y abre un pull request con la plantilla. Nunca empujes a `master`: está protegida y publica el sitio. Gabriel lo aprueba, lo integra y el sitio se actualiza solo.
 
 ## Regenerar las cifras (Gabriel o quien tenga rhino3dm)
 ```bash
