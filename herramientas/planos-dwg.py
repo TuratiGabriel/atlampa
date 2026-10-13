@@ -809,7 +809,7 @@ ar.contorno(huella(P3['humedal'], plano=False), 'A-ABAJO')
 aro(ar, 'corte')
 cinta(ar)
 ar.texto('CUBIERTA NAVE NORTE', 532, 476, 0.7, 90)
-ar.texto('NAVE SUR (CUBIERTA POR DEFINIR)', 531.5, 388, 0.6)
+ar.texto('CUBIERTA NAVE SUR (PROPUESTA)', 531.5, 388, 0.6)
 ar.texto('HOYO DEL JARDÍN', D['hoyo']['c'][0], D['hoyo']['c'][1] + 3.6, 0.5)
 
 # ---------- A-04 estructura del mercado ----------
