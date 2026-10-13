@@ -433,6 +433,9 @@
   function claveDatosActual() {
     var a = aislado === 'nave-norte' ? 'comercio' : aislado;
     if (a) return a;
+    // En un apartado manda el uso de esa página. El resaltado se conserva al
+    // navegar como referencia visual, pero no debe arrastrar su ficha de datos.
+    if (ESCENA !== 'general' && catalogoDatos && catalogoDatos[ESCENA]) return ESCENA;
     if (resAct === 'modulos') return 'vivienda';
     if (resAct === 'espacio') return 'paisajismo';
     if (catalogoDatos && catalogoDatos[resAct]) return resAct;
