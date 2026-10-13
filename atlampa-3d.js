@@ -1329,7 +1329,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const NIVELES = fija('modulos', () => {
     const A = MOD.a / 2, Bm = MOD.b / 2, porNivel = {}, COM = MOD.tipos.indexOf('comercio'), SOC = MOD.tipos.indexOf('44SOC');
     MOD.cajas.forEach(r => {
-      const nivel = r[2], z0 = MOD.z0 + nivel * MOD.alto, z1 = z0 + MOD.alto, com = r[3] === COM, soc = r[3] === SOC, clave = (com ? 'c' : '') + (soc ? 's' : '') + nivel;
+      const nivel = r[2], z0 = MOD.z0 + nivel * (MOD.paso || MOD.alto), z1 = z0 + MOD.alto, com = r[3] === COM, soc = r[3] === SOC, clave = (com ? 'c' : '') + (soc ? 's' : '') + nivel;
       if (!porNivel[clave]) porNivel[clave] = { m: new Malla(), l: new Lineas(), com, soc, nivel };
       const { m, l } = porNivel[clave];
       const P = (x, y, z) => W(r[0] + MEX[0] * x + MEY[0] * y, r[1] + MEX[1] * x + MEY[1] * y, z);
@@ -1379,6 +1379,25 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       // fondo de la caja (se ve desde abajo y en los volados)
       m.quad(P(-A, -Bm, z0), P(-A, Bm, z0), P(A, Bm, z0), P(A, -Bm, z0));
     });
+    // El entrepiso del Rhino (0.60 entre un nivel y otro, y la losa de azotea): losas con hueco, del archivo de la
+    // estructura (atlampa-estructura.js). Cada una va con los módulos del nivel que lleva encima (la de azotea, con el último).
+    if (ESTR && ESTR.entrepiso) {
+      const paso = MOD.paso || MOD.alto, nMax = Math.max(...MOD.cajas.map(q => q[2]));
+      ESTR.entrepiso.forEach(e => {
+        const nivel = Math.min(nMax, Math.max(0, Math.round((e[1] - MOD.z0) / paso))), clave = String(nivel);
+        if (!porNivel[clave]) porNivel[clave] = { m: new Malla(), l: new Lineas(), com: false, soc: false, nivel };
+        const { m, l } = porNivel[clave], z0 = e[0], z1 = e[1];
+        const cont = ccw(G.pares(e[2])), huecos = e.slice(3).map(h => ccw(G.pares(h)).reverse()), todos = cont.concat(...huecos);
+        const tr = THREE.ShapeUtils.triangulateShape(cont.map(q => new THREE.Vector2(q[0], q[1])), huecos.map(h => h.map(q => new THREE.Vector2(q[0], q[1]))));
+        tr.forEach(t => {
+          m.tri(...t.map(k => W(todos[k][0], todos[k][1], z1)));
+          m.tri(...t.slice().reverse().map(k => W(todos[k][0], todos[k][1], z0)));
+        });
+        muros(m, cont, z0, z1);
+        l.poli(cont.map(q => W(q[0], q[1], z0)), true); l.poli(cont.map(q => W(q[0], q[1], z1)), true);
+        cont.forEach(q => l.seg(W(q[0], q[1], z0), W(q[0], q[1], z1)));
+      });
+    }
     const r = {};
     Object.keys(porNivel).forEach(k => { const p = porNivel[k]; r[k] = { com: p.com, soc: p.soc, nivel: p.nivel, c: fijas(geos(p.m, p.com ? 'modcom' : p.soc ? 'social' : 'modulo', false, p.l)) }; });
     return r;
@@ -1445,24 +1464,16 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       amarres: ['estr-amarres', 0x7d868d, ['amarre']],
       diagonales: ['estr-diagonales', 0xffffff, ['cubo_diag']],
     };
-    const lin = { losas: new Lineas(), cubos: new Lineas(), entrepiso: new Lineas() };
+    const lin = { losas: new Lineas(), cubos: new Lineas() };
     Object.keys(GRUPOS).forEach(k => { lin[k] = new Lineas(); });
     Object.values(ESTR.bloques).forEach(b => {
       Object.keys(GRUPOS).forEach(k => GRUPOS[k][2].forEach(t => (b.miembros[t] || []).forEach(m => miembroCaja(lin[k], m))));
       (b.losas || []).forEach(r => cajaGirada(lin.losas, r[0], r[1], r[2], r[3], r[4], r[5]));
       (b.cubos || []).forEach(r => cajaGirada(lin.cubos, r[1], r[2], r[3], r[4], r[5], r[6]));
     });
-    ESTR.entrepiso.forEach(e => {
-      for (let i = 2; i < e.length; i++) {
-        const pts = G.pares(e[i]);
-        lin.entrepiso.poli(pts.map(q => W(q[0], q[1], e[0])), true);
-        lin.entrepiso.poli(pts.map(q => W(q[0], q[1], e[1])), true);
-      }
-    });
     Object.keys(GRUPOS).forEach(k => ponLineas(gEstr, lin[k], GRUPOS[k][0], GRUPOS[k][1], null, null));
     ponLineas(gEstr, lin.losas, 'estr-losas', 0x6f7a82, null, null);
     ponLineas(gEstr, lin.cubos, 'estr-cubos', 0xffffff, null, null);
-    ponLineas(gEstr, lin.entrepiso, 'estr-entrepiso', 0xb9a98a, null, null);
   }
 
   /* ===== 9. Estacionamiento: en rayos X (se ve a través del piso) ===== */
@@ -2001,7 +2012,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
         const pts = [];
         x.forEach(r => [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(q => {
           const u = r[0] + MEX[0] * q[0] * MOD.a / 2 + MEY[0] * q[1] * MOD.b / 2, v = r[1] + MEX[1] * q[0] * MOD.a / 2 + MEY[1] * q[1] * MOD.b / 2;
-          pts.push([(u - c[0]) * ea[0] + (v - c[1]) * ea[1], (u - c[0]) * eb[0] + (v - c[1]) * eb[1], MOD.z0 + (r[2] + 1) * MOD.alto]);
+          pts.push([(u - c[0]) * ea[0] + (v - c[1]) * ea[1], (u - c[0]) * eb[0] + (v - c[1]) * eb[1], MOD.z0 + r[2] * (MOD.paso || MOD.alto) + MOD.alto]);
         }));
         const a0 = Math.min(...pts.map(p => p[0])), a1 = Math.max(...pts.map(p => p[0])), b0 = Math.min(...pts.map(p => p[1])), b1 = Math.max(...pts.map(p => p[1]));
         // la altura de cada extremo: la más alta en su cuarto de la franja
@@ -2158,7 +2169,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (aisl) return aisl.caja;
     if (capas.nolli) return [S.u0 - 110, S.u1 + 110, S.v0 - 90, S.v1 + 90, 0, 1];
     if (capas.sol) return [CEN[0] - R_SOL, CEN[0] + R_SOL, CEN[1] - R_SOL, CEN[1] + R_SOL, 0, R_SOL];
-    if (GENERAL) return [S.u0, S.u1, S.v0, S.v1, 0, MOD ? MOD.z0 + 8 * MOD.alto : 14];
+    if (GENERAL) return [S.u0, S.u1, S.v0, S.v1, 0, MOD ? MOD.z0 + 7 * (MOD.paso || MOD.alto) + MOD.alto : 14];
     return cajaAp(ESC);
   }
   function cajaAp(ap) {

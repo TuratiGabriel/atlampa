@@ -16,8 +16,9 @@ Capas leídas:
   Estructura::Cubos de circulacion::B1…B8::{Estructura del cubo, Elevadores (volumen), Escalera (volumen)}
   Estructura::Losacero 12 cm (referencia)::B1…B8
   Módulos::entrepiso
-NO se leen (a propósito): «Estructura::Indicadores - no alcanza (cubo rojo)» (354 cubos con el índice
-de uso > 1: el usuario no los quiere en el visor; quedan en el .3dm), ni Módulos::* ni site::polygon.
+NO se leen (a propósito, 2026-10-13, el usuario): «Estructura::Indicadores - no alcanza (cubo rojo)» (354 cubos con
+el índice de uso > 1; quedan en el .3dm), los volúmenes de elevadores («Cubos de circulacion::Bn::Elevadores
+(volumen)») ni site::polygon. Los módulos van por prepara-modulos.py.
 
 Marco: el archivo está en METROS y en el marco de «nuevos bloques» (el mismo de prepara-modulos.py):
   u = x + 497.9956, v = y + 392.0994, z = z + 7.16
@@ -189,7 +190,7 @@ def main():
         elif lp.startswith('Estructura::Losacero 12 cm') and isinstance(g, r.Brep):
             losas[p[-1]].append([r3(x) for x in caja_girada(g)])
             cuenta['losacero'] += 1
-        elif lp.startswith('Estructura::Cubos de circulacion::') and isinstance(g, r.Brep):
+        elif lp.startswith('Estructura::Cubos de circulacion::') and isinstance(g, r.Brep) and not p[3].startswith('Elevadores'):
             cubos[p[2]].append([p[3].split(' ')[0].lower()] + [r3(x) for x in caja_girada(g)])
             cuenta['volumen de cubo'] += 1
         elif lp == 'Módulos::entrepiso' and isinstance(g, r.Extrusion):
