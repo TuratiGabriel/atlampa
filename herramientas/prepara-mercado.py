@@ -67,8 +67,9 @@ HOYO = {'D': TRAMO, 'franja': TRAMO / 4}
 HOYO['c'] = (549.755 - 2 * HOYO['franja'], (V_POSTES[6] + V_POSTES[7]) / 2)   # (546.57, 459.23)
 # 2026-10-12: ritmo nuevo (ver franjas_hoyo): 9 franjas de ⅛ de tramo; largo y corrimiento en v de cada una (m)
 HOYO['franja'] = TRAMO / 8
-HOYO['ritmo'] = [1.6, 3.4, 5.8, 7.4, 5.2, 6.6, 4.2, 2.6, 1.4]
-HOYO['corrido'] = [1.1, 0.5, -0.5, 0.0, 0.9, -0.7, 0.3, 1.2, -0.3]
+HOYO['franja'] = TRAMO / 4   # 2026-10-12 (Gabriel: minimizar el jardín): 3 franjas de ¼ de tramo
+HOYO['ritmo'] = [2.4, 3.8, 2.6]
+HOYO['corrido'] = [0.4, -0.3, 0.3]
 LLUVIA_ANG, Z_LLUVIA = 20.0, 9.3        # supuestos: lluvia con viento a 20°; cara de arriba de la cubierta en el hoyo
 # Niveles (relativos al 0.00 del mercado; en el visor + 0.2). Jardín inundable y
 # profundo: fondo −1.50, espejo de agua normal −0.45; se desborda hasta −0.20
@@ -90,6 +91,13 @@ Z_PISO, Z_VIGA, PERALTE, Z_PUNTAL = 0.2, 6.0, 0.5, 3.0
 COL, VIGA_B, PUNTAL, PAR = 0.30, 0.25, 0.15, 0.15                # secciones (m)
 JUNTA = 0.05                                                    # holgura con las columnas de la vivienda
 COLS_VIVIENDA = os.path.join(os.path.dirname(RAIZ), 'analisis', 'mercado', 'columnas_vivienda.json')
+# sin la carpeta del proyecto (colaboradores, sesiones en la nube): la copia que va en el repo, herramientas/columnas-vivienda.json
+COLS_REPO = os.path.join(AQUI, 'columnas-vivienda.json')
+
+
+def columnas_vivienda():
+    d = json.load(open(COLS_VIVIENDA if os.path.exists(COLS_VIVIENDA) else COLS_REPO, encoding='utf-8'))
+    return d['columnas'] if isinstance(d, dict) else d
 
 
 def malla_de(g):
@@ -382,7 +390,7 @@ def reticula(techo):
     """Acero del mercado (nave norte) y las columnas de la vivienda que lo cruzan.
     techo: triángulos originales de las cubiertas de la nave norte (para la altura)."""
     tris, lins = [], []
-    viv = [c for c in json.load(open(COLS_VIVIENDA)) if c['z0'] < 1 and adentro(c['u'], c['v'], 0)]
+    viv = [c for c in columnas_vivienda() if c['z0'] < 1 and adentro(c['u'], c['v'], 0)]
     rv = max(c['lado'] for c in viv) * math.sqrt(2) / 2 if viv else 0.3   # radio de la columna girada
     libre = rv + JUNTA + COL / 2                                          # de centro a centro, pegadas
     zc1 = Z_VIGA - PERALTE
@@ -533,7 +541,7 @@ def vidrio_aro(techos):
         for k in range(n):
             a = 2 * math.pi * k / n
             u, v = ARO[0] + math.cos(a) * CORTE, ARO[1] + math.sin(a) * CORTE
-            z = z_bajo(u, v, techo)
+            z = techo(u, v) if callable(techo) else z_bajo(u, v, techo)
             P.append((u, v, None if z is None else z - 0.02))
         # huecos de menos de 1 m (el canal del valle): la altura más baja de los lados
         for k in range(n):
@@ -559,9 +567,22 @@ def vidrio_aro(techos):
         for t in tramos:
             z0 = NIVEL(0)
             for p, q in zip(t, t[1:]):
-                tris.append(((p[0], p[1], z0), (q[0], q[1], z0), (q[0], q[1], q[2])))
-                tris.append(((p[0], p[1], z0), (q[0], q[1], q[2]), (p[0], p[1], p[2])))
-                marco.append(((p[0], p[1], z0), (q[0], q[1], z0)))
+                # tramos abiertos (VIDRIO_VANOS): el vidrio sólo queda fuera de [za, zb]
+                th = math.atan2((p[1] + q[1]) / 2 - ARO[1], (p[0] + q[0]) / 2 - ARO[0])
+                huecos = sorted((za, zb) for t0, t1, za, zb in VIDRIO_VANOS if t0 <= th <= t1)
+                tramos_z, ini = [], z0
+                for za, zb in huecos:
+                    if za > ini:
+                        tramos_z.append((ini, za))
+                    ini = max(ini, zb)
+                tramos_z.append((ini, None))
+                for ya, yb in tramos_z:
+                    pa_, qa_ = (yb if yb is not None else p[2]), (yb if yb is not None else q[2])
+                    if pa_ <= ya + 0.05 or qa_ <= ya + 0.05:
+                        continue
+                    tris.append(((p[0], p[1], ya), (q[0], q[1], ya), (q[0], q[1], qa_)))
+                    tris.append(((p[0], p[1], ya), (q[0], q[1], qa_), (p[0], p[1], pa_)))
+                    marco.append(((p[0], p[1], ya), (q[0], q[1], ya)))
                 marco.append(((p[0], p[1], p[2]), (q[0], q[1], q[2])))
                 if p[2] > VIDRIO_TRAVESANO and q[2] > VIDRIO_TRAVESANO:
                     marco.append(((p[0], p[1], VIDRIO_TRAVESANO), (q[0], q[1], VIDRIO_TRAVESANO)))
@@ -595,9 +616,11 @@ def vidrio_aro(techos):
 # cierran (se ve menos jardín) y se recortan donde llega la lluvia del hoyo.
 from shapely.geometry import Point, LineString, Polygon, box as caja2d
 from shapely.geometry.polygon import orient
-from shapely.ops import unary_union
+from shapely.ops import unary_union, transform as shp_transform
+from shapely.prepared import prep
 import random
 import shapely
+import numpy as np
 
 ZANJA_EXT = (522.585, 417.063, 558.545, 485.413)                              # borde exterior del canal perimetral
 CAJA_N = (522.585, 417.063, 558.545, 487.866)                                 # huella interior de la nave norte (hasta el muro norte)
@@ -618,7 +641,8 @@ MESAS_POR_PUESTO = 1.0   # (2026-10-12) proporción: una mesa (6 plazas) por pue
 # módulos de 5.5 × 4). Cada bloque es un claro, con las columnas en las esquinas:
 # dos filas de 4 puestos espalda con espalda (2 por módulo de 5.5 y 0.5 m en la
 # línea de la retícula); una fila abre al sur y otra al norte, cada una a su comedor.
-GV = math.radians(-10)
+GIRO = float(os.environ.get('ATLAMPA_GIRO', '0'))   # giro de la retícula de la vivienda/estacionamiento (0 = ortogonal a la nave)
+GV = math.radians(GIRO)
 CLARO = (11.0, 8.0)
 # (nombre, esquina a, esquina b del claro, hacia dónde abren las filas). B es el claro de Gabriel (su A cae casi
 # toda en el corte del aro: ahí va el comedor poniente de B); D, un claro al sureste; C, el suyo del noroeste un
@@ -631,7 +655,7 @@ BLOQUES = [('B', 447.52, 529.73, 'a'), ('D', 458.52, 521.73, 'b'), ('C', 436.52,
 # las plataformas ya no son las de Rhino; se arman por distancia a la orilla del jardín. Junto al agua, el piso
 # (+0.40); de ahí escalinatas de peralte 0.15 y huella 0.40 (NTC: ≤ 0.18 / ≥ 0.25) hasta cada terraza. Lejos del
 # jardín se llega a +2.40 (donde baja la cinta del aro). Los claros de puestos quedan planos, a su nivel.
-JARDIN_MAX = 200.0   # m² de jardín inundable (Gabriel, 2026-10-12)
+JARDIN_MAX = 110.0   # m² de jardín inundable (Gabriel, 2026-10-12)
 TERRAZAS = [(1.2, 1.00), (8.0, 1.60), (15.0, 2.40)]   # (distancia a la orilla del jardín donde arranca la escalinata, nivel de la terraza)
 ESCALON = (0.15, 0.40)                                 # peralte, huella
 MACETAS = 5                                            # pocas: árboles jóvenes en maceta en las terrazas con sol
@@ -1093,7 +1117,7 @@ def banos(S, L, pisos):
 
 
 def mercado_norte(m, capas):
-    viv = [c for c in json.load(open(COLS_VIVIENDA)) if c['z0'] < 1 and adentro(c['u'], c['v'], 0)]
+    viv = [c for c in columnas_vivienda() if c['z0'] < 1 and adentro(c['u'], c['v'], 0)]
     rng = random.Random(7)
     tan = math.tan(math.radians(LLUVIA_ANG))
     disco = Point(ARO).buffer(CORTE, 256)
@@ -1241,14 +1265,37 @@ def mercado_norte(m, capas):
 # conexión visual al mercado (sin puestos ni mesas). Una senda libre junto al
 # vidrio (y bajo la cinta), un estanque chico de humedal con bordillo para
 # sentarse, y estancias de bancas que miran al estanque, con un árbol joven atrás.
+# 2026-10-12 (Gabriel): del vidrio hacia el centro del aro, en franjas: circulación frente a los locales que abren al
+# patio, mesitas (una por local, con su mismo ritmo), otra circulación (con el anillo de columnas del aro), los humedales
+# como límite y, detrás, las bancas recreativas. Radios desde el centro del aro.
 PATIO = {'senda': 2.5,          # libre desde el corte (r 47) hacia adentro: ≥ 1.20 de paso, y la cinta encima (r 44.55–46.55)
+         # franjas (r0, r1). (2026-10-12, Gabriel: «más grueso el buffer de mesas, otra hilera; la circulación la veo grande»):
+         # antes 2.40 | una hilera en 2.00 | 4.00 con las columnas; ahora 1.80 | dos hileras de mesitas en tresbolillo en 3.60 |
+         # 3.00 con las columnas del aro. Libres reales: del vidrio a las mesitas 2.35 (adentro van las columnas de afuera del aro,
+         # r 46.12–46.92: quedan 1.47 entre ellas y las mesitas, NTC ≥ 1.10); de la 2a hilera a las columnas de adentro, 2.23
+         'circ1': (45.2, 47.0), 'mesas': (41.6, 45.2), 'circ2': (38.6, 41.6),
+         'hum_r': 36.4,         # radio del centro de los humedales (tangenciales, 12 × 4: de r 34.4 a 38.4)
+         'bancas_r': 33.4,      # las bancas, sólo de este radio hacia adentro
          'col': (38.9, 40.1),   # anillo de las columnas interiores del aro: sin bancas
-         'arriate': 1.6,        # franja plantada junto a los bordes rectos (muros de la nave, Heliotropo)
+         'hum': (12.0, 4.0), 'hum_alto': 1.0,   # humedales: 12 × 4 = 48 m², 1 m sobre el piso (Gabriel, 2026-10-12)
          'm2_banca': 32.0,      # una banca cada tantos m² de patio libre
          'tezontle': 0.03}      # (2026-10-12, Gabriel: «área abierta permeable», ref. bancas de lámina de colores sobre tezontle)
 HE_LIM_P = (401.0, 409.0)   # Heliotropo (v)
 NAVES_P = [(522.181, 417.865, 558.945, 488.266), (504.601, 323.588, 558.946, 396.78)]
 BANCAS_P = []   # [u, v, ángulo°, tipo] para los planos (planos-dwg.py)
+MESITA = {'lado': 0.70, 'banco': 0.34, 'sep': 0.62, 'r': 44.3, 'r2': 42.5}   # r: hilera de los locales; r2: la segunda, en tresbolillo   # mesita de 0.70 con dos bancos a los lados (a lo largo del arco)
+MESITAS_TH = []   # ángulo (rad) del centro de cada local que abre al patio (lo llenan las naves): una mesita por local
+VIDRIO_VANOS = []   # (θ0, θ1 en rad, z0, z1): tramos del vidrio del aro que se abren (locales al patio, llegadas de la cinta)
+
+
+def mesita(S, L, c, t, z):
+    """Mesita cuadrada (tablero a 0.75, pata central) con dos bancos a los lados; t = tangente al arco."""
+    M_ = MESITA
+    losa(S['mesa'], L['mesa'], rect_rot(c, t, M_['lado'], M_['lado']), z + 0.72, z + 0.75)
+    caja(S['mesa'], L['mesa'], c[0] - 0.04, c[1] - 0.04, z, c[0] + 0.04, c[1] + 0.04, z + 0.72)
+    for s_ in (-1, 1):
+        b = (c[0] + t[0] * s_ * M_['sep'], c[1] + t[1] * s_ * M_['sep'])
+        losa(S['mesa'], L['mesa'], rect_rot(b, t, M_['banco'], M_['banco']), z, z + 0.45)
 
 # Banca «onda»: soleras de acero de 5 cm cada 7 cm sobre dos largueros de tubo que siguen el perfil, y un patín
 # al piso (como las bancas de la referencia). Perfil z(x), x a lo largo de 2.20 m:
@@ -1292,38 +1339,85 @@ def banca_onda(S, L, c, ang, tipo, z0):
 
 def patios_aro(S, L, arboles):
     """Patios del corte del aro (2026-10-12, Gabriel): área abierta y permeable de tezontle, sin estanques;
-    arriates junto a los bordes rectos y bancas «onda» sueltas, en grupos de dos o tres con ángulos distintos."""
+    humedales rectangulares dispersos y bancas «onda» sueltas, en grupos de dos o tres con ángulos distintos."""
     P_ = PATIO
     rng = random.Random(11)
     disco = Point(ARO).buffer(CORTE, 256)
-    libre = Point(ARO).buffer(CORTE - P_['senda'], 256)
+    libre = Point(ARO).buffer(P_['bancas_r'], 256)
     cols = Point(ARO).buffer(P_['col'][1], 256).difference(Point(ARO).buffer(P_['col'][0], 256))
     calle = caja2d(400, HE_LIM_P[0], 700, HE_LIM_P[1])
-    res = {'m2': 0.0, 'tezontle_m2': 0.0, 'arriates_m2': 0.0, 'bancas': 0, 'plazas_sentado': 0}
+    res = {'m2': 0.0, 'tezontle_m2': 0.0, 'arriates_m2': 0.0, 'humedales': 0, 'mesitas': 0, 'bancas': 0, 'plazas_sentado': 0}
     bancas, n_arb = [], 0
     for nave in NAVES_P:
         for pat in poligonos(caja2d(*nave).intersection(disco).difference(calle)):
             res['m2'] += pat.area
-            # arriates: la franja junto a los bordes rectos (no la curva del vidrio, que es senda)
-            arr = pat.difference(pat.buffer(-P_['arriate'], join_style='mitre')).intersection(libre.buffer(-0.5))
-            arr = unary_union([q for q in poligonos(arr) if q.area > 3])
+            # humedales (Gabriel, 2026-10-12: 48 m² c/u, 2 por patio, 1 m de peralte, «para separar el uso de las mesas del de
+            # las banquitas recreativas»): 12 × 4 tangenciales al aro, dentro del anillo de columnas, a 1/3 y 2/3 del arco
+            # en que caben; entre ellos y en las puntas queda paso hacia las bancas.
+            for dims in (P_['hum'], (10.0, 4.8), (9.0, 48 / 9.0)):   # 48 m²: 12 × 4; si no caben dos, más cortos y anchos
+                rc = P_['col'][0] - 0.5 - dims[1] / 2
+                caben = []
+                for k in range(1440):
+                    th = -math.pi + 2 * math.pi * k / 1440
+                    t = (-math.sin(th), math.cos(th))
+                    q = rect_rot((ARO[0] + rc * math.cos(th), ARO[1] + rc * math.sin(th)), t, *dims)
+                    if pat.buffer(-0.6).contains(q) and not q.intersects(cols):
+                        caben.append((th, q))
+                hums = []
+                if caben:
+                    th0_, th1_ = caben[0][0], caben[-1][0]
+                    w_ = dims[0] / rc
+                    g_ = (th1_ - th0_ - w_) / 3   # mismos pasos en las puntas y entre los dos
+                    for ob in (th0_ + g_, th1_ - g_) if g_ > 0 else ((th0_ + th1_) / 2,):
+                        th, q = min(caben, key=lambda c: abs(c[0] - ob))
+                        if not any(q.buffer(PASILLO).intersects(h) for h in hums):
+                            hums.append(q)
+                if len(hums) >= 2:
+                    break
+            if len(hums) < 2:
+                print('OJO: sólo', len(hums), 'humedales en el patio', [round(x) for x in pat.bounds])
+            arr = unary_union(hums) if hums else Polygon()
+            INFO.setdefault('_patios', {'hums': [], 'mesitas': [], 'bancas': [], 'pat': []})
+            INFO['_patios']['hums'] += hums; INFO['_patios']['pat'].append(pat)
             tez = pat.difference(arr)
             S['humedal'] += tri_poligono(tez, NIVEL(0) + P_['tezontle'])
             res['tezontle_m2'] += tez.area
-            for q in poligonos(arr):
+            for q in hums:
                 res['arriates_m2'] += q.area
-                losa(S['humedal'], L['humedal'], q.difference(q.buffer(-0.12)), NIVEL(0), NIVEL(0) + 0.15)   # guarnición
+                res['humedales'] += 1
+                zt = NIVEL(0) + P_['hum_alto']
+                losa(S['humedal'], L['humedal'], q.difference(q.buffer(-0.20, join_style='mitre')), NIVEL(0), zt)   # muro de 20 cm, 1 m de peralte
+                S['agua_p'] += tri_poligono(q.buffer(-0.20, join_style='mitre'), zt - 0.15)                        # espejo de agua
                 u0, v0, u1, v1 = q.bounds
-                for _ in range(int(q.area * 2.5)):   # pastos y matas
+                for _ in range(int(q.area * 4)):   # juncos y carrizos
                     x, y = rng.uniform(u0, u1), rng.uniform(v0, v1)
-                    if q.buffer(-0.15).contains(Point(x, y)):
-                        h = rng.uniform(0.3, 1.0)
-                        L['junco'].append(((x, y, NIVEL(0) + 0.1), (x + rng.uniform(-0.12, 0.12), y + rng.uniform(-0.12, 0.12), NIVEL(0) + 0.1 + h)))
-                if n_arb < 8 and q.area > 12:
-                    pt = q.representative_point()
-                    arboles.append((pt.x, pt.y, NIVEL(0), rng.uniform(3.0, 4.5)))
+                    if q.buffer(-0.3).contains(Point(x, y)):
+                        h = rng.uniform(0.5, 1.4)
+                        L['junco'].append(((x, y, zt - 0.15), (x + rng.uniform(-0.12, 0.12), y + rng.uniform(-0.12, 0.12), zt - 0.15 + h)))
+                if n_arb < 8:
+                    c = q.centroid
+                    arboles.append((c.x, c.y, zt - 0.15, rng.uniform(3.0, 4.5)))
                     n_arb += 1
-            util = tez.intersection(libre).difference(cols).buffer(-0.5, join_style='mitre')
+            # juntas de piso donde cambia la franja (circulación | mesitas | circulación | humedales y bancas)
+            for r_ in (P_['circ1'][0], P_['mesas'][0], P_['circ2'][0]):
+                arco = LineString([(ARO[0] + r_ * math.cos(2 * math.pi * k / 720), ARO[1] + r_ * math.sin(2 * math.pi * k / 720)) for k in range(721)]).intersection(pat)
+                for g in getattr(arco, 'geoms', [arco]):
+                    if g.geom_type == 'LineString':
+                        c = list(g.coords)
+                        L['humedal'] += [((a[0], a[1], NIVEL(0) + P_['tezontle'] + 0.005), (b[0], b[1], NIVEL(0) + P_['tezontle'] + 0.005)) for a, b in zip(c, c[1:])]
+            # mesitas: una por cada local que abre al patio, en su mismo radio (mismo ritmo); la segunda hilera, a medio paso
+            # entre dos locales vecinos (tresbolillo)
+            dth_ = 2 * math.asin(CELDA[0] / 2 / R_VID)
+            ths_ = sorted(MESITAS_TH)
+            medios = [(a + b) / 2 for a, b in zip(ths_, ths_[1:]) if b - a < 1.5 * dth_]
+            for th, r_m in [(t_, MESITA['r']) for t_ in MESITAS_TH] + [(t_, MESITA['r2']) for t_ in medios]:
+                c = (ARO[0] + r_m * math.cos(th), ARO[1] + r_m * math.sin(th))
+                t = (-math.sin(th), math.cos(th))
+                if pat.buffer(-0.2).contains(rect_rot(c, t, 2 * MESITA['sep'] + MESITA['banco'], MESITA['lado'])):
+                    mesita(S, L, c, t, NIVEL(0) + P_['tezontle'])
+                    INFO['_patios']['mesitas'].append(rect_rot(c, t, 2 * MESITA['sep'] + MESITA['banco'], MESITA['lado']))
+                    res['mesitas'] += 1
+            util = tez.difference(arr.buffer(0.6)).intersection(libre).difference(cols).buffer(-0.5, join_style='mitre')
             if util.is_empty:
                 continue
             # bancas: centros de grupo repartidos (distancia mínima), 2–3 bancas por grupo con giros distintos
@@ -1349,26 +1443,27 @@ def patios_aro(S, L, arboles):
                         if util.contains(g) and not any(g.buffer(0.9).intersects(x) for x in bancas):
                             banca_onda(S, L, q, ang, tipo, NIVEL(0) + P_['tezontle'])
                             bancas.append(g)
+                            INFO['_patios']['bancas'].append(g)
                             BANCAS_P.append([round(q[0], 3), round(q[1], 3), round(ang, 2), tipo])
                             res['plazas_sentado'] += 2 if tipo == 'doble' else 1
                             break
     res['bancas'] = len(bancas)
     res = {k: (round(v, 1) if isinstance(v, float) else v) for k, v in res.items()}
-    senda = disco.difference(libre)   # la senda junto al vidrio queda libre
+    senda = disco.difference(libre)   # las franjas de circulación, mesitas y humedales quedan libres de bancas
     assert not any(b.intersects(senda) for b in bancas), 'banca en la senda'
     return res
 
 
-# ================= Nave sur (2026-10-12): la base del programa =================
+# ================= Nave sur (2026-10-12; mercado «barrio» 2026-10-12) =================
 # PB: carga y descarga en la esquina SE (los dos primeros tramos de postes desde el
 # muro sur; el camión de 7.5 t entra en reversa por la fachada este), un andén de
-# servicio a nivel medio (+1.20, la cama del camión), el biodigestor en la mitad
-# oeste de lo que no es circulación vehicular, y acuaponia en todo lo demás.
-# PA: UNA plataforma a +4.28 que nace donde llega la cinta del aro (esquina NE);
-# los puestos calzan la estructura (filas espalda con espalda en las líneas de
-# columnas de los valles, 2 puestos por tramo de postes); comedores y tarimas
-# con macetas en las crujías E y O; baños sobre el biodigestor y, tras un muro
-# ciego que reparte a izquierda y derecha, la escalera de servicio.
+# servicio a nivel medio (+1.20, la cama del camión) con su rampa dentro del patio de
+# servicio, el biodigestor, y la acuaponia como vitrina en la esquina SO. Todo lo demás
+# es mercado: manzanas cortas en aparejo (ver Barrio), la plaza del tragaluz (patio de
+# luz con la escalera abierta y la fonda), la plazuela de la vitrina, el borde del aro.
+# PA: UNA plataforma a +4.28 que nace donde llega la cinta del aro (esquina NE), con el
+# vacío del patio de luz; fondas y barras-mirador alrededor del vacío, terraza-mirador
+# junto al vidrio, manzanas; baños y servicio tras el muro ciego de lado a lado.
 # Todo editable aquí; cotas en u, v (m) y z del visor.
 SUR = {
     'int': (505.2, 324.2, 558.1, 396.0),            # caras interiores de los muros (o, s, e, n)
@@ -1380,21 +1475,75 @@ SUR = {
     'vehiculo': (543.0, 324.2, 558.1, 337.0),
     'anden_caja': (537.0, 324.6, 543.0, 336.6),     # andén de descarga (+1.20)
     'servicio': (530.5, 324.6, 537.0, 336.6),        # patio de servicio (PB): montacargas, base de la escalera
-    'montacargas': (534.4, 334.2, 536.8, 336.6),
+    'montacargas': (531.0, 333.4, 533.4, 335.8),     # abre al vestíbulo de servicio (PA) y al patio de servicio (PB) (2026-10-12: al oeste de la rampa)
     'biodigestor': (517.0, 324.6, 527.2, 336.6),     # mitad oeste de lo no vehicular (hasta la escalera de servicio)
     'tubo': 1.5,                                     # Ø de los biodigestores tubulares (medio enterrados)
-    'rampa': (537.4, 337.0, 539.8),                  # rampa de servicio del andén a la acuaponia (u0, v0, u1), al 8 %
+    # (2026-10-12) rampa de servicio DENTRO del patio de servicio, pegada al andén (u0, v0, u1): descanso a +1.20 junto al
+    # andén (v 324.6 → v0), baja al norte al 8 % con descanso a los 6 m y llega a +0.40 en la banda de macetas, donde arranca
+    # la calle de abasto. El abasto ya no baja en rampa dentro del mercado (Toyosu, Sydney: logística y público separados).
+    'rampa': (535.4, 326.1, 537.0),
+    # (2026-10-12, Gabriel: «es demasiada acuaponia y poco mercado») la acuaponia deja la crujía 1 (432 m²) y queda como
+    # VITRINA de producción en la esquina SO, bajo los baños de la PA, junto al biodigestor y al servicio; su cara norte es de
+    # vidrio hacia la plazuela de la vitrina: se ve trabajar, no se cruza (Toyosu / Sydney Fish Market).
+    'vitrina': (507.55, 324.6, 516.8, 337.4),
+    # (2026-10-12) acceso desde Clavel: un pasaje cubierto de 2.05 junto al muro oeste, con la vitrina de un lado (vidrio):
+    # se entra viendo trabajar la acuaponia y se llega a la plazuela de la vitrina, con su fonda
+    'pasaje_clavel': (505.35, 324.2, 507.4, 337.6),
     # PA
-    'baños': (518.0, 324.6, 527.0, 336.6),
-    'escalera': (527.6, 324.6, 530.4, 336.6),        # escalera de servicio (PB +0.40 → PA)
-    'muro_ciego': (516.0, 338.2, 532.0, 338.4),      # de frente a la llegada: reparte a baños (izq.) y servicio (der.)
-    'luz': (527.6, 345.2, 535.6, 383.0),             # vacío de luz sobre la acuaponia (con barandal)
-    'puesto': (3.3, 2.0),                            # 2 por tramo de postes (6.6): ≥ 4 m², lado ≥ 2 (NTC)
-    'cada': 4,                                       # cada 4 puestos, un paso transversal de 3.3
-    'filas': (513.5, 522.6, 540.7, 549.5),           # líneas de columnas con filas de puestos espalda con espalda (la 531.5 da al vacío de luz)
-    'tarimas': [((552.4, 352.0, 557.4, 358.6), 0.30), ((552.4, 365.2, 557.4, 371.8), 0.45), ((552.4, 378.4, 557.4, 385.0), 0.30),
-                ((506.0, 341.0, 511.0, 347.6), 0.45), ((506.0, 352.0, 511.0, 358.6), 0.30)],
-    'mesas_por_puesto': 1.5,                         # proporción: mesas por puesto de comida (≈ 2/3 de los puestos)
+    # (2026-10-12, Gabriel: «toda la potencia a los baños»): un muro ciego de lado a lado de la nave delimita la franja de
+    # servicios de la PA; un solo vano: a la derecha (oeste) los baños públicos, a la izquierda (este) la circulación
+    # vertical de servicio (escalera y montacargas) y los baños y vestidores de locatarios.
+    'muro_ciego': (505.2, 338.2, 558.1, 338.45), 'vano': (525.0, 527.4), 'muro_alto': 3.6, 'vano_alto': 2.7,
+    'vestibulo': (505.2, 335.8, 543.0, 338.2),      # pasillo detrás del muro, del vano a cada lado
+    # (2026-10-12, Gabriel: «los baños están algo grandes»): una franja de 4.10 libres a lo largo del vestíbulo (el módulo de
+    # baños de la nave norte) con mujeres, hombres, familiar accesible, lactario, primeros auxilios y aseo; atrás, sólo desde
+    # el servicio, bodegas, cámaras frías y orgánicos; la administración junto al montacargas
+    'banos_pub': (505.2, 331.4, 527.4, 335.8),
+    'servicio_pa': {'pasillo': (505.35, 324.35, 533.6, 326.2), 'cuartos_v': (326.35, 331.4), 'bodegas': 4,
+                    'admin': (533.6, 326.4, 537.0, 333.2)},
+    'locatarios': (537.2, 324.6, 542.8, 333.0),      # baños y vestidores de locatarios (sobre el andén)
+    'escalera': (527.6, 329.6, 530.4, 335.8),        # escalera de servicio (PB +0.40 → PA), llega al vestíbulo
+    # PB: banda de macetas entre la doble altura de la descarga y el mercado (con un paso: la calle de abasto)
+    'macetas': (517.0, 337.6, 558.1, 339.8), 'macetas_pasos': [(534.6, 537.6)],
+    # (2026-10-13) el jardín inundable del sur (sustituye la banda de macetas): ver mercado_sur
+    'jardin_sur': {'franja': (513.5, 337.6, 549.5, 339.8), 'esquina': (549.5, 337.6, 558.1, 344.0),
+                   'banqueta': (558.99, 337.6, 560.29, 344.0), 'paso': (534.6, 336.0, 537.6, 340.0)},
+    # ---- mercado «barrio» (2026-10-12, ver Barrio): manzanas cortas en aparejo sobre las líneas de postes ----
+    'espinas': [343.4 + 6.6 * k for k in range(8)],  # espinas de las filas (v): una por línea de postes, 343.4 … 389.6
+    'cols_u': (513.5, 522.6, 531.5, 540.7, 549.5),  # líneas de columnas (u): los pasajes van entre ellas, en aparejo
+    # patio de luz (San Antón): un vacío en la PA entre cuatro columnas, con la escalera abierta adentro (borde sur, sube
+    # al oeste) y un arriate con un árbol que crece por el vacío hacia el tragaluz de la cubierta (Nicolás Bravo)
+    'vacio': (531.5, 356.6, 540.7, 363.2), 'esc_vacio': (356.8, 358.6), 'arriate_vacio': ((536.1, 361.2), 2.8),
+    'ascensor': (529.1, 354.2, 531.3, 356.4),        # cubo del elevador accesible (cabina 1.50 × 1.50): esquina SO del vacío, junto a la llegada de la escalera
+    'calle_ns': (534.6, 339.8, 537.6, 353.3),        # calle de abasto: de la rampa al patio de luz
+    # ACCESOS (2026-10-12, Gabriel: «aún no queda claro el acceso»; San Antón: la escalera se ve desde la puerta; Huimanguillo y
+    # Matamoros: de la calle a la plaza; Sydney: escaleras que conectan la calle con lo alto; Toyosu: la carga, aparte):
+    #  · Sabino (principal): en el eje del patio de luz; el pasillo entre las filas 3 y 4 es el pasaje de entrada y remata en
+    #    el árbol y la escalera del vacío; de ahí la plaza sigue a la boca del patio del aro (calle → mercado → aro).
+    #  · Heliotropo (paso peatonal): plazuela en la esquina NE con una escalera a la PA, donde llega la cinta del aro.
+    #  · Clavel: el pasaje de la vitrina. · El patio del aro: la boca de la plaza y los pasos del borde. · Carga: SE, Sabino.
+    'puerta_e': (358.25, 361.55),                    # Sabino (v): 3.30, en el eje del vacío (v 359.9)
+    'puerta_n': (552.4, 557.4),                      # Heliotropo (u), en el muro norte
+    'esc_heliotropo': (556.3, 386.2, 558.0, 393.6),  # escalera PB → PA pegada al muro este: arranca junto a la puerta, sube al sur
+    # plazuelas de PB (Huimanguillo, Matamoros: los puestos dan a una plaza; la del tragaluz abre su boca al patio del aro)
+    # (la del tragaluz es una sola plaza con la fonda del lado del acceso este; su boca, sólo frente al vacío)
+    'plazas_pb': {'tragaluz': [(527.0, 353.3, 548.0, 366.5)],
+                  'boca': [(531.5, 362.0, 540.7, 382.0)],
+                  'vitrina': [(505.2, 337.6, 517.4, 348.3)], 'heliotropo': [(545.5, 383.8, 558.1, 396.0)]},   # (2026-10-13: +1.00 al norte, que el jardín llega a la vitrina y la fonda no cabía)
+    'racimos_pb': {'vitrina': (510.9, 343.4)},       # fonda con barra (Tepotzotlán); la plaza del tragaluz queda libre en el eje
+    'arriates_pb': [((528.8, 364.6), 2.0), ((543.6, 355.2), 1.8), ((543.6, 364.6), 1.8), ((552.6, 389.4), 1.8)],
+    # PA: las fondas alrededor del vacío (Markthal, Mercado Roma: un motivo para subir), terraza-mirador junto al vidrio
+    'plazas_pa': {'balcon': [(517.0, 352.6, 553.2, 366.4)], 'boca': [(531.5, 362.0, 540.7, 390.0)], 'cinta': [(545.0, 383.4, 558.1, 396.0)], 'vano': [(520.6, 338.45, 531.8, 342.4)]},
+    'racimos_pa': 4,                                 # (caben 2: uno a cada lado del vacío)
+    # (2026-10-13, Gabriel: «mejor deja como estaban los locales pero añádeles más espacios para respirar») respiros de pasillo
+    # (ver respiros_fila): tsuboniwa abajo, vacío y puente entre copas arriba, módulo alto translúcido encima
+    'respiros': 3,
+    # (2026-10-13, Gabriel: «que el buffer que divide carga y mercado sea doble altura, o tenga un árbol que conviva con el
+    # piso de arriba, así como tsuboniwa») ranura de 1.40 abierta en la PA sobre el jardín, pegada al muro ciego (los árboles
+    # de la franja suben por ella; tragaluz corrido encima; puente en el vano) y la esquina del jardín a doble altura
+    'ranura': (513.5, 338.45, 549.5, 339.85), 'doble_altura': (549.5, 338.45, 558.1, 344.0),
+    'arriates_pa': [((553.6, 390.6), 2.0)],          # (los de junto al vano se quitan: ahí suben los árboles de la ranura)
+    'terraza': 3.4,                                  # PA: franja junto al vidrio (barra-mirador al patio + paseo)
     # acuaponia (supuestos: cultivo flotante)
     'tanques_frac': 1 / 3, 'tanque_prof': 1.2, 'kg_m3': 40.0, 'cosechas_peces': 2, 'lechuga_m2': 20, 'ciclos_lechuga': 52 / 5,
     'otras_kg_m2': 8.0, 'otras_frac': 0.30, 'lluvia_m': 0.80, 'escurre': 0.85,
@@ -1420,63 +1569,174 @@ def tubo(tris, lins, a, b, r, n=10):
             tris.append((C[0], C[k], C[k + 1]) if s > 0 else (C[0], C[k + 1], C[k]))
 
 
+def recinto(S, L, k, g, z, puerta=None, H=3.0, e=0.12):
+    """Cuarto cerrado (muros de e en el contorno de la caja g = (u0, v0, u1, v1)) con una puerta: (lado 's'|'n'|'o'|'e', x0, x1)
+    con dintel a 2.10."""
+    u0, v0, u1, v1 = g
+    lados = {'s': ((u0, v0), (u1, v0), 0), 'n': ((u0, v1 - e), (u1, v1 - e), 0), 'o': ((u0, v0), (u0, v1), 1), 'e': ((u1 - e, v0), (u1 - e, v1), 1)}
+    for nom, (a, b, eje) in lados.items():
+        tramos = [(a[eje], b[eje])]
+        if puerta and puerta[0] == nom:
+            tramos = [(a[eje], puerta[1]), (puerta[2], b[eje])]
+            x0, x1 = puerta[1], puerta[2]
+            if eje == 0:
+                caja(S[k], L[k], x0, a[1], z + 2.1, x1, a[1] + e, z + H)
+            else:
+                caja(S[k], L[k], a[0], x0, z + 2.1, a[0] + e, x1, z + H)
+        for t0, t1 in tramos:
+            if t1 - t0 < 0.02:
+                continue
+            if eje == 0:
+                caja(S[k], L[k], t0, a[1], z, t1, a[1] + e, z + H)
+            else:
+                caja(S[k], L[k], a[0], t0, z, a[0] + e, t1, z + H)
+    return caja2d(u0, v0, u1, v1)
+
+
+def banos_publicos(S, L, caja_, z, _):
+    """Baños públicos de la nave sur (PA) en el módulo de 4.10 libres (cubículo accesible 1.70 + circulación 0.90 + lavabos
+    1.50, el de la nave norte), en una franja a lo largo del vestíbulo, detrás del muro ciego. (2026-10-12, Gabriel: «están
+    algo grandes»): del tamaño que pide la norma con holgura (antes 222 m²); en la misma franja, el sanitario familiar, el
+    lactario y primeros auxilios; atrás, bodegas y cámaras de los locatarios (servicios_pa). Cada recinto entra en codo
+    desde el vestíbulo (mampara: no se ve el interior, NTC 3.1.4.1 b); cubículos contra el muro de atrás, lavabos del lado
+    del vestíbulo."""
+    u0, v0, u1, v1 = caja_   # v1: el vestíbulo
+    e, H = 0.15, 3.0
+    ocup = 1839 / 3.0 + 2358 / 5.6   # PB de mercado y PA de la nave sur (ver resumen): para la tabla 3.1.1.1
+    req, dis, _m = banos_ntc(ocup)
+    B = BANO
+    largo = [('mujeres', B['vest'] + B['acc'] + (dis['M_inodoros'] - 1) * B['wc']),
+             ('hombres', B['vest'] + B['acc'] + (dis['H_inodoros'] - 1) * B['wc'] + dis['H_mingitorios'] * B['ming']),
+             ('familiar', 2.6), ('lactario', 2.6), ('primeros auxilios', 3.0), ('aseo', 1.4)]
+    vi0, vi1 = v0 + e, v1 - e
+    rec, x = [], u0 + e
+    caja(S['local'], L['local'], u0, v0, z, u0 + e, v1, z + H)                 # muro oeste
+    for nom, w in largo:
+        rec.append((nom, x, x + w))
+        x += w + e
+    caja(S['local'], L['local'], u0, v0, z, x, vi0, z + H)                     # muro de atrás
+    for nom, a, b in rec:
+        pu = (b - 1.25, b - 0.25) if nom in ('mujeres', 'hombres') else (a + 0.25, a + 1.25) if b - a >= 1.9 else (a + 0.1, b - 0.1)
+        caja(S['local'], L['local'], a, vi1, z, pu[0], v1, z + H)             # muro al vestíbulo, con su puerta y dintel
+        caja(S['local'], L['local'], pu[1], vi1, z, b, v1, z + H)
+        caja(S['local'], L['local'], pu[0], vi1, z + 2.1, pu[1], v1, z + H)
+        caja(S['local'], L['local'], b, v0, z, b + e, v1, z + H)              # muro divisorio
+        if nom in ('mujeres', 'hombres'):
+            caja(S['local'], L['local'], b - B['vest'], vi1 - 1.5, z, b - B['vest'] + 0.06, vi1 - 0.9, z + 2.1)   # mampara del codo
+            caja(S['local'], L['local'], b - B['vest'], vi1 - 1.5, z, b - 0.1, vi1 - 1.44, z + 2.1)
+            n_wc = dis['M_inodoros'] if nom == 'mujeres' else dis['H_inodoros']
+            xx = b - B['vest']
+            for k, w in enumerate([B['acc']] + [B['wc']] * (n_wc - 1)):            # cubículos contra el muro de atrás
+                fondo = B['acc'] if k == 0 else 1.50
+                x0 = xx - w
+                caja(S['local'], L['local'], x0 - 0.02, vi0, z + 0.15, x0 + 0.02, vi0 + fondo, z + 2.0)
+                L['local'].append(((x0 + 0.05, vi0 + fondo, z + 2.0), (xx - 0.05, vi0 + fondo, z + 2.0)))
+                caja(S['local'], L['local'], (x0 + xx) / 2 - 0.2, vi0, z, (x0 + xx) / 2 + 0.2, vi0 + 0.65, z + 0.45)   # inodoro
+                xx = x0
+            if nom == 'hombres':
+                for k in range(dis['H_mingitorios']):
+                    xm = xx - B['ming'] * (k + 0.5)
+                    caja(S['local'], L['local'], xm - 0.2, vi0, z + 0.6, xm + 0.2, vi0 + 0.35, z + 1.25)
+                    caja(S['local'], L['local'], xm - B['ming'] / 2, vi0, z + 0.3, xm - B['ming'] / 2 + 0.04, vi0 + 0.45, z + 1.5)
+            n_lav = dis['M_lavabos'] if nom == 'mujeres' else dis['H_lavabos']
+            caja(S['local'], L['local'], a + 0.1, vi1 - 0.55, z + 0.80, a + 0.1 + 0.8 * n_lav, vi1, z + 0.85)   # barra de lavabos
+        elif nom == 'familiar':
+            caja(S['local'], L['local'], b - 0.95, vi0, z, b - 0.15, vi0 + 0.65, z + 0.45)        # inodoro con barras
+            caja(S['local'], L['local'], a + 0.1, vi0 + 0.2, z + 0.85, a + 0.65, vi0 + 1.4, z + 0.90)   # cambiador
+            caja(S['local'], L['local'], b - 0.9, vi1 - 0.55, z + 0.80, b - 0.1, vi1, z + 0.85)   # lavabo
+        elif nom == 'lactario':
+            caja(S['local'], L['local'], a + 0.3, vi0 + 0.3, z, a + 1.1, vi0 + 1.1, z + 0.45)      # sillón
+            caja(S['local'], L['local'], b - 0.65, vi0, z, b - 0.1, vi0 + 1.6, z + 0.9)           # barra con tarja y refrigerador
+        elif nom == 'primeros auxilios':
+            caja(S['local'], L['local'], a + 0.4, vi0 + 0.3, z, a + 1.1, vi0 + 2.2, z + 0.75)      # camilla
+            caja(S['local'], L['local'], b - 0.6, vi0, z, b - 0.1, vi0 + 1.8, z + 0.9)            # mueble
+        elif nom == 'aseo':
+            caja(S['local'], L['local'], a + 0.2, vi0, z, a + 0.8, vi0 + 0.6, z + 0.9)            # tarja
+    recs = [(caja2d(a, v0, b, v1), nom) for nom, a, b in rec]
+    return {'NTC': req, 'proyecto': dict(dis, familiar=1, lactario=1, primeros_auxilios=1, aseo=1), 'ocupantes': round(ocup),
+            'm2_franja': round((x - u0) * (v1 - v0), 1), 'antes_m2': 222, 'recintos': recs}
+
+
+def servicios_pa(S, L, z, u_fin):
+    """Atrás de los baños, sólo desde el servicio: un pasillo pegado al muro de Clavel lleva del montacargas a las bodegas de
+    los locatarios, a las cámaras de refrigeración y congelación y al cuarto de orgánicos (bajan directo al biodigestor, que
+    está abajo); la administración, junto al montacargas y a los locatarios (Toyosu / Sydney: la logística no se cruza
+    con el público). Devuelve [(polígono, nombre)]."""
+    P_ = SUR['servicio_pa']
+    pu0, pv0, pu1, pv1 = P_['pasillo']
+    c0, c1 = P_['cuartos_v']
+    caja(S['local'], L['local'], SUR['int'][0], SUR['int'][1], z, SUR['locatarios'][0], pv0, z + 3.0)   # muro a Clavel (la PA llega a la fachada)
+    out, x = [], pu0
+    # (2026-10-13: las cámaras y los residuos bajaron a la PB, donde estaba el biodigestor; aquí sólo bodegas y limpieza)
+    n_b = int((u_fin - pu0 - 1.8) / 2.5)
+    for nom, w in [('bodega', 2.5)] * n_b + [('limpieza', 1.8)]:
+        if x + w > u_fin:
+            break
+        e = 0.12
+        g = recinto(S, L, 'local', (x, c0, x + w, c1), z, ('s', x + 0.3, x + min(1.3, w - 0.3)), e=e)
+        out.append((g, nom))
+        x += w
+    out.append((recinto(S, L, 'local', P_['admin'], z, ('n', P_['admin'][0] + 0.4, P_['admin'][0] + 1.4)), 'administración'))
+    a0, b0, a1, b1 = P_['admin']
+    caja(S['local'], L['local'], a0 + 0.5, b0 + 0.5, z, a0 + 2.1, b0 + 1.2, z + 0.75)   # escritorio
+    caja(S['local'], L['local'], a0 + 0.6, b0 + 3.0, z, a1 - 0.6, b0 + 4.2, z + 0.75)    # mesa de juntas de locatarios
+    out.append((caja2d(pu0, pv0, pu1, pv1), 'pasillo de servicio'))
+    return out
+
+
 def mercado_sur():
     P_ = SUR
     rng = random.Random(5)
-    S = {k: [] for k in ('piso', 'anden', 'bio', 'tanque', 'cama', 'agua', 'pa', 'local', 'mesa', 'muro', 'tarima', 'maceta', 'columna', 'escalera')}
-    L = {k: [] for k in ('piso', 'anden', 'bio', 'tanque', 'cama', 'pa', 'local', 'mesa', 'muro', 'tarima', 'maceta', 'columna', 'escalera', 'baranda', 'planta', 'pasto')}
+    S = {k: [] for k in ('piso', 'anden', 'bio', 'tanque', 'cama', 'agua', 'pa', 'local', 'mesa', 'muro', 'tarima', 'maceta', 'columna', 'escalera', 'cubo', 'local_pb', 'mesa_pb', 'jardinera', 'jardin')}
+    L = {k: [] for k in ('piso', 'anden', 'bio', 'tanque', 'cama', 'pa', 'local', 'mesa', 'muro', 'tarima', 'maceta', 'columna', 'escalera', 'baranda', 'planta', 'pasto', 'cubo', 'local_pb', 'mesa_pb', 'jardinera')}
     arboles = []
     disco = Point(ARO).buffer(CORTE + 0.3, 256)
     nave = caja2d(*P_['int']).difference(disco)
     z0, za, zp, e = P_['piso'], P_['anden'], P_['pa'], P_['losa']
-    # ---- PB ----
+    W, F = CELDA
+    I0, I1, I2, I3 = P_['int']
+    # ---- PB: servicio (carga, andén, rampa, montacargas, biodigestor) ----
     losa(S['piso'], L['piso'], nave, NIVEL(0), z0)
     rayas(L['piso'], caja2d(*P_['vehiculo']), z0 + 0.005, 3.5, eje=1, desfase=P_['vehiculo'][1])   # el cajón de carga
     caja(S['anden'], L['anden'], *P_['anden_caja'][:2], z0, *P_['anden_caja'][2:], za)
-    for k in range(4):   # escalones del andén al patio de servicio (peralte 0.20 → 4 de 0.20; huella 0.30)
-        u = P_['anden_caja'][0] - 0.3 * (k + 1)
-        caja(S['anden'], L['anden'], u, 324.6, z0, u + 0.3, 327.6, za - 0.2 * (k + 1))
     caja(S['anden'], L['anden'], *P_['montacargas'][:2], z0, *P_['montacargas'][2:], zp + 2.4)   # cubo del montacargas
-    # rampa de servicio: del andén (+1.20) a la acuaponia (+0.40) al 8 %, con descanso a los 6 m
+    # rampa de servicio: descanso a +1.20 pegado al andén, baja al norte al 8 % (descanso de 1.50 a los 6 m) hasta +0.40
     u0r, v0r, u1r = P_['rampa']
-    caida = za - z0
-    t1 = min(6.0, caida / 0.08)
-    v1 = v0r + t1; zm = za - t1 * 0.08
-    v2 = v1 + 1.5; v3 = v2 + (zm - z0) / 0.08
+    caja(S['anden'], L['anden'], u0r, P_['anden_caja'][1], z0, u1r, v0r, za)
+    zm = za - 6.0 * 0.08
+    v1 = v0r + 6.0; v2 = v1 + 1.5; v3 = v2 + (zm - z0) / 0.08
     for (va, zA), (vb, zB) in (((v0r, za), (v1, zm)), ((v1, zm), (v2, zm)), ((v2, zm), (v3, z0))):
-        Pp = [(u0r, va, zA - 0.15), (u1r, va, zA - 0.15), (u1r, vb, zB - 0.15), (u0r, vb, zB - 0.15), (u0r, va, zA), (u1r, va, zA), (u1r, vb, zB), (u0r, vb, zB)]
-        prisma8(S['anden'], L['anden'], Pp)
-        for u in (u0r, u1r):
-            for h in (0.1, 0.5, BARANDAL):
-                L['baranda'].append(((u, va, zA + h), (u, vb, zB + h)))
-    rampa_huella = caja2d(u0r - 0.2, v0r, u1r + 0.2, v3 + 1.2)
-    # biodigestor: tubos de geomembrana a lo largo de u, medio enterrados, y su gasómetro
-    b0, b1 = P_['biodigestor'][1], P_['biodigestor'][3]
-    n_t = int((b1 - b0) / (P_['tubo'] + 1.6))
-    vs_t = [b0 + (b1 - b0) * (k + 0.5) / n_t for k in range(n_t)]
-    for v in vs_t:
-        tubo(S['bio'], L['bio'], (P_['biodigestor'][0] + 0.6, v, z0), (P_['biodigestor'][2] - 0.6, v, z0), P_['tubo'] / 2)
-    vol_bio = n_t * math.pi * (P_['tubo'] / 2) ** 2 * (P_['biodigestor'][2] - P_['biodigestor'][0] - 1.2) * 0.75   # 3/4 líquido, 1/4 gas
-    # acuaponia: lo que queda de la PB al norte de la carga, sin la rampa
-    acu = nave.difference(caja2d(P_['int'][0], P_['int'][1], P_['int'][2], 337.6)).difference(rampa_huella)
-    util = acu.buffer(-0.6, join_style='mitre')
-    A_acu = acu.area
+        prisma8(S['anden'], L['anden'], [(u0r, va, z0), (u1r, va, z0), (u1r, vb, z0), (u0r, vb, z0), (u0r, va, zA), (u1r, va, zA), (u1r, vb, zB), (u0r, vb, zB)])
+        for h in (0.1, 0.5, BARANDAL):
+            L['baranda'].append(((u0r, va, zA + h), (u0r, vb, zB + h)))   # (el otro lado es el andén)
+    # (2026-10-13, Gabriel: se quita el biodigestor) en su lugar, junto a la descarga y con puertas a un pasillo de servicio
+    # al este: las cámaras de refrigeración y congelación, el cuarto de residuos separados y una bodega húmeda
+    bu0, bv0, bu1, bv1 = P_['biodigestor']
+    cuartos_pb, y = [], bv0
+    for nom, d in (('cámara de refrigeración', 4.4), ('cámara de congelación', 3.4), ('residuos: orgánicos, inorgánicos, reciclables', 2.4), ('bodega húmeda', 1.8)):
+        g = recinto(S, L, 'cubo', (bu0, y, bu1 - 1.2, y + d), z0, ('e', y + 0.3, y + min(1.3, d - 0.3)), e=0.20 if nom.startswith('cámara') else 0.12)
+        cuartos_pb.append((g, nom))
+        y += d
+    cuartos_pb.append((caja2d(bu1 - 1.2, bv0, bu1, bv1), 'pasillo de servicio'))
+    n_t, vol_bio = 0, 0.0
+    # ---- acuaponia: vitrina de producción en la esquina SO (ver SUR['vitrina']) ----
+    vu0, vv0, vu1, vv1 = P_['vitrina']
+    vit = caja2d(*P_['vitrina'])
+    util = vit.buffer(-0.6, join_style='mitre')
+    A_acu = vit.area
     A_cult_obj = A_acu * 0.75 / (1 + P_['tanques_frac'])   # 25 % circulación; tanques = 1/3 del cultivo
-    # tanques de peces al sur (junto al servicio: alimento y cosecha), camas flotantes al norte; ambos a lo largo de v
     A_t = A_c = 0.0
-    u = P_['int'][0] + 1.0
     camas, tanques = [], []
-    while u + 1.2 < P_['int'][2] - 0.8:
-        franja = util.intersection(caja2d(u, 337.6, u + 1.2, 400))
-        for p in poligonos(franja):
+    u = vu0 + 0.9
+    while u + 1.2 < vu1 - 0.6:   # franjas de 1.20 a lo largo de v: tanque de peces al sur (junto al servicio), camas al norte (a la vista)
+        for p in poligonos(util.intersection(caja2d(u, vv0, u + 1.2, vv1))):
             p0, q0, p1, q1 = p.bounds
             if q1 - q0 < 2:
                 continue
-            corte_t = q0 + 6.6   # el primer tramo de cada franja: tanque
             if A_t < A_cult_obj * P_['tanques_frac']:
-                t = p.intersection(caja2d(p0, q0, p1, corte_t))
+                t = p.intersection(caja2d(p0, q0, p1, q0 + 4.0))
                 tanques.append(t); A_t += t.area
-                p = p.difference(caja2d(p0, q0, p1, corte_t + 0.9))
+                p = p.difference(caja2d(p0, q0, p1, q0 + 4.9))
             for q in poligonos(p):
                 camas.append(q); A_c += q.area
         u += 1.2 + 0.9
@@ -1486,146 +1746,279 @@ def mercado_sur():
     for q in camas:
         losa(S['cama'], L['cama'], q.difference(q.buffer(-0.06)), z0, z0 + 0.6)
         S['agua'] += tri_poligono(q.buffer(-0.06), z0 + 0.5) if q.buffer(-0.06).area > 0.1 else []
-        p0, q0, p1, q1 = q.bounds   # lechugas: un brote cada 0.45 (en el dibujo; la cuenta va con 20/m²)
+        p0, q0, p1, q1 = q.bounds
         y = q0 + 0.25
         while y < q1 - 0.2:
             for x in (p0 + 0.3, p1 - 0.3):
                 if q.contains(Point(x, y)):
                     L['planta'] += [((x, y, z0 + 0.5), (x - 0.12, y, z0 + 0.72)), ((x, y, z0 + 0.5), (x + 0.12, y, z0 + 0.72))]
             y += 0.45
-    # ---- PA: una sola plataforma ----
+    # muros de la vitrina: el este (al biodigestor) hasta la losa; el norte (a la plazuela) y el oeste (al pasaje de Clavel),
+    # de vidrio: antepecho, parteluces y cerramiento
+    caja(S['cubo'], L['cubo'], vu1, vv0, z0, vu1 + 0.15, vv1 + 0.15, zp - e)
+    caja(S['cubo'], L['cubo'], vu0 - 0.15, vv1, z0, vu1, vv1 + 0.15, z0 + 0.5)
+    caja(S['cubo'], L['cubo'], vu0 - 0.15, vv1, z0 + 3.0, vu1, vv1 + 0.15, zp - e)
+    caja(S['cubo'], L['cubo'], vu0 - 0.15, vv0, z0, vu0, vv1, z0 + 0.5)
+    caja(S['cubo'], L['cubo'], vu0 - 0.15, vv0, z0 + 3.0, vu0, vv1, zp - e)
+    x = vu0
+    while x <= vu1 + 1e-6:
+        L['cubo'].append(((x, vv1 + 0.075, z0 + 0.5), (x, vv1 + 0.075, z0 + 3.0)))
+        x += 1.2
+    y = vv0
+    while y <= vv1 + 1e-6:
+        L['cubo'].append(((vu0 - 0.075, y, z0 + 0.5), (vu0 - 0.075, y, z0 + 3.0)))
+        y += 1.2
+    rayas(L['piso'], caja2d(*P_['pasaje_clavel']), z0 + 0.005, 0.6, eje=1)   # el pasaje de Clavel
+    # ---- PB: jardín inundable del sur (2026-10-13, Gabriel: «uno de 120 m² que conecte las esquinas más al sur de los
+    # locales; en la esquina que colinda a la calle, que dé fachada verde; ese buffer dividirá la descarga»; «debe salir
+    # del predio y rematar internamente»; «llega a la vitrina»): franja de 2.20 de la cumbre 513.5 (remate con árbol en la
+    # plazuela de la vitrina) a la cumbre 549.5, la esquina hasta el muro de Sabino y la línea de postes 344.0 (celosía
+    # verde en el muro) y una jardinera en la banqueta frente a ella; la cruza el paso de abasto (a nivel) ----
+    J_ = P_['jardin_sur']
+    paso = caja2d(*J_['paso'])
+    banda = unary_union([caja2d(*J_['franja']), caja2d(*J_['esquina'])]).difference(paso)
+    ranura, esq2 = caja2d(*P_['ranura']), caja2d(*P_['doble_altura'])
+    arboles.append((esq2.centroid.x, (J_['esquina'][1] + esq2.bounds[3]) / 2 - 0.4, Z_AGUA, 8.5))   # el de la doble altura
+    for x in (518.5, 529.6, 539.6, 545.6):   # uno por crujía bajo la ranura (no en el puente del vano ni en el paso): suben a la PA
+        arboles.append((x, (ranura.bounds[1] + J_['franja'][3]) / 2, Z_AGUA, rng.uniform(6.5, 7.5)))
+    m_bar_j = jardin_inundable(S, L, banda, z0, 'jardin', 'agua', 'planta', arboles, rng, n_arboles=1,
+                               sin_barandal=LineString([(I2, 300), (I2, 400)]).buffer(0.06), alto=(6.0, 7.5))   # suben por la ranura
+    arboles.append((J_['franja'][0] + 1.1, (J_['franja'][1] + J_['franja'][3]) / 2, Z_AGUA, 6.0))   # el remate (también sube por la ranura)
+    q = caja2d(*J_['banqueta'])
+    t = q.buffer(-0.1, join_style='mitre')
+    losa(S['jardinera'], L['jardinera'], q.difference(t), NIVEL(0), NIVEL(0) + 0.45)
+    S['jardinera'] += tri_poligono(t, NIVEL(0) + 0.38)
+    for _ in range(60):
+        x, y = rng.uniform(t.bounds[0], t.bounds[2]), rng.uniform(t.bounds[1], t.bounds[3])
+        L['planta'].append(((x, y, NIVEL(0) + 0.38), (x + rng.uniform(-0.15, 0.15), y + rng.uniform(-0.15, 0.15), NIVEL(0) + 0.38 + rng.uniform(0.3, 0.9))))
+    arboles.append((q.centroid.x, q.centroid.y, NIVEL(0) + 0.38, 3.2))
+    # ---- PB: mercado «barrio» (ver Barrio) ----
+    mer = nave.intersection(caja2d(I0, 337.6, I2, 400))
+    piso_m = mer.difference(banda)
+    cols_s = [(u, v) for u in P_['cols_u'] for v in P_['postes'][1:-1] if nave.buffer(-0.3).contains(Point(u, v))]
+    cols_m = [c for c in cols_s if mer.buffer(-0.3).contains(Point(c))]
+    S_m, L_m = {'local': [], 'mesa': []}, {'local': [], 'mesa': []}
+    # patio de luz: escalera abierta adentro (dos tiros de 11 peraltes de 0.176 ≤ 0.18 y huellas de 0.28 ≥ 0.25, descanso
+    # de 1.80; sube al oeste y llega a la PA en el borde oeste del vacío), elevador junto al vacío, el árbol en su arriate
+    vac = caja2d(*P_['vacio'])
+    asc = caja2d(*P_['ascensor'])
+    losa(S['cubo'], L['cubo'], asc, z0, zp + 2.8)
+    ev0, ev1 = P_['esc_vacio']
+    n_p, hu_p, desc = 22, 0.28, 1.80
+    h_p = (zp - z0) / n_p
+    u_top = P_['vacio'][0]
+    ud = u_top + 10 * hu_p + desc          # donde arranca el descanso (lado este)
+    u_bot = ud + 10 * hu_p                  # arranque del primer tiro
+    for kk in range(10):
+        ua = u_bot - (kk + 1) * hu_p        # tiro 1: huellas flotadas de 0.18 (escalera abierta: se ve a través)
+        losa(S['escalera'], L['escalera'], caja2d(ua, ev0, ua + hu_p, ev1), z0 + (kk + 1) * h_p - 0.18, z0 + (kk + 1) * h_p)
+        ua = ud - desc - (kk + 1) * hu_p    # tiro 2
+        losa(S['escalera'], L['escalera'], caja2d(ua, ev0, ua + hu_p, ev1), z0 + (12 + kk) * h_p - 0.18, z0 + (12 + kk) * h_p)
+    z_d = z0 + 11 * h_p
+    losa(S['escalera'], L['escalera'], caja2d(ud - desc, ev0, ud, ev1), z_d - 0.2, z_d)
+    caja(S['escalera'], L['escalera'], ud - desc / 2 - 0.08, (ev0 + ev1) / 2 - 0.08, z0, ud - desc / 2 + 0.08, (ev0 + ev1) / 2 + 0.08, z_d - 0.2)   # poste del descanso
+    for vv in (ev0 + 0.03, ev1 - 0.03):   # zancas (líneas) y pasamanos a 0.90
+        for (pa_, za_), (pb_, zb_) in (((u_bot, z0), (ud, z_d)), ((ud, z_d), (ud - desc, z_d)), ((ud - desc, z_d), (u_top, zp))):
+            L['escalera'].append(((pa_, vv, za_ - 0.1), (pb_, vv, zb_ - 0.1)))
+            L['baranda'].append(((pa_, vv, za_ + 0.9), (pb_, vv, zb_ + 0.9)))
+    esc_v = caja2d(u_top, ev0, u_bot, ev1)
+    arr_v = arriate(S, L, 'jardinera', 'planta', P_['arriate_vacio'][0], P_['arriate_vacio'][1], z0, arboles, rng, arbol=(5.5, 7.0))
+    # escalera de Heliotropo (PB → PA, sube al sur pegada al muro este, a la plazuela de la cinta): 22 peraltes de 0.176,
+    # dos tiros de 10 huellas de 0.28 y descanso de 1.80; arranca junto a la puerta (se ve al entrar)
+    hu0, hv0, hu1, hv1 = P_['esc_heliotropo']
+    for kk in range(10):
+        va = hv1 - (kk + 1) * hu_p
+        losa(S['escalera'], L['escalera'], caja2d(hu0, va, hu1, va + hu_p), z0, z0 + (kk + 1) * h_p)
+        va = hv1 - 10 * hu_p - desc - (kk + 1) * hu_p
+        losa(S['escalera'], L['escalera'], caja2d(hu0, va, hu1, va + hu_p), z0, z0 + (12 + kk) * h_p)
+    losa(S['escalera'], L['escalera'], caja2d(hu0, hv1 - 10 * hu_p - desc, hu1, hv1 - 10 * hu_p), z0, z0 + 11 * h_p)
+    for (va_, za_), (vb_, zb_) in (((hv1, z0), (hv1 - 10 * hu_p, z_d)), ((hv1 - 10 * hu_p, z_d), (hv1 - 10 * hu_p - desc, z_d)), ((hv1 - 10 * hu_p - desc, z_d), (hv0, zp))):
+        L['baranda'].append(((hu0 + 0.03, va_, za_ + 0.9), (hu0 + 0.03, vb_, zb_ + 0.9)))
+    esc_h = caja2d(*P_['esc_heliotropo'])
+    plazas = {nom: unary_union([caja2d(*q) for q in qs]).intersection(piso_m) for nom, qs in P_['plazas_pb'].items()}
+    calle = caja2d(*P_['calle_ns'])
+    # borde del aro: doble fila (la de afuera abre al patio), con la boca de la plaza y un paso al patio cada 5
+    th_a = math.atan2(-math.sqrt(R_VID ** 2 - (I0 + 0.15 - ARO[0]) ** 2), I0 + 0.15 - ARO[0])
+    pts_s = arco_pts(R_VID, th_a, -0.05, W)
+    borde_s = isla_borde(S_m, L_m, pts_s, radial, piso_m.difference(plazas['boca']).difference(plazas['heliotropo']), piso_m, z0, cada=BOCA_CADA)
+    for g in borde_s[0::2]:
+        MESITAS_TH.append(math.atan2(g.centroid.y - ARO[1], g.centroid.x - ARO[0]))
+    dth = 2 * math.asin(W / 2 / R_VID)
+    if borde_s:
+        ths = [math.atan2(g.centroid.y - ARO[1], g.centroid.x - ARO[0]) for g in borde_s]
+        VIDRIO_VANOS.append((min(ths) - dth, max(ths) + dth, NIVEL(0) - 0.1, zp - e))
+    banda_aro = Point(ARO).buffer(R_VID + 2 * F + 1.2, 256)   # el borde del aro y su pasillo
+    # fondas con barra en las plazuelas (Tepotzotlán)
+    rac, rac_g = [], []
+    for nom, c in P_['racimos_pb'].items():
+        pos, _ = poner_racimos(plazas[nom].difference(banda_aro), 1, c)
+        for cc in pos:
+            h_, g_ = racimo(S_m, L_m, cc, z0)
+            rac += h_; rac_g.append(g_)
+    duro = unary_union([esc_v, esc_h, asc, arr_v, banda] + rac_g + borde_s)
+    arrs = poner_arriates(S, L, 'jardinera', 'planta', P_['arriates_pb'], piso_m.difference(duro.buffer(0.05)).difference(Point(ARO).buffer(R_VID + 2 * F, 256)), z0, arboles, rng)
+    duro = unary_union([duro] + arrs)
+    # filas contra los muros oeste y este (el acceso este, abierto)
+    libre = piso_m.difference(duro)
+    puerta = caja2d(I2 - 3, P_['puerta_e'][0], I2, P_['puerta_e'][1])
+    lejos = unary_union([banda_aro, duro.buffer(PASILLO)] + list(plazas.values()))
+    filas_m = manzanas(S_m, L_m, piso_m.intersection(caja2d(I0, 337.6, I0 + F + 0.01, 400)).difference(lejos), libre, [I0], [], z0, lados=(1,), eje=1, pasajes=False)
+    filas_m += manzanas(S_m, L_m, piso_m.intersection(caja2d(I2 - F - 0.01, 337.6, I2, 400)).difference(lejos).difference(puerta), libre, [I2], [], z0, lados=(-1,), eje=1, pasajes=False)
+    duro = unary_union([duro] + filas_m)
+    libre = piso_m.difference(duro)
+    # manzanas en aparejo sobre las líneas de postes (ver Barrio) y RESPIROS (2026-10-13, Gabriel: «no nos conviene clusters,
+    # mejor deja como estaban los locales pero añádeles más espacios para respirar»): en la celda (crujía × entre dos espinas)
+    # que más acerca la luz a la PB, las dos medias filas que dan al pasillo se vuelven tsuboniwa (ver respiro_fila); arriba
+    # son vacío y el pasillo de la PA pasa entre las copas, como puente; encima, un módulo alto translúcido
+    region = piso_m.difference(unary_union([lejos, calle, banda.buffer(1.4), caja2d(I0, 300, I0 + F + PASILLO, 400), caja2d(I2 - F - PASILLO, 300, I2, 400)]))
+    luz0 = unary_union([vac, ranura, esq2, Point(ARO).buffer(R_VID, 256).exterior.buffer(0.05)])
+    prohibido = unary_union([vac.buffer(1.0), asc.buffer(1.0), esc_v.buffer(1.0), esc_h.buffer(1.0), calle] + list(plazas.values())
+                            + [caja2d(*q) for qs in P_['plazas_pa'].values() for q in qs])   # (ni donde arriba ya hay plaza)
+    camas_r = respiros_fila(P_['respiros'], region, prohibido, luz0)
+    for k_, cs in enumerate(camas_r):
+        respiro_fila(S, L, 'jardinera', 'planta', 'agua', cs, z0, arboles, rng, pileta=(k_ == 0))
+    huecos = [unary_union([g for g, _ in cs]) for cs in camas_r]
+    if huecos:
+        region = region.difference(unary_union(huecos).buffer(0.01))
+    celdas = manzanas(S_m, L_m, region, libre, P_['espinas'], P_['cols_u'], z0, cols=cols_m, fase=0)
+    loc_pb = celdas + filas_m + borde_s + rac
+    INFO['sur_pb'] = {'piso': piso_m, 'celdas': celdas, 'filas': filas_m, 'bordes': borde_s, 'racimos': rac, 'arriates': arrs + [arr_v],
+                      'plazas': [(g, n) for n, g in plazas.items()], 'escaleras': [esc_v, esc_h, asc], 'vacios': [vac], 'respiros': huecos,
+                      'calles': [calle, caja2d(P_['plazas_pb']['tragaluz'][0][2], 358.65, I2, 361.15), caja2d(*P_['pasaje_clavel'])],
+                      'jardines': [banda, caja2d(*J_['banqueta'])],
+                      'servicio': [vit, caja2d(*P_['vehiculo']), caja2d(*P_['anden_caja']), caja2d(u0r, P_['anden_caja'][1], u1r, v3)],
+                      'cuartos': cuartos_pb, 'cols': cols_s}
+    print('nave sur PB', {'manzanas': len(celdas), 'respiros': len(huecos), 'contra_muros': len(filas_m), 'borde_aro': len(borde_s), 'racimos': len(rac_g),
+                          'locales': len(loc_pb), 'm2_locales': round(sum(g.area for g in loc_pb)), 'jardin_m2': round(banda.area + caja2d(*J_['banqueta']).area, 1)})
+    S['local_pb'], S['mesa_pb'], L['local_pb'], L['mesa_pb'] = S_m['local'], S_m['mesa'], L_m['local'], L_m['mesa']
+    # ---- PA: una sola plataforma con el vacío del patio de luz ----
     cinta_llega = Polygon([(ARO[0] + r_ * math.cos(math.radians(th)), ARO[1] + r_ * math.sin(math.radians(th)))
                            for r_, ths in ((ARO_RE - CINTA['ancho'], (-22.6, -18.6)), (CORTE + 0.6, (-18.6, -22.6))) for th in [ths[0] + (ths[1] - ths[0]) * k / 8 for k in range(9)]])
-    vac_luz = caja2d(*P_['luz'])
     vac_esc = caja2d(*P_['escalera'])
-    pa = nave.difference(caja2d(*P_['vehiculo']).buffer(0.01)).difference(vac_luz).difference(vac_esc).difference(caja2d(*P_['montacargas']))
+    pa = nave.difference(caja2d(*P_['vehiculo']).buffer(0.01)).difference(vac).difference(vac_esc).difference(caja2d(*P_['montacargas'])).difference(asc).difference(esc_h)
+    pa = pa.difference(unary_union(huecos)) if huecos else pa   # los respiros: vacío arriba (el pasillo, puente entre copas)
+    puente = caja2d(P_['vano'][0], ranura.bounds[1], P_['vano'][1], ranura.bounds[3])
+    pa = pa.difference(ranura.difference(puente)).difference(esq2)   # el buffer del jardín: ranura y esquina a doble altura
     pa = unary_union([pa, cinta_llega.difference(Point(ARO).buffer(ARO_RE - CINTA['ancho'], 256))]).buffer(0)
     losa(S['pa'], L['pa'], pa, zp - e, zp)
     rayas(L['pa'], pa, zp + 0.005, 0.4)
-    # columnas de la PA: en las líneas de valles y cumbreras, a cada línea de postes (no en la carga ni en los vacíos)
+    # columnas de la PA: en las líneas de columnas, a cada línea de postes (no en la carga; las del vacío, en sus esquinas)
     n_col = 0
-    for u in list(P_['valles']) + list(P_['cumbres']):
-        for v in P_['postes'][1:-1]:
-            q = Point(u, v)
-            if pa.buffer(-0.3).contains(q) and not caja2d(*P_['vehiculo']).buffer(0.5).contains(q):
-                caja(S['columna'], L['columna'], u - 0.15, v - 0.15, z0, u + 0.15, v + 0.15, zp - e)
-                n_col += 1
-    # barandal: lado largo (fachada este) y todo borde de la PA con vacío (> 0.30) que no sea muro ni vidrio
+    for u, v in cols_s:
+        if not caja2d(*P_['vehiculo']).buffer(0.5).contains(Point(u, v)) and not asc.buffer(0.2).contains(Point(u, v)):
+            caja(S['columna'], L['columna'], u - 0.15, v - 0.15, z0, u + 0.15, v + 0.15, zp - e)
+            n_col += 1
+    # barandal en todo borde con vacío (> 0.30) que no sea muro ni vidrio (la llegada de las escaleras queda abierta)
     muros_ext = caja2d(*P_['int']).exterior.buffer(0.05).union(disco.exterior.buffer(0.35))
-    m_bar = 0.0
-    for p in poligonos(pa):
-        for anillo in [p.exterior] + list(p.interiors):
-            c = list(anillo.coords)
-            for a, b in zip(c, c[1:]):
-                seg = LineString([a, b]).difference(muros_ext.difference(LineString([(P_['int'][2], 300), (P_['int'][2], 400)]).buffer(0.06)))
-                for s in getattr(seg, 'geoms', [seg]):
-                    if s.geom_type == 'LineString' and s.length > 0.2:
-                        barandal(L['baranda'], s.coords[0], s.coords[-1], zp); m_bar += s.length
-    # baños (H, M, locatarios), muro ciego y escalera de servicio
-    bu0, bv0, bu1, bv1 = P_['baños']
-    caja(S['local'], L['local'], bu0, bv0, zp, bu1, bv1, zp + 3.0)
-    for k in (1, 2):
-        L['local'].append(((bu0 + (bu1 - bu0) * k / 3, bv0, zp + 3.0), (bu0 + (bu1 - bu0) * k / 3, bv1, zp + 3.0)))
-    for k in range(3):   # puertas al norte, detrás del muro ciego
-        um = bu0 + (bu1 - bu0) * (k + 0.5) / 3
-        L['local'] += [((um - 0.45, bv1 + 0.01, zp), (um - 0.45, bv1 + 0.01, zp + 2.1)), ((um + 0.45, bv1 + 0.01, zp), (um + 0.45, bv1 + 0.01, zp + 2.1)),
-                       ((um - 0.45, bv1 + 0.01, zp + 2.1), (um + 0.45, bv1 + 0.01, zp + 2.1))]
-    caja(S['muro'], L['muro'], P_['muro_ciego'][0], P_['muro_ciego'][1], zp, P_['muro_ciego'][2], P_['muro_ciego'][3], zp + 3.0)
-    eu0, ev0, eu1, ev1 = P_['escalera']
-    sube = zp - z0
-    n_esc = math.ceil(sube / 0.18)
-    h_esc = sube / n_esc
-    huella = min(0.28, (ev1 - ev0 - 1.2) / n_esc)
-    for k in range(n_esc):   # un solo tramo a lo largo de v, de sur a norte (peralte ≤ 0.18, huella ≥ 0.25)
-        v = ev0 + k * huella
-        caja(S['escalera'], L['escalera'], eu0, v, z0 + k * h_esc, eu1, v + huella, z0 + (k + 1) * h_esc)
-    # puestos: filas espalda con espalda en las líneas de columnas (la columna queda en el muro de fondo)
-    W_, F_ = P_['puesto']
-    libre_pa = pa.buffer(-0.05)
-    ocupa = [caja2d(*P_['baños']).buffer(1.2), caja2d(*P_['muro_ciego']).buffer(2.0), vac_esc.buffer(1.2), caja2d(*P_['montacargas']).buffer(1.5)]
-    puestos_s = []
-    for uc in P_['filas']:
-        for lado in (-1, 1):
-            k = 0
-            v = 337.8 + 0.6
-            while v + W_ <= P_['int'][3]:
-                k += 1
-                if k % (P_['cada'] + 1) == 0:   # paso transversal
-                    v += W_; continue
-                g = caja2d(min(uc, uc + lado * F_), v, max(uc, uc + lado * F_), v + W_)
-                frente = LineString([(uc + lado * F_, v), (uc + lado * F_, v + W_)])
-                if libre_pa.contains(g) and libre_pa.contains(frente.buffer(1.1, cap_style=2)) and not any(g.intersects(o) for o in ocupa):
-                    puesto_geo(S, L, g, [frente], zp)
-                    puestos_s.append(g)
-                v += W_
-    # tarimas (+0.30 / +0.45) con macetas en sus orillas y mesas encima; las mesas, también en el piso de las crujías E y O
-    tarimas = []
-    for (q, h) in P_['tarimas']:
-        g = caja2d(*q)
-        if not libre_pa.contains(g):
+    abiertos = unary_union([LineString([(u_top, ev0), (u_top, ev1)]).buffer(0.05),
+                            LineString([(P_['escalera'][0], P_['escalera'][3]), (P_['escalera'][2], P_['escalera'][3])]).buffer(0.05),
+                            asc.exterior.buffer(0.05), LineString([(hu0, hv0), (hu1, hv0)]).buffer(0.05),
+                            LineString([(I0, P_['muro_ciego'][3]), (I2, P_['muro_ciego'][3])]).buffer(0.05)])   # (la ranura, contra el muro ciego)
+    m_bar = barandal_bordes(L, pa, zp, unary_union([muros_ext.difference(LineString([(I2, 300), (I2, 400)]).buffer(0.06)), abiertos]))
+    # franja de servicios: muro ciego de lado a lado con un vano; baños públicos a la derecha, servicio a la izquierda
+    banos_s = banos_publicos(S, L, P_['banos_pub'], zp, None)
+    cuartos = banos_s.pop('recintos') + servicios_pa(S, L, zp, P_['escalera'][0] - 0.1)
+    lu0, lv0, lu1, lv1 = P_['locatarios']
+    caja(S['local'], L['local'], lu0, lv0, zp, lu1, lv1, zp + 3.0)
+    L['local'].append((((lu0 + lu1) / 2, lv0, zp + 3.0), ((lu0 + lu1) / 2, lv1, zp + 3.0)))
+    for x in (lu0 + 0.5, (lu0 + lu1) / 2 + 0.5):   # puertas al vestíbulo de servicio
+        L['local'] += [((x, lv1 + 0.01, zp), (x, lv1 + 0.01, zp + 2.1)), ((x + 0.9, lv1 + 0.01, zp), (x + 0.9, lv1 + 0.01, zp + 2.1)), ((x, lv1 + 0.01, zp + 2.1), (x + 0.9, lv1 + 0.01, zp + 2.1))]
+    mu0_, mv0_, mu1_, mv1_ = P_['muro_ciego']
+    va_, vb_ = P_['vano']
+    alto = P_['muro_alto']
+    caja(S['muro'], L['muro'], mu0_, mv0_, zp, va_, mv1_, zp + alto)
+    caja(S['muro'], L['muro'], vb_, mv0_, zp, mu1_, mv1_, zp + alto)
+    caja(S['muro'], L['muro'], va_, mv0_, zp + P_['vano_alto'], vb_, mv1_, zp + alto)   # dintel
+    se0, sv0, se1, sv1 = P_['escalera']
+    n_esc = math.ceil((zp - z0) / 0.18)
+    h_esc = (zp - z0) / n_esc
+    huella = (sv1 - sv0) / (n_esc - 1)
+    for k in range(n_esc - 1):   # un tiro de sur a norte; el último peralte llega al vestíbulo
+        v = sv0 + k * huella
+        caja(S['escalera'], L['escalera'], se0, v, z0, se1, v + huella, z0 + (k + 1) * h_esc)
+    # ---- PA: el mercado de arriba (fondas alrededor del vacío, terraza-mirador al patio del aro, manzanas) ----
+    piso_pa = pa.intersection(caja2d(I0, mv1_, I2, 400))
+    plazas_a = {nom: unary_union([caja2d(*q) for q in qs]).intersection(piso_pa) for nom, qs in P_['plazas_pa'].items()}
+    S_a, L_a = {'local': [], 'mesa': []}, {'local': [], 'mesa': []}
+    # terraza junto al vidrio: barra corrida mirando al patio del aro (sin la llegada de la cinta) y paseo
+    T = P_['terraza']
+    barras = []
+    th_c = (math.radians(-23.2), math.radians(-18.0))
+    pts_b = arco_pts(R_VID + 0.05, th_a, -0.05, 1.2)
+    for p, q in zip(pts_b, pts_b[1:]):
+        thm = math.atan2((p[1] + q[1]) / 2 - ARO[1], (p[0] + q[0]) / 2 - ARO[0])
+        if th_c[0] <= thm <= th_c[1]:
             continue
-        tarimas.append((g, h))
-        losa(S['tarima'], L['tarima'], g, zp, zp + h)
-        n_e = round(h / 0.15)
-        for i in range(1, n_e):   # escalones de 0.15 a lo largo del lado largo sur
-            caja(S['tarima'], L['tarima'], q[0], q[1] - 0.3 * i, zp, q[2], q[1] - 0.3 * (i - 1), zp + h - 0.15 * i)
-        for x in (q[0] + 0.4, q[2] - 0.4):   # dos macetas por tarima, en las esquinas norte
-            caja(S['maceta'], L['maceta'], x - 0.4, q[3] - 0.8, zp + h, x + 0.4, q[3], zp + h + 0.6)
-            arboles.append((x, q[3] - 0.4, zp + h + 0.6, rng.uniform(1.8, 2.6)))
-            for _ in range(6):
-                dx, dy = rng.uniform(-0.3, 0.3), rng.uniform(-0.3, 0.3)
-                L['pasto'].append(((x + dx, q[3] - 0.4 + dy, zp + h + 0.6), (x + dx * 1.3, q[3] - 0.4 + dy * 1.3, zp + h + 0.6 + rng.uniform(0.25, 0.5))))
-    M_ = MESA
-    largo, ancho, banca, entre, cab = M_['largo'], M_['ancho'], M_['banca'], M_['entre'], M_['cabecera']
-    prof = ancho + 2 * banca
-    estorba = unary_union(puestos_s + ocupa + [p.buffer(2.0) for p in puestos_s] + [Point(u, v).buffer(0.4) for u in list(P_['valles']) + list(P_['cumbres']) for v in P_['postes']])
-    mesas_s = []
-    base_m = pa.buffer(-0.9, join_style='mitre')
-    for (g, h) in [(None, 0.0)] + tarimas:
-        zona = (base_m.difference(unary_union([t.buffer(0.6) for t, _ in tarimas])) if g is None else g.buffer(-0.3).difference(caja2d(g.bounds[0], g.bounds[3] - 1.0, g.bounds[2], g.bounds[3])))
-        u0, v0, u1, v1 = zona.bounds
-        x = u0
-        while x + largo <= u1:
-            y = v0
-            while y + prof <= v1:
-                q = caja2d(x, y, x + largo, y + prof)
-                if zona.contains(q) and not q.intersects(estorba) and not any(q.buffer(0.05).intersects(m[0]) for m in mesas_s):
-                    mesas_s.append((q, zp + h, g is not None))
-                    y += prof + entre
-                else:
-                    y += 0.5
-            x += largo + cab
-    # proporción: sólo las más cercanas a los puestos (las de las tarimas siempre), hasta mesas_por_puesto × los de comida
-    cerca = unary_union(puestos_s)
-    tope = round(P_['mesas_por_puesto'] * round(len(puestos_s) * 2 / 3))
-    mesas_s.sort(key=lambda m: (not m[2], m[0].distance(cerca)))
-    mesas_s = mesas_s[:tope]
-    for q, zz, _ in mesas_s:
-        x, y = q.bounds[0], q.bounds[1]
-        caja(S['mesa'], L['mesa'], x, y + banca, zz + 0.70, x + largo, y + banca + ancho, zz + 0.75)
-        for yy in (y, y + banca + ancho):
-            caja(S['mesa'], L['mesa'], x + 0.05, yy + 0.05, zz + 0.40, x + largo - 0.05, yy + banca - 0.05, zz + 0.45)
-        for xx in (x + 0.15, x + largo - 0.15):
-            L['mesa'].append(((xx, y + banca + ancho / 2, zz), (xx, y + banca + ancho / 2, zz + 0.70)))
+        t_ = tira(p, q, 0.0, 1.0, 0.0, radial(p, q))
+        if t_ is not None and piso_pa.buffer(0.02).contains(t_):
+            barras.append(barra_mirador(S_a, L_a, 'mesa', p, q, radial(p, q), zp))
+    pts_t = arco_pts(R_VID + T, th_a, -0.05, W)
+    borde_t = isla_borde(S_a, L_a, pts_t, radial, piso_pa.difference(plazas_a['boca']).difference(plazas_a['balcon']).difference(plazas_a['cinta']), piso_pa, zp, cada=BOCA_CADA)
+    # barras-mirador en tres bordes del vacío (en el cuarto llega la escalera)
+    vu0_, vv0_, vu1_, vv1_ = P_['vacio']
+    for a, b, n in (((vu0_, vv1_), (vu1_, vv1_), (0, 1)), ((vu1_, vv0_), (vu1_, vv1_), (1, 0)), ((vu0_, ev1 + 0.6), (vu0_, vv1_), (-1, 0))):
+        barras.append(barra_mirador(S_a, L_a, 'mesa', a, b, n, zp))
+    llegada = caja2d(u_top - 2.4, ev0 - 0.6, u_top, ev1 + 0.6)
+    llegada_h = caja2d(hu0 - 1.4, hv0 - 2.4, I2, hv1)   # la llegada de la escalera de Heliotropo
+    duro_a = unary_union(barras + borde_t + [vac.buffer(0.05), asc, llegada, vac_esc, llegada_h])
+    # fondas con barra alrededor del vacío
+    pos_a, _ = poner_racimos(plazas_a['balcon'].difference(vac.buffer(2.4, join_style='mitre')).difference(llegada.buffer(0.5)).difference(asc.buffer(1.2)).difference(duro_a),
+                             P_['racimos_pa'], ((vu0_ + vu1_) / 2, (vv0_ + vv1_) / 2))
+    rac_a, rac_ag = [], []
+    for c in pos_a:
+        h_, g_ = racimo(S_a, L_a, c, zp)
+        rac_a += h_; rac_ag.append(g_)
+    duro_a = unary_union([duro_a] + rac_ag)
+    arrs_a = poner_arriates(S, L, 'maceta', 'pasto', P_['arriates_pa'], piso_pa.difference(duro_a.buffer(0.05)), zp, arboles, rng, arbol=(2.2, 3.2))
+    duro_a = unary_union([duro_a] + arrs_a)
+    libre_a = piso_pa.difference(duro_a)
+    banda_t = Point(ARO).buffer(R_VID + T + 2 * F + 1.2, 256)
+    lejos_a = unary_union([banda_t, duro_a.buffer(PASILLO)] + list(plazas_a.values()))
+    filas_a = manzanas(S_a, L_a, piso_pa.intersection(caja2d(I0, mv1_, I0 + F + 0.01, 400)).difference(lejos_a), libre_a, [I0], [], zp, lados=(1,), eje=1, pasajes=False)
+    filas_a += manzanas(S_a, L_a, piso_pa.intersection(caja2d(I2 - F - 0.01, mv1_, I2, 400)).difference(lejos_a), libre_a, [I2], [], zp, lados=(-1,), eje=1, pasajes=False)
+    duro_a = unary_union([duro_a] + filas_a)
+    libre_a = piso_pa.difference(duro_a)
+    # manzanas arriba (las mismas espinas, pasajes en el otro aparejo); el pasillo junto a la ranura, de 1.40
+    region_a = piso_pa.difference(unary_union([lejos_a, caja2d(I0, 300, I2, ranura.bounds[3] + 1.4), esq2.buffer(1.4, join_style='mitre'),
+                                               caja2d(I0, 300, I0 + F + PASILLO, 400), caja2d(I2 - F - PASILLO, 300, I2, 400)]))
+    celdas_a = manzanas(S_a, L_a, region_a, libre_a, P_['espinas'], P_['cols_u'], zp, cols=cols_s, fase=1)
+    loc_pa = celdas_a + filas_a + borde_t + rac_a
+    for k in ('local', 'mesa'):
+        S[k] += S_a[k]; L[k] += L_a[k]
+    INFO['sur_pa'] = {'piso': piso_pa, 'celdas': celdas_a, 'filas': filas_a, 'bordes': borde_t, 'racimos': rac_a, 'arriates': arrs_a,
+                      'plazas': [(g, n) for n, g in plazas_a.items()], 'calles': [], 'escaleras': [llegada, asc, esc_h], 'barras': barras,
+                      'vacios': [vac, ranura.difference(puente), esq2] + huecos, 'respiros': huecos,
+                      'servicio': [caja2d(I0, I1, I2, mv1_).intersection(pa)], 'cuartos': cuartos, 'cols': cols_s}
+    print('nave sur PA', {'manzanas': len(celdas_a), 'racimos': len(rac_ag), 'contra_muros': len(filas_a), 'terraza': len(borde_t), 'arriates': len(arrs_a),
+                          'locales': len(loc_pa), 'barra_m': round(sum(b.length / 2 - 1.0 for b in barras if not b.is_empty)), 'm2_locales': round(sum(g.area for g in loc_pa))})
+    # ---- la cubierta nueva (módulos a tres alturas) y sus columnas: de la PA (o del piso, en los vacíos) a cada módulo ----
+    mods = cubierta_sur(huecos + [vac, esq2], ranuras=[ranura])
+    for u, v in cols_s:
+        if caja2d(*P_['vehiculo']).buffer(0.5).contains(Point(u, v)) or asc.buffer(0.2).contains(Point(u, v)):
+            continue
+        zb = z0 if any(h.buffer(0.05).contains(Point(u, v)) for h in huecos + [vac]) else zp
+        caja(S['columna'], L['columna'], u - 0.12, v - 0.12, zb, u + 0.12, v + 0.12, CUB_SUR['z'](u, v) - CUBIERTA_SUR['canto'])
     # ---- cuentas ----
     lluvia = (caja2d(504.6, 323.6, 558.9, 396.8).difference(disco).area + caja2d(*CAJA_N).difference(disco).area) * P_['lluvia_m'] * P_['escurre']
     biomasa = A_t * P_['tanque_prof'] * P_['kg_m3']
     cult_lech = A_c * (1 - P_['otras_frac'])
-    comida = round(len(puestos_s) * 2 / 3)
+    comida = round(len(loc_pa) * 2 / 3)
     org = (comida + 25) * P_['org_kg_puesto']   # + los ~25 de comida de la nave norte (supuesto)
     vol_req = org * P_['trh'] / 1000 * 1.25 * 4   # mezcla 1:3 con agua
     pb_util = nave.area - caja2d(*P_['vehiculo']).area
     res = {'carga_m2': round(caja2d(*P_['vehiculo']).area + caja2d(*P_['anden_caja']).area + caja2d(*P_['servicio']).area, 1),
-           'biodigestor_m2': round(caja2d(*P_['biodigestor']).area, 1), 'biodigestor_m3': round(vol_bio, 1), 'biodigestor_m3_requerido': round(vol_req, 1),
+           'biodigestor_m2': 0, 'camaras_residuos_bodega_m2': round(caja2d(*P_['biodigestor']).area, 1),
+           'respiros': len(huecos), 'ranura_m2': round(ranura.difference(puente).area, 1), 'doble_altura_m2': round(esq2.area, 1),
+           'jardin_sur_m2': round(banda.area + caja2d(*J_['banqueta']).area, 1), 'cubierta_modulos': CUB_SUR.get('modulos'), 'cubierta_dobleces': CUB_SUR.get('dobleces'),
+           'cubierta_alero': CUBIERTA_SUR['valle'], 'cubierta_cumbrera': CUBIERTA_SUR['valle'] + CUBIERTA_SUR['subida'],
            'tubos': n_t, 'acuaponia_m2': round(A_acu, 1), 'tanques_m2': round(A_t, 1), 'cultivo_m2': round(A_c, 1),
            'peces_kg_año': round(biomasa * P_['cosechas_peces']), 'lechugas_año': round(cult_lech * P_['lechuga_m2'] * P_['ciclos_lechuga']),
            'otras_kg_año': round(A_c * P_['otras_frac'] * P_['otras_kg_m2']), 'lluvia_m3_año': round(lluvia),
            'agua_sistema_m3': round(A_t * P_['tanque_prof'] + A_c * 0.3), 'reposicion_m3_año': round((A_t * P_['tanque_prof'] + A_c * 0.3) * 0.015 * 365),
-           'pa_m2': round(pa.area, 1), 'puestos': len(puestos_s), 'puestos_comida': comida, 'mesas': len(mesas_s), 'tarimas': len(tarimas),
-           'macetas': 2 * len(tarimas), 'columnas_pa': n_col, 'banos': 3, 'barandal_m': round(m_bar, 1),
-           'ocupantes_pa': round(pa.area / 5.6), 'ancho_salidas_m': round(pa.area / 5.6 * 0.005, 2),
-           'acuaponia/pb_util': round(A_acu / pb_util, 2)}
-    res['ACUAPONIA_GRANDE'] = res['acuaponia/pb_util'] > 0.5
+           'pa_m2': round(pa.area, 1), 'puestos': len(loc_pa), 'puestos_comida': comida, 'racimos_pa': len(rac_ag), 'racimos_pb': len(rac_g), 'columnas_pa': n_col, 'banos': banos_s,
+           'barandal_m': round(m_bar, 1), 'ocupantes_pa': round(pa.area / 5.6), 'ancho_salidas_m': round(pa.area / 5.6 * 0.005, 2),
+           'acuaponia/pb_util': round(A_acu / pb_util, 2), 'puestos_pb': len(loc_pb), 'm2_locales_pb': round(sum(g.area for g in loc_pb)),
+           'm2_locales_pa': round(sum(g.area for g in loc_pa)), 'mercado_pb_m2': round(piso_m.area, 1), 'arboles': len(arboles)}
     print('nave sur', json.dumps(res, ensure_ascii=False))
     return {**{k: plano(v) for k, v in S.items() if v}, **{k + 'L': plano(v) for k, v in L.items() if v}}, arboles, res
 
@@ -1636,10 +2029,10 @@ def mercado_sur():
 # objeto y sólo se empieza a separar»), baja en rampa (≤ 8 %, descansos de 1.20 a
 # cada 6 m: NTC 2.2.2.4.1 y tabla 2.2.2.4.1), descansa a la altura de la planta
 # alta de la nave sur (+4.28) y termina a +2.40 en las plataformas de la nave
-# norte, cruzando Heliotropo. Va en sentido antihorario. El aro, donde se
+# norte, cruzando Heliotropo (2026-10-12: a +4.28, la de la P3 norte: sigue plana). Va en sentido antihorario. El aro, donde se
 # desprendió, queda 2 m más angosto (eso lo dibuja el visor con th0…th1).
 ARO_Z, ARO_CANTO, ARO_RE = 10.03, 0.35, 46.55
-CINTA = {'ancho': 2.0, 'pa': 4.28, 'fin': 2.40, 'th_fin': 18.0, 'pendiente': 0.08, 'tramo': 6.0, 'descanso': 1.2, 'desc_pa': 3.0, 'desc_fin': 1.6}
+CINTA = {'plano': 27.6, 'ancho': 2.0, 'pa': 4.28, 'fin': 4.28, 'th_fin': 18.0, 'pendiente': 0.08, 'tramo': 6.0, 'descanso': 1.2, 'desc_pa': 3.0, 'desc_fin': 1.6}
 
 
 def cinta_aro():
@@ -1660,7 +2053,10 @@ def cinta_aro():
     baja(ARO_Z - CINTA['pa'])
     s_pa0 = s
     s += CINTA['desc_pa']; perfil.append((s, z))
-    baja(CINTA['pa'] - CINTA['fin'])
+    if CINTA['pa'] - CINTA['fin'] > 1e-6:
+        baja(CINTA['pa'] - CINTA['fin'])
+    else:   # (2026-10-12) la PA sur y la P3 de la nave norte están a +4.28: la cinta sigue plana, cruzando Heliotropo
+        s += CINTA['plano']; perfil.append((s, z))
     s_fin0 = s
     s += CINTA['desc_fin']; perfil.append((s, z))
     Ltot = s
@@ -1709,8 +2105,9 @@ def cinta_aro():
             q = P(th(x), r, z_en(x)); lins.append((q, (q[0], q[1], q[2] + BARANDAL)))
             x += 2.4
     # llegadas: a la planta alta de la nave sur (por el descanso) y a la plataforma +2.40 de la nave norte
-    for (sa, sb), r1 in (((s_pa0, s_pa0 + CINTA['desc_pa']), CORTE + 0.05), ((s_fin0, Ltot), CORTE + 0.6)):
+    for (sa, sb), r1 in (((s_pa0, s_pa0 + CINTA['desc_pa']), CORTE + 0.6), ((s_fin0, Ltot), CORTE + 0.9)):
         za = z_en(sa)
+        VIDRIO_VANOS.append((math.radians(th(sa)), math.radians(th(sb)), za - ARO_CANTO, za + 2.5))   # se cruza el vidrio
         n = 6
         borde = [P(th(sa + (sb - sa) * i / n), re, za) for i in range(n + 1)] + [P(th(sb - (sb - sa) * i / n), r1, za) for i in range(n + 1)]
         g = Polygon([(q[0], q[1]) for q in borde])
@@ -1785,7 +2182,1611 @@ def planta_png(pisos, hoyo, vis, jardin, arboles, viv, hechos, barr):
                  'comedores (mesas en amarillo), hoyo Ø 6.36 (verde) y jardín',
                  color='w', fontsize=8)
     salida = os.path.join(os.path.dirname(RAIZ), 'analisis', 'mercado', 'planta_mercado_norte.png')
+    if not os.path.isdir(os.path.dirname(salida)):   # sin la carpeta del proyecto (nube): no hay dónde dejarla
+        print('sin', os.path.dirname(salida), '· no se dibujó', os.path.basename(salida))
+        plt.close(fig)
+        return
     fig.savefig(salida, dpi=110, facecolor='#111', bbox_inches='tight')
+    print('planta', salida)
+
+
+# ================= Mercado plano en cruz (2026-10-12, Gabriel) =================
+# «Plano, más locales, algo más tradicional mexicano: pasillos y ejes en cruz; los locales siguen la retícula del
+# estacionamiento; minimiza el jardín; circulaciones en lo que marcan las NTC.»
+# Locales de 2.75 × 2.0 (5.5 m²: ≥ 4 m² y lado ≥ 2.00, NTC 2.2.1.2) en islas de dos filas espalda con espalda; las
+# islas se apilan en b con pasillos de 1.10 (NTC tabla 4.3.5.1b: mínimo en áreas de ventas) y van de 2.75 en 2.75
+# sobre la retícula de la vivienda/estacionamiento (columnas cada 5.5 en a y cada 8.0 en b, girada GIRO°). Dos ejes
+# en cruz de 2.75 (un módulo) se cruzan en una plaza de 8.25 × 8 con mesas; el eje largo cae en la línea de módulos
+# y el corto en una línea de columnas (b). La alineación en b entre islas no es completa (5.1 m de periodo, no 8).
+A0, B0 = 447.52, 529.73      # esquina de un claro de la vivienda (BLOQUES): columnas en A0 + 5.5 k, B0 + 8 k
+# Baños (NTC Proyecto Arquitectónico, Gaceta 12/12/2024): cubículo de inodoro accesible con lavabo dentro 1.70 × 1.70
+# (3.1.4.2 / tabla 3.1.6.1), cubículos de 0.90 × 1.50 con inodoro de caja (3.1.4.1 d), mingitorio 0.75 con mampara,
+# lavabo accesible 0.80 × 1.50 con su área de uso, circulación interior ≥ 0.90 (3.1.4.1 f), vestíbulo en codo para que
+# al abrir no se vea el interior (3.1.4.1 b). Ancho libre = cubículo accesible + circulación + lavabo con su área de uso.
+# Los baños se reparten entre las dos naves (Gabriel): cada nave tiene los suyos para sus propios ocupantes.
+BANO = {'acc': 1.70, 'wc': 0.90, 'ming': 0.75, 'lav': (0.80, 1.50), 'circ': 0.90, 'vest': 1.50, 'aseo': 1.20, 'muro': 0.15}
+ANCHO_BANO = BANO['acc'] + BANO['circ'] + BANO['lav'][1]          # 4.10 m libres
+# (Gabriel: «de lo que salga ese ancho de los baños, para la retícula del mercado cambiaremos la tipología»): el fondo de una
+# isla de dos locales espalda con espalda = el ancho de los baños; cada local 2.50 × 2.05 = 5.1 m² (≥ 4 m², lado ≥ 2.00).
+CELDA = (2.5, ANCHO_BANO / 2)
+GRUPO = 6                    # puestos seguidos antes de un pasillo transversal de 1.10
+PASILLO = 1.10               # NTC: pasillos en áreas de ventas, mínimo
+EJE = 2.75                   # ancho de cada eje en cruz
+MESAS_FRAC = 0.0             # (2026-10-12, Gabriel: «no me gusta el comedor frente al local»): se come en las barras de los racimos
+INFO = {}                    # para la planta rotulada
+
+
+def mesa_ret(S, L, a, b, z):
+    M_ = MESA
+    bm = b + M_['banca']
+    caja_ret(S['mesa'], L['mesa'], a, bm, a + M_['largo'], bm + M_['ancho'], z + 0.70, z + 0.75)
+    for bb in (b, bm + M_['ancho']):
+        caja_ret(S['mesa'], L['mesa'], a + 0.05, bb + 0.05, a + M_['largo'] - 0.05, bb + M_['banca'] - 0.05, z + 0.40, z + 0.45)
+    for aa in (a + 0.15, a + M_['largo'] - 0.15):
+        for bb, h in ((b + 0.17, 0.4), (bm + 0.37, 0.7), (bm + M_['ancho'] + 0.18, 0.4)):
+            pp = de_ret(aa, bb)
+            L['mesa'].append(((pp[0], pp[1], z), (pp[0], pp[1], z + h)))
+
+
+def trama(S, L, nombre, piso, duro, cols, centro, z, escalera=None, tope_mesas=None, ejes_cruz=True):
+    """Locales, ejes en cruz y mesas sobre `piso` (polígono uv libre de muros, jardín, vidrio).
+    duro: obstáculos que ni locales ni ejes pisan; escalera: remate del cruce (los locales la esquivan, los ejes llegan a ella);
+    cols: columnas (puntos) que pueden quedar dentro de un local pero no en un pasillo de 1.10."""
+    W, F = CELDA
+    libre = piso.difference(duro)
+    if escalera is not None:
+        libre = libre.difference(escalera.buffer(PASILLO))
+    cols_b = unary_union([Point(u, v).buffer(0.25) for u, v in cols]) if cols else Polygon()
+    pts = [a_ret(*p) for p in piso.envelope.exterior.coords]
+    amin, amax = min(p[0] for p in pts), max(p[0] for p in pts)
+    bmin, bmax = min(p[1] for p in pts), max(p[1] for p in pts)
+    ca, cb = a_ret(*centro)
+    banda_a = lambda k: poli_ret(A0 + k * W, bmin - 5, A0 + (k + 1) * W, bmax + 5)
+    banda_b = lambda b: poli_ret(amin - 5, b - EJE / 2, amax + 5, b + EJE / 2)
+    banda_a = lambda a_c: poli_ret(a_c - EJE / 2, bmin - 5, a_c + EJE / 2, bmax + 5)
+    a_ax = min([ca + 0.25 * i for i in range(-28, 29)],
+               key=lambda a_c: banda_a(a_c).intersection(duro).area * 10 + banda_a(a_c).intersection(cols_b).area * 4 + abs(a_c - ca) * 0.5)
+    mb = min(range(round((cb - B0) / 8) - 3, round((cb - B0) / 8) + 4),
+             key=lambda m_: banda_b(B0 + 8 * m_).intersection(duro).area * 10 + abs(B0 + 8 * m_ - cb) * 0.5)
+    b_ax = B0 + 8 * mb
+    if not ejes_cruz:   # sin cruz: las islas corren de lado a lado (los ejes quedan fuera de la nave)
+        a_ax, b_ax = amin - 50.0, bmin - 50.0
+    plaza = Polygon() if not ejes_cruz else poli_ret(a_ax - EJE / 2 - 5.5, b_ax - EJE / 2 - 5.4, a_ax + EJE / 2 + 5.5, b_ax + EJE / 2 + 5.4)   # plaza del cruce: cuatro comedores de 2 × 2 mesas
+    filas = []   # (b inferior de la fila, lado del frente: −1 abre a −b, +1 a +b)
+    s = b_ax + EJE / 2
+    while s < bmax + F:
+        filas += [(s, -1), (s + F, 1)]
+        s += 2 * F + PASILLO
+    e = b_ax - EJE / 2
+    while e > bmin - F:
+        filas += [(e - 2 * F, -1), (e - F, 1)]
+        e -= 2 * F + PASILLO
+    zona = libre.buffer(-0.02)
+    celdas = []
+    cols_a = []   # a de cada puesto: desde cada borde del eje hacia afuera, GRUPO puestos y un pasillo transversal de 1.10
+    a = a_ax + EJE / 2
+    while a < amax:
+        for _ in range(GRUPO):
+            cols_a.append(a); a += W
+        a += PASILLO
+    a = a_ax - EJE / 2
+    while a > amin:
+        for _ in range(GRUPO):
+            a -= W; cols_a.append(a)
+        a -= PASILLO
+    for bl, lado in filas:
+        for a0 in cols_a:
+            g = poli_ret(a0, bl, a0 + W, bl + F)
+            if (not plaza.is_empty and g.intersects(plaza)) or not zona.contains(g):
+                continue
+            bf = bl if lado < 0 else bl + F
+            strip = poli_ret(a0, bf - PASILLO, a0 + W, bf) if lado < 0 else poli_ret(a0, bf, a0 + W, bf + PASILLO)
+            if not piso.buffer(0.01).contains(strip) or strip.intersects(duro) or strip.intersects(cols_b) or (escalera is not None and strip.intersects(escalera)):
+                continue
+            celdas.append((g, LineString([de_ret(a0, bf), de_ret(a0 + W, bf)])))
+    for g, frente in celdas:
+        puesto_geo(S, L, g, [frente], z)
+    # mesas: en los huecos (cruce, cuñas, donde se cayó un local), a ≥ 1.10 de los locales y fuera de los ejes
+    ocupado = unary_union([g for g, _ in celdas]) if celdas else Polygon()
+    ejes = unary_union([banda_a(a_ax), banda_b(b_ax)])
+    vacio = piso.buffer(-0.4, join_style='mitre').difference(ocupado.buffer(PASILLO - 0.05, join_style='mitre')).difference(duro.buffer(0.3)).difference(cols_b.buffer(0.3)).difference(ejes)
+    if escalera is not None:
+        vacio = vacio.difference(escalera.buffer(PASILLO))
+    M_ = MESA
+    paso_a, paso_b = M_['largo'] + M_['cabecera'], M_['ancho'] + 2 * M_['banca'] + M_['entre']
+    prof = M_['ancho'] + 2 * M_['banca']
+    cand = []
+    a = math.floor(amin / paso_a) * paso_a + A0 % paso_a
+    while a < amax:
+        b = math.floor(bmin / paso_b) * paso_b + B0 % paso_b
+        while b < bmax:
+            q = poli_ret(a - 0.1, b - 0.1, a + M_['largo'] + 0.1, b + prof + 0.1)
+            if vacio.contains(q):
+                cand.append((q.centroid.distance(Point(centro)), a, b, q))
+            b += paso_b
+        a += paso_a
+    # los cuatro comedores de la plaza: 2 × 2 mesas pegadas a las esquinas de cada cuadrante
+    pri = []
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            for i in range(2):
+                for j in range(2):
+                    aa = a_ax + sx * (EJE / 2 + 0.45) + (i * paso_a if sx > 0 else -M_['largo'] - i * paso_a)
+                    bb = b_ax + sy * (EJE / 2 + 0.45) + (j * paso_b if sy > 0 else -prof - j * paso_b)
+                    q = poli_ret(aa - 0.1, bb - 0.1, aa + M_['largo'] + 0.1, bb + prof + 0.1)
+                    if piso.buffer(-0.3).contains(q) and not q.intersects(duro) and not q.intersects(cols_b):
+                        pri.append((-1.0, aa, bb, q))
+    cand = pri + cand
+    cand.sort(key=lambda t: t[0])
+    tope = tope_mesas if tope_mesas is not None else round(MESAS_FRAC * len(celdas))
+    mesas = []
+    for _, a, b, q in cand:
+        if len(mesas) >= tope:
+            break
+        if any(q.intersects(m_) for m_ in mesas):
+            continue
+        mesas.append(q)
+        mesa_ret(S, L, a, b, z)
+    INFO.setdefault(nombre, {}).update({'celdas': [g for g, _ in celdas], 'mesas': mesas, 'ejes': ejes, 'plaza': plaza, 'duro': duro, 'cols': cols, 'piso': piso})
+    print('trama', nombre, {'locales': len(celdas), 'm2_locales': round(sum(g.area for g, _ in celdas)), 'mesas': len(mesas),
+                            'cruce_uv': [round(x, 1) for x in de_ret(a_ax, b_ax)], 'plaza': None if plaza.is_empty else [round(x, 1) for x in plaza.centroid.coords[0]]})
+    return len(celdas), len(mesas), sum(g.area for g, _ in celdas)
+
+
+# ---- Nave norte con tres plataformas (Gabriel, 2026-10-12) ----
+# P1: franja de 12 m contra el muro oeste, de dos pisos: abajo locales que dan servicio hacia afuera (abren al muro
+#     oeste) y espalda con espalda otros hacia la nave; arriba (+4.28, la altura de la PA sur) se conecta al mercado.
+# P2: a medio piso (+2.40, donde termina la cinta del aro), de los 12 m al muro este y unos 20 m de largo (al norte);
+#     escaleras de P1 a P2 y de P2 al piso.
+# P3: a la altura de P1 (+4.28), a lo largo del vidrio del aro; abajo, locales que dan al patio del aro.
+Z_P1 = Z_P3 = 4.28
+Z_P2 = 2.40
+P1_ANCHO, P2_LARGO, P3_ANCHO = 12.0, 20.0, 9.5   # (2026-10-13: P3 de 9.5: 3.00 de paso detrás de sus locales)
+LOSA_P = 0.30
+ESC = {'ancho': 2.4, 'huella': 0.30}
+RACIMO = {'n': 4, 'barra': 0.45, 'banco': 0.60}   # 4 locales espalda con espalda con una barra alrededor (Tepotzotlán)
+R_VID = CORTE + 0.3                                 # cara de la nave en el corte del aro
+
+
+def banos_ntc(ocupantes):
+    """Muebles para los ocupantes de UNA nave (los baños se reparten entre las dos; tabla 3.1.1.1, comercio y abasto:
+    mujeres 1 inodoro / 375, hombres 1 / 750; lavabos 1 / 750; 1 mingitorio por cada 5 inodoros de hombres;
+    1 de cada 5 muebles accesible) y el tamaño del bloque."""
+    m = h = ocupantes / 2   # 3.1.1.2 a): 50 % mujeres, 50 % hombres
+    req = {'M_inodoros': math.ceil(m / 375), 'H_inodoros': math.ceil(h / 750), 'M_lavabos': math.ceil(m / 750), 'H_lavabos': math.ceil(h / 750)}
+    req['H_mingitorios'] = math.ceil(req['H_inodoros'] / 5)
+    # lo que se proyecta (más que el mínimo: el mercado tiene fondas): clientes y locatarios
+    dis = {'M_inodoros': max(3, req['M_inodoros']), 'H_inodoros': max(2, req['H_inodoros']), 'H_mingitorios': max(2, req['H_mingitorios']),
+           'M_lavabos': max(2, req['M_lavabos']), 'H_lavabos': max(2, req['H_lavabos'])}
+    B = BANO
+    largo_m = B['vest'] + B['acc'] + (dis['M_inodoros'] - 1) * B['wc']
+    largo_h = B['vest'] + B['acc'] + (dis['H_inodoros'] - 1) * B['wc'] + dis['H_mingitorios'] * B['ming']
+    return req, dis, {'ancho_libre': round(ANCHO_BANO, 2), 'ancho_total': round(ANCHO_BANO + 2 * B['muro'], 2),
+                      'largo_mujeres': round(largo_m, 2), 'largo_hombres': round(largo_h, 2), 'aseo': B['aseo'],
+                      'largo_total': round(largo_m + largo_h + B['aseo'] + 4 * B['muro'], 2)}
+
+
+def bloque_banos(S, L, u1, v0, med, z):
+    """Bloque de baños contra el muro este (u1), de v0 hacia el norte: mujeres, hombres, aseo; puertas al oeste."""
+    B = BANO
+    u0 = u1 - med['ancho_total']
+    v1 = v0 + med['largo_total']
+    caja(S['local'], L['local'], u0, v0, z, u1, v1, z + 3.0)
+    cortes = [v0 + B['muro'] + med['largo_mujeres'], v0 + 2 * B['muro'] + med['largo_mujeres'] + med['largo_hombres']]
+    for v in cortes:
+        L['local'].append(((u0, v, z + 3.0), (u1, v, z + 3.0)))
+    for a, b in ((v0, cortes[0]), (cortes[0], cortes[1]), (cortes[1], v1)):   # una puerta de 0.90 por recinto, en su extremo sur
+        vm = a + 0.3 + 0.45
+        for (p, q) in (((u0 - 0.01, vm - 0.45, z), (u0 - 0.01, vm - 0.45, z + 2.1)), ((u0 - 0.01, vm + 0.45, z), (u0 - 0.01, vm + 0.45, z + 2.1)),
+                       ((u0 - 0.01, vm - 0.45, z + 2.1), (u0 - 0.01, vm + 0.45, z + 2.1))):
+            L['local'].append((p, q))
+    return caja2d(u0, v0, u1, v1)
+
+
+def isla_borde(S, L, pts, hacia, zona, piso, z, cada=None):
+    """Fila doble de locales a lo largo de la polilínea `pts` (la cara exterior): los de afuera abren hacia afuera (sobre
+    la polilínea), los de atrás hacia la nave. hacia(p, q) = vector unitario hacia adentro. cada: tras ese número de
+    pares seguidos, un paso libre (2026-10-12: del mercado al patio, sin rodear toda la fila)."""
+    W, F = CELDA
+    hechos, seguidos = [], 0
+    for p, q in zip(pts, pts[1:]):
+        if cada and seguidos >= cada:
+            seguidos = 0
+            continue
+        n = hacia(p, q)
+        P = lambda x, d: (x[0] + n[0] * d, x[1] + n[1] * d)
+        A = Polygon([p, q, P(q, F), P(p, F)])
+        B_ = Polygon([P(p, F), P(q, F), P(q, 2 * F), P(p, 2 * F)])
+        if not zona.contains(A.buffer(-0.02)) or not zona.contains(B_.buffer(-0.02)):
+            seguidos = 0
+            continue
+        frente_b = LineString([P(p, 2 * F), P(q, 2 * F)])
+        if not piso.buffer(0.01).contains(Polygon([P(p, 2 * F), P(q, 2 * F), P(q, 2 * F + PASILLO), P(p, 2 * F + PASILLO)])):
+            seguidos = 0
+            continue
+        puesto_geo(S, L, A, [LineString([p, q])], z)
+        puesto_geo(S, L, B_, [frente_b], z)
+        hechos += [A, B_]
+        seguidos += 1
+    return hechos
+
+
+def racimo(S, L, c, z):
+    """Cuatro locales espalda con espalda (2 × 2) que abren a una barra corrida alrededor, con bancos (Tepotzotlán)."""
+    W, F = CELDA
+    a, b = a_ret(*c)
+    nucleo = poli_ret(a - W, b - F, a + W, b + F)
+    hechos = []
+    for i in (-1, 0):
+        for j in (-1, 0):
+            g = poli_ret(a + i * W, b + j * F, a + (i + 1) * W, b + (j + 1) * F)
+            fb = b + (j + 1) * F if j == 0 else b + j * F
+            fa = a + (i + 1) * W if i == 0 else a + i * W
+            frentes = [LineString([de_ret(a + i * W, fb), de_ret(a + (i + 1) * W, fb)]), LineString([de_ret(fa, b + j * F), de_ret(fa, b + (j + 1) * F)])]
+            puesto_geo(S, L, g, frentes, z)
+            hechos.append(g)
+    br, bc = RACIMO['barra'], RACIMO['banco']
+    anillo = nucleo.buffer(br, join_style='mitre').difference(nucleo)
+    losa(S['mesa'], L['mesa'], anillo, z + 0.90, z + 0.95)                                       # cubierta de la barra
+    losa(S['mesa'], L['mesa'], nucleo.buffer(br, join_style='mitre').difference(nucleo.buffer(br - 0.05, join_style='mitre')), z, z + 0.90)   # frente
+    ext = list(nucleo.buffer(br + 0.3, join_style='mitre').exterior.coords)
+    for p, q in zip(ext, ext[1:]):   # bancos a cada 0.60
+        Lg = math.dist(p, q)
+        nb = int(Lg / bc)
+        for k in range(nb):
+            x, y = p[0] + (q[0] - p[0]) * (k + 0.5) / nb, p[1] + (q[1] - p[1]) * (k + 0.5) / nb
+            caja(S['mesa'], L['mesa'], x - 0.15, y - 0.15, z, x + 0.15, y + 0.15, z + 0.70)
+    return hechos, nucleo.buffer(br + bc, join_style='mitre')
+
+
+def poner_racimos(region, n, centro):
+    """Hasta n racimos en `region`, del más cercano a `centro` hacia afuera, con 1.10 libres alrededor de sus bancos."""
+    W, F = CELDA
+
+    def foot(c, pas=PASILLO):
+        a, b = a_ret(*c)
+        return poli_ret(a - W, b - F, a + W, b + F).buffer(RACIMO['barra'] + RACIMO['banco'] + pas, join_style='mitre')
+    u0, v0, u1, v1 = region.bounds
+    cand = sorted(((x, y) for x in [u0 + 0.5 * i for i in range(int((u1 - u0) / 0.5) + 1)] for y in [v0 + 0.5 * j for j in range(int((v1 - v0) / 0.5) + 1)]),
+                  key=lambda c: math.dist(c, centro))
+    puestos, ocup = [], []
+    for c in cand:
+        if len(puestos) >= n:
+            break
+        f, f2 = foot(c), foot(c, PASILLO / 2)   # 1.10 a la orilla; entre dos racimos, el pasillo se comparte
+        if region.contains(f) and not any(f2.intersects(o) for o in ocup):
+            puestos.append(c); ocup.append(f2)
+    return puestos, unary_union(ocup).buffer(PASILLO / 2, join_style='mitre') if ocup else Polygon()
+
+
+def escalera_recta(S, L, x0, y0, d, ancho, z0, z1, huella, grueso=None):
+    """Escalera recta que arranca en (x0, y0) a z0 y sube en la dirección d (unitaria) hasta z1; peralte ≤ 0.18.
+    grueso: huellas flotadas de ese espesor (escalera volada: se pasa por debajo) en vez de escalones macizos."""
+    n = math.ceil((z1 - z0) / 0.18 - 1e-9)
+    h = (z1 - z0) / n
+    w = (-d[1], d[0])
+    for k in range(n - 1):   # el último peralte llega al piso de arriba
+        a = (x0 + d[0] * huella * k, y0 + d[1] * huella * k)
+        b = (x0 + d[0] * huella * (k + 1), y0 + d[1] * huella * (k + 1))
+        g = Polygon([(a[0] - w[0] * ancho / 2, a[1] - w[1] * ancho / 2), (b[0] - w[0] * ancho / 2, b[1] - w[1] * ancho / 2),
+                     (b[0] + w[0] * ancho / 2, b[1] + w[1] * ancho / 2), (a[0] + w[0] * ancho / 2, a[1] + w[1] * ancho / 2)])
+        losa(S['escalera'], L['escalera'], g, z0 + (k + 1) * h - grueso if grueso else z0, z0 + (k + 1) * h)
+    fin = (x0 + d[0] * huella * (n - 1), y0 + d[1] * huella * (n - 1))
+    for s_ in (-1, 1):   # pasamanos a 0.90
+        L['baranda'].append(((x0 + s_ * w[0] * ancho / 2, y0 + s_ * w[1] * ancho / 2, z0 + 0.9), (fin[0] + s_ * w[0] * ancho / 2, fin[1] + s_ * w[1] * ancho / 2, z1 + 0.9)))
+    huella_pol = Polygon([(x0 - w[0] * ancho / 2, y0 - w[1] * ancho / 2), (fin[0] - w[0] * ancho / 2, fin[1] - w[1] * ancho / 2),
+                          (fin[0] + w[0] * ancho / 2, fin[1] + w[1] * ancho / 2), (x0 + w[0] * ancho / 2, y0 + w[1] * ancho / 2)])
+    return huella_pol, LineString([(fin[0] - w[0] * ancho / 2, fin[1] - w[1] * ancho / 2), (fin[0] + w[0] * ancho / 2, fin[1] + w[1] * ancho / 2)]), n
+
+
+def barandal_bordes(L, g, z, sin):
+    """Barandal de 0.90 en los bordes de g a la altura z, menos donde toca `sin` (muros, vidrio, llegadas de escalera)."""
+    m = 0.0
+    for p in poligonos(g):
+        for anillo in [p.exterior] + list(p.interiors):
+            c = list(anillo.coords)
+            for a, b in zip(c, c[1:]):
+                seg = LineString([a, b]).difference(sin)
+                for s_ in getattr(seg, 'geoms', [seg]):
+                    if s_.geom_type == 'LineString' and s_.length > 0.2:
+                        barandal(L['baranda'], s_.coords[0], s_.coords[-1], z); m += s_.length
+    return m
+
+
+def trama_orientada(S, L, nombre, *args, **kw):
+    """trama() con la cuadrícula a 0° y a 90°: se queda con la que da más locales."""
+    global GV
+    g0, mejor = GV, None
+    for g in (g0, g0 + math.pi / 2):
+        GV = g
+        n = trama({'local': [], 'mesa': []}, {'local': [], 'mesa': []}, nombre, *args, **kw)[0]
+        if mejor is None or n > mejor[0]:
+            mejor = (n, g)
+    GV = mejor[1]
+    try:
+        return trama(S, L, nombre, *args, **kw)
+    finally:
+        GV = g0
+
+
+# ================= Barrio (2026-10-12) =================
+# Gabriel: «métele mucho coco: es demasiada acuaponia y poco mercado; hay claros muy largos que se vuelven cansados; el
+# chiste es un mercado que maximice los locales pero promueva la interacción social; aunque sean pocas áreas verdes; los
+# tragaluces están súper; toma más de arquitectos y proyectos reales». Lo que se toma de cada referente:
+#  · Tepoztlán (LRA + Ramírez Suárez): retícula de 2.50 y puestos de ~5 m²; el abasto con su propio recorrido.
+#  · Nicolás Bravo (AIDIA Studio): patios verdes que interrumpen la cubierta de una retícula regular → arriates con árbol
+#    bajo los vacíos y los tragaluces; el jardín inundable bajo el hoyo.
+#  · San Antón (QVE): el vacío con lucernario y la escalera abierta adentro como punto de orientación → patio de luz.
+#  · Huimanguillo (128) y Matamoros (C733): una plaza a la que dan los puestos, abierta a un patio arbolado → la plaza
+#    del tragaluz abre su boca al patio del aro.
+#  · Mercado Roma (Rojkind): recorridos que reinterpretan la retícula → pasajes en aparejo, no pasillos infinitos.
+#  · Markthal (MVRDV) y Sydney Fish Market (3XN): un motivo para subir, comida y mirador → fondas y barras arriba.
+#  · Toyosu y Sydney: la logística separada y a la vista → abasto por una sola calle; la acuaponia, vitrina.
+#  · Metropol Parasol (J. Mayer H.) y Tepoztlán: plataformas a distintas alturas → la gradería del jardín (nave norte).
+# Reglas:
+#  1. Manzana corta: hasta 3 locales por lado (≤ ~8 m) y un pasaje de 1.40 (NTC ≥ 1.10; cabe el diablito).
+#  2. Aparejo: en filas vecinas los pasajes no se alinean (a media crujía y a un cuarto): cada pasaje remata en el
+#     frente de una manzana; a cada ~20 m, una plazuela con motivo (fondas con barra, árbol, escalera, vitrina, acceso).
+#  3. La espina de cada fila va sobre una línea de columnas: la columna queda en el muro de fondo, nunca en un pasillo.
+#  4. Los locales de punta tienen dos frentes; en el borde del aro, un paso al patio cada 5 locales.
+PASAJE = 1.40
+CEL_MAX = 2.60
+BOCA_CADA = 5
+
+
+def _sw(g):
+    return shp_transform(lambda x, y, z=None: (y, x), g)
+
+
+def pasajes_fila(cols, k, fase, a0, a1):
+    """Pasajes (intervalos) de la fila k: a media crujía en las pares y a un cuarto en las nones (aparejo)."""
+    cu = sorted(cols)
+    if len(cu) < 2:
+        return []
+    bay = (cu[-1] - cu[0]) / (len(cu) - 1)
+    off = 0.5 if (k + fase) % 2 == 0 else 0.25
+    xs = [c0 + (c1 - c0) * off for c0, c1 in zip(cu, cu[1:])]
+    x = cu[0] - bay * (1 - off)
+    while x > a0:
+        xs.insert(0, x)
+        x -= bay
+    x = cu[-1] + bay * off
+    while x < a1:
+        xs.append(x)
+        x += bay
+    return [(x - PASAJE / 2, x + PASAJE / 2) for x in xs]
+
+
+def manzanas(S, L, region, libre, espinas, cols_eje, z, cols=(), fase=0, eje=0, lados=(-1, 1), pasajes=True):
+    """Filas de locales espalda con espalda (o una sola: `lados`) sobre las `espinas`, cortadas en manzanas cortas por
+    pasajes en aparejo (ver Barrio). eje 0: las filas corren en u (espinas en v); eje 1: corren en v (espinas en u).
+    region: donde caben locales; libre: el piso transitable (cada frente pide 1.10 libres, sin columnas).
+    Cada manzana se reparte en locales iguales de 2.00 a 2.60 de frente (NTC: lado ≥ 2.00, ≥ 4 m²)."""
+    W, F = CELDA
+    sw = _sw if eje else (lambda g: g)
+    reg = sw(region)
+    if reg.is_empty:
+        return []
+    R, Lb = prep(reg.buffer(0.01)), prep(sw(libre).buffer(0.01))
+    cb = unary_union([Point((p[1], p[0]) if eje else p).buffer(0.2) for p in cols]) if cols else Polygon()
+    a0, _, a1, _ = reg.bounds
+    hechos = []
+    for k, e in enumerate(espinas):
+        pas = pasajes_fila(cols_eje, k, fase, a0 - 1, a1 + 1) if pasajes else []
+        for lado in lados:
+            b0, b1 = (e - F, e) if lado < 0 else (e, e + F)
+            fb = b0 if lado < 0 else b1
+            tramos, run, x = [], None, a0
+            while x <= a1 + 1e-9:
+                ok = R.contains(caja2d(x, b0 + 0.01, x + 0.05, b1 - 0.01))
+                if ok and run is None:
+                    run = x
+                elif not ok and run is not None:
+                    tramos.append((run, x))
+                    run = None
+                x += 0.05
+            if run is not None:
+                tramos.append((run, x))
+            for A, B in tramos:
+                cortes = [A]
+                for p0, p1 in pas:
+                    if p0 - cortes[-1] >= 2.0 and B - p1 >= 2.0:
+                        cortes += [p0, p1]
+                cortes.append(B)
+                for i in range(0, len(cortes), 2):
+                    m0, m1 = cortes[i], cortes[i + 1]
+                    G = m1 - m0
+                    if G < 2.0:
+                        continue
+                    n = math.ceil(G / CEL_MAX - 1e-9)
+                    if G / n < 2.0:
+                        n = int(G / 2.0)
+                    w = G / n
+                    fila = []
+                    for j in range(n):
+                        x0, x1 = m0 + j * w, m0 + (j + 1) * w
+                        g = caja2d(x0, b0, x1, b1)
+                        t_ = caja2d(x0 + 0.02, fb - PASILLO, x1 - 0.02, fb - 0.02) if lado < 0 else caja2d(x0 + 0.02, fb + 0.02, x1 - 0.02, fb + PASILLO)
+                        t2 = caja2d(x0 + 0.02, fb - 2.6, x1 - 0.02, fb - 0.02) if lado < 0 else caja2d(x0 + 0.02, fb + 0.02, x1 - 0.02, fb + 2.6)
+                        sin_col = not t_.intersects(cb) or Lb.contains(t2)   # (una columna en un pasillo de ≥ 2.6 se rodea)
+                        fila.append([g, [LineString([(x0, fb), (x1, fb)])] if Lb.contains(t_) and sin_col else []])
+                    for j, xe, s_ in ((0, m0, -1), (n - 1, m1, 1)):   # puntas: segundo frente al pasaje o a la calle
+                        lat = caja2d(xe - PASILLO, b0 + 0.02, xe - 0.02, b1 - 0.02) if s_ < 0 else caja2d(xe + 0.02, b0 + 0.02, xe + PASILLO, b1 - 0.02)
+                        if Lb.contains(lat) and not lat.intersects(cb):
+                            fila[j][1].append(LineString([(xe, b0), (xe, b1)]))
+                    hechos += [(g, fr) for g, fr in fila if fr]
+    out = []
+    for g, fr in hechos:
+        g2 = sw(g)
+        puesto_geo(S, L, g2, [sw(f) for f in fr], z)
+        out.append(g2)
+    return out
+
+
+def arriate(S, L, ks, kl, c, lado, z, arboles, rng, alto=0.45, arbol=(2.8, 4.2)):
+    """Arriate de plaza de barrio: jardinera cuadrada con orilla de 0.35 para sentarse, tierra, matas y un árbol."""
+    g = caja2d(c[0] - lado / 2, c[1] - lado / 2, c[0] + lado / 2, c[1] + lado / 2)
+    t = g.buffer(-0.35, join_style='mitre')
+    losa(S[ks], L[ks], g.difference(t), z, z + alto)
+    S[ks] += tri_poligono(t, z + alto - 0.08)
+    if arbol:
+        arboles.append((c[0], c[1], z + alto - 0.08, rng.uniform(*arbol)))
+    u0, v0, u1, v1 = t.bounds
+    for _ in range(int(t.area * 6)):
+        x, y = rng.uniform(u0, u1), rng.uniform(v0, v1)
+        L[kl].append(((x, y, z + alto - 0.08), (x + rng.uniform(-0.12, 0.12), y + rng.uniform(-0.12, 0.12), z + alto + rng.uniform(0.15, 0.55))))
+    return g
+
+
+def poner_arriates(S, L, ks, kl, lista, libre, z, arboles, rng, **kw):
+    """Los arriates de `lista` [(c, lado)] que caben en `libre` con 1.10 libres alrededor."""
+    hechos = []
+    for c, lado in lista:
+        q = caja2d(c[0] - lado / 2, c[1] - lado / 2, c[0] + lado / 2, c[1] + lado / 2)
+        if libre.contains(q.buffer(PASILLO, join_style='mitre')):
+            hechos.append(arriate(S, L, ks, kl, c, lado, z, arboles, rng, **kw))
+    return hechos
+
+
+def barra_mirador(S, L, ks, a, b, n, z):
+    """Barra corrida en una orilla con vista (el vacío, el jardín, el patio del aro): cubierta a 1.05, frente lleno del
+    lado del vacío (hace de pretil, ≥ 0.90), bancos altos cada 0.60. n: hacia la plataforma (unitario).
+    Devuelve lo que ocupa (barra y bancos)."""
+    t = tira(a, b, 0.0, 0.45, 0.0, n)
+    if t is None:
+        return Polygon()
+    losa(S[ks], L[ks], t, z + 1.00, z + 1.05)
+    losa(S[ks], L[ks], tira(a, b, 0.0, 0.06, 0.0, n), z, z + 1.00)
+    k = int(math.dist(a, b) / 0.6)
+    for i in range(k):
+        s = (i + 0.5) / k
+        x, y = a[0] + (b[0] - a[0]) * s + n[0] * 0.8, a[1] + (b[1] - a[1]) * s + n[1] * 0.8
+        caja(S[ks], L[ks], x - 0.16, y - 0.16, z, x + 0.16, y + 0.16, z + 0.75)
+    return tira(a, b, 0.0, 1.0, 0.0, n)
+
+
+def graderia(S, L, ks, u0, u1, v0, n, z0, z1, pasos):
+    """Gradería que sube hacia +v desde v0 (a z0) hasta z1 en n gradas de 0.80 de huella, para sentarse; en `pasos`
+    [(u0, u1)] cada grada se parte en 3 escalones (peralte ≤ 0.18, huella 0.27 ≥ 0.25, NTC) con pasamanos."""
+    h, hu = (z1 - z0) / n, 0.80
+    corte = sorted(pasos)
+    asientos, x = [], u0
+    for a, b in corte:
+        if a > x:
+            asientos.append((x, a))
+        x = b
+    if x < u1:
+        asientos.append((x, u1))
+    for i in range(n):
+        va, vb = v0 + i * hu, v0 + (i + 1) * hu
+        for a, b in asientos:
+            losa(S[ks], L[ks], caja2d(a, va, b, vb), z0, z0 + (i + 1) * h)
+        for a, b in corte:
+            for j in range(3):
+                losa(S[ks], L[ks], caja2d(a, va + j * hu / 3, b, va + (j + 1) * hu / 3), z0, z0 + i * h + (j + 1) * h / 3)
+    for a, b in corte:
+        for x in (a + 0.05, b - 0.05):
+            L['baranda'].append(((x, v0, z0 + 0.9), (x, v0 + n * hu, z1 + 0.9)))
+    return caja2d(u0, v0, u1, v0 + n * hu)
+
+
+def arco_pts(r, th0, th1, paso):
+    """Puntos del arco del aro de radio r de th0 a th1 (rad), cada `paso` m de cuerda."""
+    d = 2 * math.asin(paso / 2 / r)
+    n = int((th1 - th0) / d)
+    return [(ARO[0] + r * math.cos(th0 + k * d), ARO[1] + r * math.sin(th0 + k * d)) for k in range(n + 1)]
+
+
+def radial(p, q):
+    """Hacia afuera del aro (hacia la nave) en el punto medio de p→q."""
+    mx, my = (p[0] + q[0]) / 2, (p[1] + q[1]) / 2
+    d = math.hypot(mx - ARO[0], my - ARO[1])
+    return ((mx - ARO[0]) / d, (my - ARO[1]) / d)
+
+
+# ================= Clusters, respiros y jardines (2026-10-13, propuesta 2) =================
+# Gabriel: «mezcla de mercancía y barra para comer, con divisiones claras, no convivencia forzada»; «módulos de combinación
+# que se repitan y hagan piso, con respecto a las grids estructurales»; «las columnas de la estructura deben regir todo»;
+# «compacto»; «los vacíos deben ser zonas de respiro (arquitectura japonesa), con un paisaje de fondo».
+# Un cluster es una machiya en miniatura sobre una línea de columnas (las dos columnas de su tramo quedan en el núcleo):
+#   cabeza (6.00 × 2.05): barra de comida que sale del producto del cluster, sólo donde da a un respiro, una plaza o un
+#     jardín (si no, dos puestos de punta);
+#   costados: 4 + 4 puestos de ≈ 2.34 × 2.05, fusionables (NTC: lado ≥ 2.00, ≥ 4 m²);
+#   núcleo (1.90): trastiendas, una bodega de fondo por puesto (Kahn: el sirviente, con la columna);
+#   pie: zaguán de 0.90 (tōri-niwa) por donde entran el locatario y el diablito.
+# Compacto: 2 tramos de postes (13.2) = cluster de 11.40 + pasaje de 1.80; calles de 3.00 entre líneas de columnas a
+# ≈ 9.0 (9.0 − 6.0). Aparejo (tatami shūgijiki): en líneas vecinas los clusters van corridos un tramo (no hay cruces de
+# cuatro; cada pasaje remata en T contra el costado de otro cluster).
+# Respiro = el lugar de un cluster vacío: tsuboniwa abajo (árbol, piedra, agua, borde-banca tipo engawa), vacío arriba,
+# módulo alto de la cubierta (hibukuro: saca el humo de los comales).
+CLUSTER = {'ancho': 6.0, 'nucleo': 1.9, 'cabeza': 2.05, 'pasaje': 1.8, 'largo': 11.4, 'antes_col': 2.3, 'frente': 2.34, 'zaguan': (0.9, 1.2)}
+FAM_COL = {'humedo': '#e85d5d', 'fresco': '#78c46b', 'seco': '#e6c85c', 'flores': '#f08bd0', 'ropa': '#6f8dff', 'hogar': '#5ab0c8', 'artesania': '#b48cff'}
+
+
+def cluster_geo(S, L, uc, va, vb, z, cabeza, lados=(-1, 1), ks='local', km='mesa'):
+    """Un cluster sobre la línea de columnas uc, de va a vb (a lo largo de v), con la cabeza en va (al sur).
+    cabeza: 'barra' | 'punta' | None (medio cluster, sin cabeza). lados: los costados que lleva (−1 oeste, +1 este).
+    Devuelve {'puestos', 'cocina', 'barra', 'nucleo', 'huella'}."""
+    C = CLUSTER
+    a, nu, H = C['ancho'] / 2, C['nucleo'] / 2, PUESTO[2]
+    out = {'puestos': [], 'cocina': None, 'barra': None, 'nucleo': None}
+    y0 = va
+    if cabeza and vb - va >= C['cabeza'] + 4.0:
+        cab = caja2d(uc - a, va, uc + a, va + C['cabeza'])
+        if cabeza == 'barra':
+            # la cocina abre a la barra (su mostrador es la barra) y los bancos quedan afuera, en el pasaje
+            puesto_geo(S, L, cab, [LineString([(uc - a, va), (uc + a, va)])], z)
+            n = int(2 * a / RACIMO['banco'])
+            for k in range(n):
+                x = uc - a + (k + 0.5) * 2 * a / n
+                caja(S[km], L[km], x - 0.15, va - 0.55, z, x + 0.15, va - 0.25, z + 0.70)
+            out['cocina'], out['barra'] = cab, caja2d(uc - a, va - 0.6, uc + a, va)
+        else:
+            for x0, x1, xs in ((uc - a, uc, uc - a), (uc, uc + a, uc + a)):
+                g = caja2d(x0, va, x1, va + C['cabeza'])
+                puesto_geo(S, L, g, [LineString([(x0, va), (x1, va)]), LineString([(xs, va), (xs, va + C['cabeza'])])], z)
+                out['puestos'].append(g)
+        y0 = va + C['cabeza']
+    G = vb - y0
+    n = max(1, int(round(G / C['frente'])))
+    while n > 1 and G / n < 2.0:
+        n -= 1
+    if G / n < 2.0:
+        return None
+    w = G / n
+    for lado in lados:
+        x0, x1 = (uc - a, uc - nu) if lado < 0 else (uc + nu, uc + a)
+        xf = uc - a if lado < 0 else uc + a
+        for j in range(n):
+            ya, yb = y0 + j * w, y0 + (j + 1) * w
+            g = caja2d(x0, ya, x1, yb)
+            fr = [LineString([(xf, ya), (xf, yb)])]
+            if j == n - 1:
+                fr.append(LineString([(x0, vb), (x1, vb)]))            # punta del pie: segundo frente al pasaje
+            if j == 0 and y0 == va:
+                fr.append(LineString([(x0, va), (x1, va)]))            # medio cluster: también la otra punta
+            puesto_geo(S, L, g, fr, z)
+            out['puestos'].append(g)
+    # núcleo: trastiendas (una bodega de fondo por puesto) con el zaguán al pie
+    zw, zl = C['zaguan']
+    nx0, nx1 = (uc - nu, uc + nu) if len(lados) == 2 else ((uc - nu, uc) if lados[0] < 0 else (uc, uc + nu))
+    for q in (caja2d(nx0, y0, nx1, vb - zl), caja2d(nx0, vb - zl, max(nx0, uc - zw / 2), vb), caja2d(min(nx1, uc + zw / 2), vb - zl, nx1, vb)):
+        if q.area > 0.05:
+            caja(S[ks], L[ks], *q.bounds[:2], z, *q.bounds[2:], z + H - 0.4)
+    if len(lados) == 2:
+        L[ks].append(((uc, y0, z + H - 0.39), (uc, vb - zl, z + H - 0.39)))
+    for j in range(1, n):
+        y = y0 + j * w
+        L[ks].append(((nx0, y, z + H - 0.39), (nx1, y, z + H - 0.39)))
+    out['nucleo'] = caja2d(nx0, y0, nx1, vb)
+    out['huella'] = unary_union(out['puestos'] + [out['nucleo']] + ([out['cocina']] if out['cocina'] else []))
+    return out
+
+
+def _corridas(R, x0, x1, v_lo, v_hi):
+    """Tramos en v donde la franja [x0, x1] cabe entera en R (preparado), a cada 0.10."""
+    n = int((v_hi - v_lo) / 0.1) + 1
+    runs, ini = [], None
+    for t in range(n + 1):
+        y = v_lo + t * 0.1
+        ok = t < n and R.contains(caja2d(x0, y + 0.005, x1, y + 0.095))
+        if ok and ini is None:
+            ini = y
+        elif not ok and ini is not None:
+            runs.append((ini, y)); ini = None
+    return runs
+
+
+def _resta(tramo, quitar):
+    out = [tramo]
+    for a, b in quitar:
+        nuevo = []
+        for x, y in out:
+            if b <= x or a >= y:
+                nuevo.append((x, y))
+            else:
+                if a > x:
+                    nuevo.append((x, a))
+                if b < y:
+                    nuevo.append((b, y))
+        out = nuevo
+    return out
+
+
+def slots_clusters(region, lineas, postes=None, fase=0):
+    """Los lugares de los clusters: cada línea de columnas se llena de sur a norte, en cada tramo libre, con clusters de
+    11.40 y pasajes de 1.80 (el último, medio cluster si sobra ≥ 4.00); en las líneas nones el tramo arranca con medio
+    cluster (aparejo: los pasajes de líneas vecinas no se alinean). Donde no cabe el ancho completo, clusters de un solo
+    costado. [(uc, va, vb, tipo, lados)]"""
+    C = CLUSTER
+    a, nu, P = C['ancho'] / 2, C['nucleo'] / 2, C['pasaje']
+    R = prep(region.buffer(0.01))
+    v_lo, v_hi = region.bounds[1], region.bounds[3]
+    slots = []
+
+    def llena(uc, A, B, lados, nones):
+        y = A
+        if nones and B - A >= C['largo'] + P + 4.0:
+            Lm = (C['largo'] - P) / 2
+            slots.append((uc, y, y + Lm, 'medio', lados)); y += Lm + P
+        while B - y >= 4.0:
+            Lc = min(C['largo'], B - y)
+            slots.append((uc, y, y + Lc, 'entero' if Lc >= C['largo'] - 1e-6 and len(lados) == 2 else ('medio' if len(lados) == 2 else 'lado'), lados))
+            y += Lc + P
+    for i, uc in enumerate(lineas):
+        for A, B in _corridas(R, uc - a, uc + a, v_lo, v_hi):
+            llena(uc, A, B, (-1, 1), (i + fase) % 2)
+        for lado, (x0, x1) in ((-1, (uc - a, uc + nu)), (1, (uc - nu, uc + a))):
+            usados = [(s_[1] - P, s_[2] + P) for s_ in slots if s_[0] == uc]
+            for A, B in _corridas(R, x0, x1, v_lo, v_hi):
+                for A2, B2 in _resta((A, B), usados):
+                    llena(uc, A2, B2, (lado,), False)
+    return slots
+
+
+def ajusta_slots(slots, region):
+    """Los mismos lugares (de la PB) recortados a otra planta (la PA): el tramo más largo de cada uno que cabe ahí."""
+    C = CLUSTER
+    a, nu = C['ancho'] / 2, C['nucleo'] / 2
+    R = prep(region.buffer(0.01))
+    out = []
+    for uc, va, vb, tipo, lados in slots:
+        x0, x1 = (uc - a, uc + a) if len(lados) == 2 else ((uc - a, uc + nu) if lados[0] < 0 else (uc - nu, uc + a))
+        rr = _corridas(R, x0, x1, va, vb)
+        b_ = max(rr, key=lambda r_: r_[1] - r_[0]) if rr else None
+        if b_ and b_[1] - b_[0] >= 4.0:
+            ent = b_[0] <= va + 1e-6 and b_[1] >= vb - 1e-6
+            out.append((uc, b_[0], b_[1], tipo if ent else ('medio' if len(lados) == 2 else 'lado'), lados))
+    return out
+
+
+def columnas_clusters(slots):
+    """Las columnas de cada cluster, en su núcleo: a 2.30 y a 8.90 de su arranque (una sola si es corto)."""
+    out = []
+    for uc, va, vb, tipo, lados in slots:
+        ys = [va + 2.3, va + 8.9] if vb - va >= 10.0 else [(va + vb) / 2]
+        out += [(uc, y) for y in ys]
+    return out
+
+
+def escoge_respiros(slots, n, luz0, permitido=lambda s: True):
+    """Los n slots enteros que, vacíos, más acercan la luz a los demás (uno por uno)."""
+    caja_ = lambda s: caja2d(s[0] - CLUSTER['ancho'] / 2, s[1], s[0] + CLUSTER['ancho'] / 2, s[2])
+    ent = [j for j, s in enumerate(slots) if s[3] in ('entero', 'medio') and permitido(s)]
+    cent = [caja_(s).centroid for s in slots]
+    resp, luz = [], luz0
+    for _ in range(min(n, len(ent))):
+        def costo(j):
+            l2 = unary_union([luz, caja_(slots[j])])
+            return sum(c.distance(l2) for t, c in enumerate(cent) if t not in resp and t != j)
+        j = min((j for j in ent if j not in resp), key=costo)
+        resp.append(j)
+        luz = unary_union([luz, caja_(slots[j])])
+    return resp
+
+
+def dibuja_clusters(S, L, slots, resp, z, piso, familia, ks='local', km='mesa'):
+    """Los clusters de `slots` (menos los respiros). La cabeza lleva barra si al sur (el pasaje) no hay otro cluster y sí
+    hay piso: da a un respiro, a una plaza o al jardín; si no, dos puestos de punta."""
+    a = CLUSTER['ancho'] / 2
+    huellas = {j: caja2d(s[0] - a, s[1], s[0] + a, s[2]) for j, s in enumerate(slots) if j not in resp}
+    P = prep(piso.buffer(0.01))
+    out = []
+    for j, (uc, va, vb, tipo, lados) in enumerate(slots):
+        if j in resp:
+            continue
+        cab = None
+        if tipo == 'entero':
+            frente = caja2d(uc - a, va - CLUSTER['pasaje'], uc + a, va - 0.05)
+            libre = P.contains(caja2d(uc - a, va - 0.8, uc + a, va - 0.05)) and not any(h.intersects(frente) for t, h in huellas.items() if t != j)
+            cab = 'barra' if libre else 'punta'
+        r_ = cluster_geo(S, L, uc, va, vb, z, cab, lados, ks, km)
+        if r_:
+            r_['fam'], r_['slot'] = familia(uc, va, vb), (uc, va, vb, tipo)
+            out.append(r_)
+    return out
+
+
+def respiros_fila(n, region, prohibido, luz0):
+    """Las n celdas de respiro (crujía entre líneas de columnas × entre dos espinas) que, una por una, más acercan la luz a la
+    PB (distancia media a la luz de una malla de 1 m sobre donde van los locales), como los vacíos V1–V3 de la propuesta.
+    Por celda, sus dos camas [(g, lado)]: la media fila norte de la espina de abajo (lado +1: el pasillo le queda al norte)
+    y la media fila sur de la de arriba (−1)."""
+    W, F = CELDA
+    us = [SUR['int'][0] + F + PASILLO] + list(SUR['cols_u']) + [SUR['int'][2] - F - PASILLO]
+    cand = []
+    for u0, u1 in zip(us, us[1:]):
+        for e0, e1 in zip(SUR['espinas'], SUR['espinas'][1:]):
+            celda = caja2d(u0, e0, u1, e1)
+            if celda.intersection(prohibido).area > 0.05 * celda.area:
+                continue
+            camas = []
+            for q, lado in ((caja2d(u0, e0, u1, e0 + F), 1), (caja2d(u0, e1 - F, u1, e1), -1)):
+                ps = poligonos(region.intersection(q))
+                if ps:
+                    camas.append((max(ps, key=lambda p_: p_.area), lado))
+            if len(camas) == 2 and all(g.area >= 0.85 * (u1 - u0) * F for g, _ in camas):
+                cand.append(camas)
+    if not cand or n <= 0:
+        return []
+    x0, y0, x1, y1 = region.bounds
+    pts = shapely.points([(x0 + 0.5 + i, y0 + 0.5 + j) for i in range(int(x1 - x0)) for j in range(int(y1 - y0))])
+    pts = pts[shapely.contains(region, pts)]
+    d = shapely.distance(pts, luz0)
+    dc = [shapely.distance(pts, unary_union([g for g, _ in c])) for c in cand]
+    elegidos = []
+    for _ in range(n):
+        libres = [k for k in range(len(cand)) if k not in elegidos]
+        if not libres:
+            break
+        k = min(libres, key=lambda k_: float(np.minimum(d, dc[k_]).mean()) if len(d) else 0.0)
+        elegidos.append(k)
+        d = np.minimum(d, dc[k])
+    return [cand[k] for k in elegidos]
+
+
+def respiro_fila(S, L, ks, kl, ka, camas, z, arboles, rng, pileta=False):
+    """Tsuboniwa de pasillo (2026-10-13): cada media fila que se quita es un arriate contra la espalda de los locales, con
+    borde de 0.30 y, del lado del pasillo, banca-borde de 0.55 a +0.45 (engawa); tezontle y musgo, piedras y un árbol que
+    sube por el vacío (los dos, en aparejo). El pasillo sigue de paso entre los dos; arriba es el puente entre las copas."""
+    for k, (g, lado) in enumerate(camas):
+        u0, v0, u1, v1 = g.bounds
+        t = caja2d(u0 + 0.3, v0 + 0.3, u1 - 0.3, v1 - 0.3).intersection(g)
+        banca = (caja2d(u0, v1 - 0.55, u1, v1) if lado > 0 else caja2d(u0, v0, u1, v0 + 0.55)).intersection(g)
+        tierra = t.difference(banca)
+        losa(S[ks], L[ks], g.difference(tierra), z, z + 0.45)
+        for p_ in poligonos(tierra):
+            S[ks] += tri_poligono(p_, z + 0.06)
+        tu0, tv0, tu1, tv1 = tierra.bounds
+        arboles.append((tu0 + (tu1 - tu0) * (0.28 if k == 0 else 0.72), (tv0 + tv1) / 2, z + 0.06, rng.uniform(6.5, 8.0)))
+        pil = caja2d(tu1 - 1.4, tv0 + 0.15, tu1 - 0.5, tv1 - 0.15) if pileta and k == 0 else Polygon()
+        if not pil.is_empty:   # tsukubai: la pileta de piedra con agua
+            losa(S[ks], L[ks], pil.difference(pil.buffer(-0.12, join_style='mitre')), z, z + 0.35)
+            S[ka] += tri_poligono(pil.buffer(-0.12, join_style='mitre'), z + 0.28)
+        for _ in range(3):   # piedras
+            x, y = rng.uniform(tu0 + 0.4, tu1 - 0.4), rng.uniform(tv0 + 0.3, tv1 - 0.3)
+            if pil.buffer(0.3).contains(Point(x, y)):
+                continue
+            s_ = rng.uniform(0.2, 0.4)
+            caja(S[ks], L[ks], x - s_, y - s_ * 0.7, z + 0.06, x + s_, y + s_ * 0.7, z + 0.06 + rng.uniform(0.15, 0.4))
+        for _ in range(int(tierra.area * 5)):   # musgo y helechos
+            x, y = rng.uniform(tu0, tu1), rng.uniform(tv0, tv1)
+            if pil.buffer(0.15).contains(Point(x, y)):
+                continue
+            L[kl].append(((x, y, z + 0.06), (x + rng.uniform(-0.1, 0.1), y + rng.uniform(-0.1, 0.1), z + 0.06 + rng.uniform(0.1, 0.4))))
+
+
+def respiro_pb(S, L, ks, kl, ka, g, z, arboles, rng):
+    """Tsuboniwa en el lugar de un cluster: borde-banca de 0.45 alrededor (engawa), tezontle y musgo, una pileta de agua,
+    piedras y un árbol que sube por el vacío hacia el módulo alto de la cubierta."""
+    t = g.buffer(-0.6, join_style='mitre')
+    losa(S[ks], L[ks], g.difference(t), z, z + 0.45)
+    S[ks] += tri_poligono(t, z + 0.06)
+    u0, v0, u1, v1 = t.bounds
+    pil = caja2d(u0 + 0.4, v0 + 0.8, u0 + 2.2, v0 + 2.6)
+    losa(S[ks], L[ks], pil.difference(pil.buffer(-0.12, join_style='mitre')), z, z + 0.35)
+    S[ka] += tri_poligono(pil.buffer(-0.12, join_style='mitre'), z + 0.28)
+    arboles.append(((u0 + u1) / 2 + 0.6, (v0 + v1) / 2 + 1.2, z + 0.06, rng.uniform(6.5, 8.0)))
+    for _ in range(5):   # piedras
+        x, y = rng.uniform(u0 + 0.4, u1 - 0.4), rng.uniform(v0 + 3.2, v1 - 0.4)
+        s_ = rng.uniform(0.25, 0.5)
+        caja(S[ks], L[ks], x - s_, y - s_ * 0.7, z + 0.06, x + s_, y + s_ * 0.7, z + 0.06 + rng.uniform(0.2, 0.45))
+    for _ in range(int(t.area * 5)):   # musgo y helechos
+        x, y = rng.uniform(u0, u1), rng.uniform(v0, v1)
+        if pil.buffer(0.2).contains(Point(x, y)):
+            continue
+        L[kl].append(((x, y, z + 0.06), (x + rng.uniform(-0.1, 0.1), y + rng.uniform(-0.1, 0.1), z + 0.06 + rng.uniform(0.1, 0.4))))
+    return g
+
+
+def jardin_inundable(S, L, g, z_borde, k_pared, k_agua, k_junco, arboles, rng, n_arboles=2, sin_barandal=None, alto=(2.5, 4.0)):
+    """Jardín hundido a −1.30 con espejo de agua a −0.25 (la lluvia lo inunda), barandal de 0.90 en la orilla, juncos y
+    árboles jóvenes (el del hoyo de la nave norte, ahora en las esquinas)."""
+    for p in poligonos(g):
+        for anillo in [p.exterior] + list(p.interiors):
+            c = list(anillo.coords)
+            for a, b in zip(c, c[1:]):
+                S[k_pared] += [((a[0], a[1], Z_JARDIN), (b[0], b[1], Z_JARDIN), (b[0], b[1], z_borde)),
+                               ((a[0], a[1], Z_JARDIN), (b[0], b[1], z_borde), (a[0], a[1], z_borde))]
+        S[k_agua] += tri_poligono(p, Z_AGUA)
+    m_bar = barandal_bordes(L, g, z_borde, sin_barandal if sin_barandal is not None else Polygon())
+    n_j = 0
+    for p in poligonos(g.buffer(-0.6)):
+        u0, v0, u1, v1 = p.bounds
+        cand = [(x, y) for x in [u0 + 0.6 * i for i in range(int((u1 - u0) / 0.6) + 1)] for y in [v0 + 0.6 * j for j in range(int((v1 - v0) / 0.6) + 1)] if p.contains(Point(x, y))]
+        rng.shuffle(cand)
+        for x, y in cand:
+            if n_j < n_arboles and all(math.hypot(x - a[0], y - a[1]) >= 3.0 for a in arboles):
+                arboles.append((x, y, Z_AGUA, rng.uniform(*alto)))
+                n_j += 1
+    for p in poligonos(g):
+        u0, v0, u1, v1 = p.bounds
+        k = 0
+        while k < int(p.area * 1.2):
+            x, y = rng.uniform(u0, u1), rng.uniform(v0, v1)
+            if not p.contains(Point(x, y)):
+                continue
+            h = rng.uniform(0.5, 1.1)
+            dx, dy = rng.uniform(-0.15, 0.15), rng.uniform(-0.15, 0.15)
+            L[k_junco] += [((x, y, Z_AGUA), (x + dx, y + dy, Z_AGUA + h)), ((x + dx * 0.7, y + dy * 0.7, Z_AGUA + h * 0.7), (x + dx, y + dy, Z_AGUA + h))]
+            k += 1
+    return m_bar
+
+
+# Cubierta de la nave sur (2026-10-13; ref. Mauricio Rocha, mercado de San Pablo Oztotepec): módulos de crujía (entre
+# cumbres y valles ≈ 9 m × postes 6.6 m) a tres alturas: alto sobre cada vacío (translúcido: luz cenital a la PB),
+# damero bajo / medio en el resto (cada escalón de 1 m es una franja de luz: vidrio si mira al N o al E, persiana si mira
+# al S o al O), bajo corrido sobre el servicio; la fila del muro norte, al menos medio.
+# 2026-10-13 (Gabriel: «que esa forma cuadrada le responda a las aguas originales … levantar los costados y doblar en
+# medio para canalizar el agua; los que estén por encima, la forma inversa para rechazar el agua y mandarla a los demás
+# techos»): cada módulo es un pedazo de las dos aguas de Rhino (valle o alero → cumbrera: +3.00 en media crujía, 1:3)
+# cortado y subido su escalón, con un doblez a lo largo de la pendiente, a la mitad entre postes:
+#   · CANAL (costados arriba, doblez abajo): la lluvia baja por en medio hasta el valle, lejos del vidrio del vecino;
+#   · LOMO (doblez arriba): sólo el que no tiene vecino más alto en su fila y sí alguno más bajo; el agua se va a los
+#     costados, a los techos de junto.
+# La silueta completa sube 1.70 (alero +7.90 en vez de +6.20) para dejar ≥ 3.00 libres sobre la PA (+4.28) en su punto
+# más bajo (el doblez de un canal en el valle). El módulo más alto vuela sobre el de junto lo que pide la lluvia a
+# LLUVIA_ANG para que no le llegue al vidrio del escalón; en los valles, donde el agua sí llega al escalón, el pie del
+# escalón es lámina (pretil) sobre el canalón.
+CUBIERTA_SUR = {'valle': 7.90, 'subida': 3.00, 'escalon': 1.00, 'doblez': 0.40, 'canto': 0.20, 'pretil': 0.30}
+NIV_SUR = {'bajo': 0, 'medio': 1, 'alto': 2}
+CUB_SUR = {}   # lo llena mercado_sur: triángulos y líneas de la cubierta (opaca) y del vidrio, para main()
+
+
+def _cruces(a, b, cu=(), cv=()):
+    """Los puntos donde el segmento a→b cruza las líneas u = c (cu) o v = c (cv), en orden."""
+    ts = []
+    for k, cs in ((0, cu), (1, cv)):
+        d = b[k] - a[k]
+        if abs(d) < 1e-9:
+            continue
+        for c in cs:
+            t = (c - a[k]) / d
+            if 1e-6 < t < 1 - 1e-6:
+                ts.append(t)
+    return [(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for t in sorted(ts)]
+
+
+def losa_f(tris, lins, g, f, canto, cu=(), cv=()):
+    """Extruye g del canto hacia abajo bajo la superficie z = f(u, v), plana por pedazos entre las líneas u = cu, v = cv."""
+    for p in poligonos(g):
+        x0, y0, x1, y1 = p.bounds
+        us = [x0 - 1] + sorted(c for c in cu if x0 < c < x1) + [x1 + 1]
+        vs = [y0 - 1] + sorted(c for c in cv if y0 < c < y1) + [y1 + 1]
+        for ua, ub in zip(us, us[1:]):
+            for va, vb in zip(vs, vs[1:]):
+                for pz in poligonos(p.intersection(caja2d(ua, va, ub, vb))):
+                    for t in tri_poligono(pz, 0):
+                        top = [(x, y, f(x, y)) for x, y, _ in t]
+                        tris.append(tuple(top))
+                        tris.append(tuple((x, y, z - canto) for x, y, z in (top[0], top[2], top[1])))
+        for anillo in [p.exterior] + list(p.interiors):
+            c = list(anillo.coords)
+            for a, b in zip(c, c[1:]):
+                pts = [a] + _cruces(a, b, cu, cv) + [b]
+                for s, e in zip(pts, pts[1:]):
+                    za, zb = f(*s), f(*e)
+                    tris.append(((s[0], s[1], za - canto), (e[0], e[1], zb - canto), (e[0], e[1], zb)))
+                    tris.append(((s[0], s[1], za - canto), (e[0], e[1], zb), (s[0], s[1], za)))
+                    lins += [((s[0], s[1], za), (e[0], e[1], zb)), ((s[0], s[1], za - canto), (e[0], e[1], zb - canto))]
+                lins.append(((a[0], a[1], f(*a) - canto), (a[0], a[1], f(*a))))
+
+
+def linea_f(lins, g, a, b, f, cu=(), cv=(), dz=0.0):
+    """El tramo a→b dentro de g, sobre la superficie z = f (+ dz), partido en las líneas de quiebre."""
+    s_ = g.intersection(LineString([a, b]))
+    for ln in getattr(s_, 'geoms', [s_]):
+        if ln.geom_type != 'LineString' or ln.length < 0.05:
+            continue
+        p0, p1 = ln.coords[0], ln.coords[-1]
+        pts = [p0] + _cruces(p0, p1, cu, cv) + [p1]
+        lins += [((s[0], s[1], f(*s) + dz), (e[0], e[1], f(*e) + dz)) for s, e in zip(pts, pts[1:])]
+
+
+def cubierta_sur(huecos, ranuras=()):
+    U = [NAVES_P[1][0], 513.5, 522.6, 531.5, 540.7, 549.5, NAVES_P[1][2]]   # alero O, cumbrera, valle, …, alero E
+    V = [NAVES_P[1][1]] + SUR['postes'][1:-1] + [NAVES_P[1][3]]
+    techo = caja2d(*NAVES_P[1]).difference(Point(ARO).buffer(CORTE, 256))
+    C = CUBIERTA_SUR
+    mods = {}
+    for i in range(len(U) - 1):
+        for j in range(len(V) - 1):
+            q = caja2d(U[i], V[j], U[i + 1], V[j + 1]).intersection(techo)
+            if q.area < 2:
+                continue
+            if any(q.intersection(h).area > 0.3 * min(q.area, h.area) for h in huecos):
+                n = 'alto'
+            elif V[j + 1] <= 337.7:
+                n = 'bajo'
+            else:
+                n = 'bajo' if (i + j) % 2 == 0 else 'medio'
+                if j == len(V) - 2 and n == 'bajo':
+                    n = 'medio'
+            mods[(i, j)] = (q, n)
+    niv = {k: NIV_SUR[n] for k, (q, n) in mods.items()}
+    # el doblez: lomo si nadie en su fila (los vecinos al N y al S) lo rebasa y alguno queda abajo; canal si no
+    forma = {}
+    for (i, j) in mods:
+        vec = [niv[(i, j + d)] for d in (-1, 1) if (i, j + d) in mods]
+        forma[(i, j)] = 'lomo' if vec and max(vec) <= niv[(i, j)] and min(vec) < niv[(i, j)] else 'canal'
+
+    def sup(k):
+        """z de la cara de arriba del módulo k (fuera de su celda sigue a nivel: los volados)."""
+        i, j = k
+        a, b = (U[i], U[i + 1]) if i % 2 == 0 else (U[i + 1], U[i])   # (valle o alero, cumbrera)
+        v0, v1 = V[j], V[j + 1]
+        vm, h = (v0 + v1) / 2, (v1 - v0) / 2
+        sg = 1 if forma[k] == 'lomo' else -1
+        z0 = C['valle'] + C['escalon'] * niv[k]
+
+        def f(u, v):
+            u, v = min(max(u, U[i]), U[i + 1]), min(max(v, v0), v1)
+            return z0 + C['subida'] * (u - a) / (b - a) + sg * C['doblez'] * (1 - abs(v - vm) / h)
+        return f
+    F = {k: sup(k) for k in mods}
+    celda = {(i, j): caja2d(U[i], V[j], U[i + 1], V[j + 1]) for (i, j) in mods}
+    quiebres = {(i, j): ((U[i], U[i + 1]), (V[j], (V[j] + V[j + 1]) / 2, V[j + 1])) for (i, j) in mods}
+    rango = lambda k: (niv[k], forma[k] == 'lomo')
+    t_c, l_c, t_v, l_v = [], [], [], []
+    volados = {k: [] for k in mods}
+    tg = math.tan(math.radians(LLUVIA_ANG))
+    n_pretil = 0
+    for (i, j), (q, n) in mods.items():
+        for (di, dj) in ((1, 0), (0, 1)):
+            k2 = (i + di, j + dj)
+            if k2 not in mods or rango((i, j)) == rango(k2):
+                continue
+            hi, lo = ((i, j), k2) if rango((i, j)) > rango(k2) else (k2, (i, j))
+            fh, fl = F[hi], F[lo]
+            lin = q.intersection(mods[k2][0])
+            segs = [s for s in getattr(lin, 'geoms', [lin]) if s.geom_type == 'LineString' and s.length > 0.5]
+            if not segs:
+                continue
+            valle = di == 1 and (i + 1) % 2 == 0            # el escalón cae en un valle: ahí llega el agua del bajo
+            pr = C['pretil'] if valle else 0.0
+            # hacia dónde mira el escalón: hacia el módulo bajo
+            cara = ('E' if hi == (i, j) else 'O') if di else ('N' if hi == (i, j) else 'S')
+            for sg_ in segs:
+                p0, p1 = sg_.coords[0], sg_.coords[-1]
+                pts = [p0] + _cruces(p0, p1, (), (quiebres[lo][1][1],) if di else ()) + [p1]
+                zl = [fl(*p) for p in pts]
+                zt = [max(fh(*p) - C['canto'], z_ + pr) for p, z_ in zip(pts, zl)]
+                alto_max = max(t_ - z_ for t_, z_ in zip(zt, zl))
+                if alto_max < 0.05:
+                    continue
+                # el volado del alto: lo que pide la lluvia a LLUVIA_ANG sobre la cara más alta del escalón
+                if niv[hi] > niv[lo]:
+                    w = max(0.25, math.ceil((alto_max * tg + 0.05) * 20) / 20)
+                    lado = -1 if (hi[0] > lo[0] or hi[1] > lo[1]) else 1   # hacia el bajo
+                    if di:
+                        x = p0[0]
+                        s_ = caja2d(min(x, x + lado * w), min(p0[1], p1[1]), max(x, x + lado * w), max(p0[1], p1[1]))
+                    else:
+                        y = p0[1]
+                        s_ = caja2d(min(p0[0], p1[0]), min(y, y + lado * w), max(p0[0], p1[0]), max(y, y + lado * w))
+                    volados[hi].append(s_.intersection(techo))
+                tramo = list(zip(pts, zl, zt))
+                for (s, a_, b_), (e, c_, d_) in zip(tramo, tramo[1:]):
+                    if pr:   # pretil de lámina al pie
+                        t_c += [((s[0], s[1], a_), (e[0], e[1], c_), (e[0], e[1], c_ + pr)), ((s[0], s[1], a_), (e[0], e[1], c_ + pr), (s[0], s[1], a_ + pr))]
+                        l_c.append(((s[0], s[1], a_ + pr), (e[0], e[1], c_ + pr)))
+                    za0, za1, zb0, zb1 = a_ + pr, b_, c_ + pr, d_
+                    if cara in ('N', 'E'):   # franja de vidrio con montantes cada ~1.5
+                        t_v += [((s[0], s[1], za0), (e[0], e[1], zb0), (e[0], e[1], zb1)), ((s[0], s[1], za0), (e[0], e[1], zb1), (s[0], s[1], za1))]
+                        m_ = max(1, int(math.dist(s, e) / 1.5))
+                        for t in range(m_ + 1):
+                            x, y = s[0] + (e[0] - s[0]) * t / m_, s[1] + (e[1] - s[1]) * t / m_
+                            l_v.append(((x, y, za0 + (zb0 - za0) * t / m_), (x, y, za1 + (zb1 - za1) * t / m_)))
+                    else:                    # persiana metálica: lamas cada 0.15, paralelas al pie
+                        o = 0.10
+                        while o < max(za1 - za0, zb1 - zb0) - 0.05:
+                            ha, hb = za1 - za0 - o - 0.05, zb1 - zb0 - o - 0.05   # lo que le sobra a la lama en cada punta
+                            if ha >= 0 or hb >= 0:
+                                t0, t1 = (0.0, 1.0) if ha >= 0 and hb >= 0 else ((0.0, ha / (ha - hb)) if ha >= 0 else (ha / (ha - hb), 1.0))
+                                P_ = lambda t: (s[0] + (e[0] - s[0]) * t, s[1] + (e[1] - s[1]) * t, za0 + (zb0 - za0) * t + o)
+                                l_c.append((P_(t0), P_(t1)))
+                            o += 0.15
+                        l_c += [((s[0], s[1], za0), (s[0], s[1], za1)), ((e[0], e[1], zb0), (e[0], e[1], zb1))]
+                n_pretil += bool(pr)
+    for k, (q, n) in mods.items():
+        g = unary_union([q] + volados[k]) if volados[k] else q
+        f = F[k]
+        cu, cv = quiebres[k]
+        vm = cv[1]
+        u0, _, u1, _ = g.bounds
+        if n == 'alto':   # translúcido (policarbonato alveolar, las celdas a lo largo de la pendiente): va con el vidrio
+            losa_f(t_v, l_v, g, f, 0.05, cu, cv)
+            for d in (0.0, 1.1, -1.1, 2.2, -2.2, 3.3, -3.3):
+                linea_f(l_v, g, (u0 - 1, vm + d), (u1 + 1, vm + d), f, cu, cv, 0.01)
+        else:
+            rn = unary_union(list(ranuras)).intersection(g) if ranuras else Polygon()
+            if not rn.is_empty:   # tragaluz corrido sobre la ranura del jardín (vidrio en el mismo plano, con montantes)
+                losa_f(t_v, l_v, rn, f, 0.05, cu, cv)
+                g = g.difference(rn)
+                r0, r1 = rn.bounds[1], rn.bounds[3]
+                x = math.ceil(rn.bounds[0] / 1.5) * 1.5
+                while x < rn.bounds[2]:
+                    linea_f(l_v, rn, (x, r0 - 1), (x, r1 + 1), f, cu, cv, 0.01)
+                    x += 1.5
+            losa_f(t_c, l_c, g, f, C['canto'], cu, cv)
+            linea_f(l_c, g, (u0 - 1, vm), (u1 + 1, vm), f, cu, cv, 0.005)   # el doblez
+
+    def z_en(u, v, celdas=False):
+        """z más alta de los módulos que tocan (u, v); con celdas, aunque el aro corte el módulo."""
+        p = Point(u, v)
+        zs = [F[k](u, v) for k, (q, n) in mods.items() if (celda[k] if celdas else q).buffer(0.01).contains(p)]
+        return max(zs) if zs else None
+    CUB_SUR.update({'tris': t_c, 'lins': l_c, 'vid': t_v, 'vidL': l_v,
+                    'z': lambda u, v: z_en(u, v) or C['valle'],
+                    # la cara de abajo en (u, v), para el vidrio del corte del aro (que cae justo en la orilla cortada)
+                    'abajo': lambda u, v: (lambda z_: None if z_ is None else z_ - C['canto'])(z_en(u, v, True)),
+                    'modulos': {n_: sum(1 for _, x in mods.values() if x == n_) for n_ in ('bajo', 'medio', 'alto')},
+                    'dobleces': {f_: sum(1 for x in forma.values() if x == f_) for f_ in ('canal', 'lomo')},
+                    'pretiles': n_pretil, 'U': U, 'V': V, 'mapa': {k: (n, forma[k]) for k, (q, n) in mods.items()}, 'sup': F})
+    return mods
+
+
+# Retícula de la vivienda (2026-10-13, medida de las columnas que bajan a la nave norte): 11 × 8 girada −10°; líneas c
+# (a 80° del eje u, cada 11.0) y s (perpendiculares, cada 8.0; la red de B1 va corrida 1 m). En la nave norte manda ella.
+VIV = {'ang': 80.0, 'c': (436.52, 447.52, 458.52, 469.52), 's_b1': 562.81}
+_VD = (math.cos(math.radians(VIV['ang'])), math.sin(math.radians(VIV['ang'])))
+_VN = (math.sin(math.radians(VIV['ang'])), -math.cos(math.radians(VIV['ang'])))
+
+
+def viv_uv(s, c):
+    return (s * _VD[0] + c * _VN[0], s * _VD[1] + c * _VN[1])
+
+
+def viv_sc(u, v):
+    return (_VD[0] * u + _VD[1] * v, _VN[0] * u + _VN[1] * v)
+
+
+def viv_u(c, v):
+    """u de la línea c a la altura v."""
+    return (c + _VD[0] * v) / _VN[0]
+
+
+def banda_viv(c0, c1, v0, v1):
+    """La franja entre las líneas c0 y c1, de v0 a v1 (cortada horizontal)."""
+    return Polygon([(viv_u(c0, v0), v0), (viv_u(c1, v0), v0), (viv_u(c1, v1), v1), (viv_u(c0, v1), v1)])
+
+
+def fila_viv(S, L, c0, c1, frente, s0, s1, region, z, ancho=2.5, pasaje=1.8, cada=3):
+    """Locales entre las líneas c0 y c1 (de vivienda) a lo largo de s, de ≈ ancho de frente, con un pasaje cada `cada`
+    locales; frente: la línea c del frente. Sólo los que caben en `region`."""
+    hechos, s, k = [], s0, 0
+    while s + 2.0 <= s1:
+        w = min(ancho, s1 - s)
+        g = Polygon([viv_uv(s, c0), viv_uv(s + w, c0), viv_uv(s + w, c1), viv_uv(s, c1)])
+        if region.contains(g):
+            puesto_geo(S, L, g, [LineString([viv_uv(s, frente), viv_uv(s + w, frente)])], z)
+            hechos.append(g)
+            k += 1
+        else:
+            k = 0
+        s += w
+        if cada and k >= cada:
+            s += pasaje
+            k = 0
+    return hechos
+
+
+def fila_muro_viv(S, L, u_muro, c_fondo, v0, v1, region, z, ancho=2.5):
+    """Locales que abren afuera, entre el muro (u_muro, su frente) y la línea c_fondo de vivienda (su fondo, con las
+    columnas): trapecios de fondo variable; sólo los de ≥ 2.00 de fondo."""
+    hechos, v = [], v0
+    while v + 2.0 <= v1:
+        w = min(ancho, v1 - v)
+        g = Polygon([(u_muro, v), (viv_u(c_fondo, v), v), (viv_u(c_fondo, v + w), v + w), (u_muro, v + w)])
+        if min(viv_u(c_fondo, v), viv_u(c_fondo, v + w)) - u_muro >= 2.0 and region.contains(g):
+            puesto_geo(S, L, g, [LineString([(u_muro, v), (u_muro, v + w)])], z)
+            hechos.append(g)
+        v += w
+    return hechos
+
+
+# Esquina NE (2026-10-13, Gabriel: «quita el jardín de donde está, hazlo de 80 m² y ponlo en la esquina recibiendo gente:
+# será gancho natural para generar accesos colindantes»; «que la esquina le dé menos la espalda a la calle»; «pudiera estar
+# abierta una parte de la esquina y dejar un alero que permita que la plataforma no se moje»; lluvia de diseño 20°):
+# el jardín inundable va entre la línea c de B3-2 y la línea s de la red de B1 (pasan por columnas de vivienda) y los dos
+# muros; la cubierta se abre sólo donde la lluvia a 20° (con 0.50 de holgura) cae dentro del jardín: alero de 3.30 medido
+# con la altura real de la cubierta (+8.1 en la orilla de la abertura). La abertura se recorta en franjas (el lenguaje del
+# hoyo pixelado).
+ESQ_NE = {'c': 458.52, 's': 562.81, 'alero': 3.30, 'franja': 0.6}
+
+
+def esquina_ne_jardin():
+    E = ESQ_NE
+    big = 60
+    q = Polygon([viv_uv(E['s'], E['c']), viv_uv(E['s'] + big, E['c']), viv_uv(E['s'] + big, E['c'] + big), viv_uv(E['s'], E['c'] + big)])
+    return q.intersection(caja2d(*ZANJA))
+
+
+def esquina_ne_abierto():
+    """Franjas (u0, v0, u1, v1) de la abertura al cielo: dentro del jardín, a ≥ alero de sus orillas interiores."""
+    E = ESQ_NE
+    c_a, s_a = E['c'] + E['alero'], E['s'] + E['alero']
+    u1, v1 = ZANJA[2], ZANJA[3]
+    out, x = [], viv_u(c_a, v1)
+    while x < u1 - 0.05:
+        x1 = min(u1, x + E['franja'])
+        v_lo = (s_a - _VD[0] * x) / _VD[1]                        # la línea s (baja hacia el este): su v más alta en x
+        v_hi = min(v1, (_VN[0] * x - c_a) / -_VN[1] if _VN[1] else v1)   # u ≥ viv_u(c_a, v) en todo el tramo
+        if v_hi - v_lo > 0.3:
+            out.append((round(x, 3), round(v_lo, 3), round(x1, 3), round(v_hi, 3)))
+        x = x1
+    return out
+
+
+def mercado_norte_plano(m, capas):
+    """Nave norte (2026-10-13, propuesta 2: «las columnas de la estructura deben regir todo»). La retícula de la vivienda
+    (11 × 8 girada −10°) baja a la nave: su línea B1-oeste es la espina de la isla bajo P1 (la fila que abre afuera al oeste,
+    en trapecios hasta el muro, y una fila hacia el portal al este: las columnas quedan en el muro de fondo); la línea
+    B1-este es el pórtico de la calle de las plantas (3.60, abierta hasta la cubierta) y la orilla de la P2; entre la isla y
+    la calle, un portal bajo P1. P1 (+4.28) repite la isla arriba con barra-mirador a la calle; P2 (+2.40) con su gradería al
+    foro (donde estaba el jardín, bajo el hoyo, que ahora lleva vidrio); P3 (+4.28) junto al vidrio, con 3.00 atrás. El
+    jardín inundable va a la esquina NE (ver ESQ_NE) con dos accesos pegados a él: N1b (Eulalia Guzmán) y N4 (Sabino), que
+    entran por un zaguán en L bajo la P2 (piso a −0.20, 2.30 libres) que lo rodea y sale a la calle de las plantas."""
+    viv = [c for c in columnas_vivienda() if c['z0'] < 1 and adentro(c['u'], c['v'], 0)]
+    rng = random.Random(7)
+    arboles = []
+    tan = math.tan(math.radians(LLUVIA_ANG))
+    disco_m = Point(ARO).buffer(R_VID, 256)
+    disco = Point(ARO).buffer(CORTE, 256)
+    interior = caja2d(*ZANJA).difference(disco_m)
+    hoyo = unary_union([caja2d(*q) for q in franjas_hoyo()])
+    alcance = lambda z: hoyo.buffer((Z_LLUVIA - z) * tan, join_style='mitre')
+    margen = 0.6
+    while True:   # el jardín de antes (bajo el hoyo): ahora el foro; sólo marca dónde arranca la gradería
+        foro = alcance(Z_AGUA).buffer(margen, join_style='mitre').intersection(interior)
+        if foro.area <= JARDIN_MAX or margen <= 0:
+            break
+        margen = max(0.0, margen - 0.05)
+    jardin = esquina_ne_jardin()
+    S = {k: [] for k in ('piso', 'resto', 'zanja', 'jardin', 'agua', 'plataforma', 'escalera', 'local', 'mesa', 'banca', 'humedal', 'agua_p', 'arriate')}
+    L = {k: [] for k in ('piso', 'agua', 'plataforma', 'lamina', 'local', 'mesa', 'escalera', 'baranda', 'junco', 'pasto', 'banca', 'humedal', 'arriate')}
+    u0n, v0n, u1n, v1n = ZANJA
+    W, F = CELDA
+    hu = ESC['huella']
+    # ---- la retícula de vivienda manda ----
+    cB1o, cB1e = VIV['c'][0], VIV['c'][1]
+    c_fondo = cB1o + 0.15            # muro de fondo de la isla (las columnas B1-oeste, dentro de él)
+    c_isla = c_fondo + F             # frente de la fila este de la isla (al portal)
+    c_p1 = cB1e - 3.6                # orilla de P1 = orilla oeste de la calle de las plantas (3.60); la este es el pórtico
+    oeste_de = lambda c: banda_viv(c - 400, c, v0n - 10, v1n + 10)
+    este_de = lambda c: banda_viv(c, c + 400, v0n - 10, v1n + 10)
+    calle_pl = banda_viv(c_p1, cB1e, v0n - 10, v1n).intersection(interior)
+    # ---- plataformas ----
+    x12 = viv_u(c_p1, 460.0)        # (para las cuentas del arco: dónde P1 se vuelve P3)
+    p2v0 = foro.bounds[3] + 1.2
+    P1 = interior.intersection(oeste_de(c_p1))
+    P2 = caja2d(u0n, p2v0, u1n, v1n).intersection(interior).intersection(este_de(cB1e)).difference(jardin)
+    P3 = Point(ARO).buffer(R_VID + P3_ANCHO, 256).difference(disco_m).intersection(interior).intersection(este_de(c_p1))
+    PA = unary_union([P1, P3])
+    # ---- piso (+0.40), con el jardín de la esquina hundido y el zaguán en L bajo la P2 (−0.20) ----
+    zg_s = caja2d(viv_u(cB1e, p2v0 + 4.0), p2v0 + 4.1, u1n, p2v0 + 4.1 + 3.6).intersection(P2)      # zaguán E–O (al norte de la gradería)
+    zg_o = banda_viv(ESQ_NE['c'] - 3.6, ESQ_NE['c'], p2v0 + 4.1, v1n).intersection(P2)             # zaguán N–S (al oeste del jardín)
+    zaguan = unary_union([zg_s, zg_o]).buffer(0)
+    Z_ZAG = NIVEL(-0.40)
+    zv0, zv1 = (zg_s.bounds[1], zg_s.bounds[3]) if not zg_s.is_empty else (0.0, 0.0)
+    esc_z = [(cB1e - (k + 1) * 0.30 * _VN[0], cB1e - k * 0.30 * _VN[0]) for k in range(4)]
+    escalones_z = banda_viv(esc_z[-1][0], cB1e, zv0, zv1)
+    piso = unary_union([caja2d(*ZANJA), caja2d(ZANJA_EXT[0], ZANJA_EXT[3], ZANJA_EXT[2], CAJA_N[3])]).difference(disco).difference(jardin).difference(zaguan).difference(escalones_z)
+    losa(S['piso'], L['piso'], piso, NIVEL(0), PISO)
+    losa(S['piso'], L['piso'], zaguan, Z_ZAG - 0.2, Z_ZAG)
+    for p in poligonos(caja2d(*CAJA_N).intersection(disco)):
+        S['resto'] += tri_poligono(p, NIVEL(0))
+    S['zanja'] = zanja_rhino(m, capas)
+    m_bar = jardin_inundable(S, L, jardin, PISO, 'jardin', 'agua', 'junco', arboles, rng, n_arboles=2,
+                             sin_barandal=unary_union([LineString([(u1n, 300), (u1n, 500)]).buffer(0.06), LineString([(400, v1n), (600, v1n)]).buffer(0.06)]))
+    # ---- baños (SE), núcleo de servicio sobre la línea B3-3 (las dos columnas de vivienda junto a los baños) ----
+    occ = interior.difference(jardin).area / 3.0 + (PA.area + P2.area) / 5.6
+    req, dis, med = banos_ntc(occ)
+    banos_g = bloque_banos(S, L, u1n, v0n + 0.3, med, PISO)
+    print('baños nave norte', json.dumps({'ocupantes': round(occ), 'NTC': req, 'proyecto': dis, 'medidas': med}, ensure_ascii=False))
+    sv = [viv_sc(c['u'], c['v'])[0] for c in viv if abs(viv_sc(c['u'], c['v'])[1] - VIV['c'][3]) < 0.4 and interior.contains(Point(c['u'], c['v']))]
+    nucleo_s = None
+    if sv:
+        c3 = VIV['c'][3]
+        nucleo_s = Polygon([viv_uv(min(sv) - 1.4, c3 - 1.0), viv_uv(max(sv) + 1.4, c3 - 1.0), viv_uv(max(sv) + 1.4, c3 + 1.0), viv_uv(min(sv) - 1.4, c3 + 1.0)]).difference(banos_g.buffer(0.3))
+        losa(S['local'], L['local'], nucleo_s, PISO, PISO + 2.4)   # bebedero, lockers y cuarto de aseo
+    # ---- P2 (+2.40): gradería al foro, losa sobre el zaguán, macizo en lo demás ----
+    gu0 = viv_u(cB1e, p2v0 + 4.0) + 0.05
+    pasos_g = [(gu0, gu0 + 1.2), (547.4, 548.6), (u1n - 1.2, u1n)]
+    grad = graderia(S, L, 'plataforma', gu0, u1n, p2v0, 5, PISO, Z_P2, pasos_g)
+    P2f = P2.difference(grad)
+    losa(S['plataforma'], L['plataforma'], P2f.difference(zaguan), PISO, Z_P2)
+    losa(S['plataforma'], L['plataforma'], P2f.intersection(zaguan), Z_P2 - LOSA_P, Z_P2)
+    rayas(L['lamina'], P2f, Z_P2 + 0.005, 0.4)
+    # escalones del zaguán a la calle de las plantas (−0.20 → +0.40: 4 de 0.15 × 0.30, en la calle, al sur de la escalera P2→P1)
+    for k, (c0, c1) in enumerate(esc_z):
+        losa(S['escalera'], L['escalera'], banda_viv(c0, c1, zv0, zv1), Z_ZAG - 0.2, Z_ZAG + (k + 1) * 0.15)
+    losa(S['plataforma'], L['plataforma'], PA, Z_P1 - LOSA_P, Z_P1)
+    rayas(L['lamina'], PA, Z_P1 + 0.005, 0.4)
+    # ---- escalera P2 → P1 (volada sobre la calle) y elevador junto al pórtico: PB, zaguán, P2 y, por un puente, P1 ----
+    vc = grad.bounds[3] + 4.6 + 1.3
+    n12 = math.ceil((Z_P1 - Z_P2) / 0.18 - 1e-9)
+    x_p1 = viv_u(c_p1, vc)
+    e12, l12, _ = escalera_recta(S, L, x_p1 + hu * (n12 - 1), vc, (-1, 0), ESC['ancho'], Z_P2, Z_P1, hu, grueso=0.22)
+    ua = viv_u(cB1e, v1n) + 0.3
+    asc_n = caja2d(ua, v1n - 2.4, ua + 2.2, v1n - 0.2)
+    caja(S['local'], L['local'], *asc_n.bounds[:2], Z_ZAG, *asc_n.bounds[2:], Z_P1 + 2.8)
+    puente = Polygon([(viv_u(c_p1, asc_n.bounds[1]) - 0.3, asc_n.bounds[1]), (ua, asc_n.bounds[1]), (ua, asc_n.bounds[3]), (viv_u(c_p1, asc_n.bounds[3]) - 0.3, asc_n.bounds[3])])
+    PA = unary_union([PA, puente])
+    losa(S['plataforma'], L['plataforma'], puente, Z_P1 - LOSA_P, Z_P1)
+    pn0, pn1 = PUERTA_NORTE
+    losa(S['plataforma'], L['plataforma'], caja2d(pn0, v1n - 0.05, pn1, ZANJA_EXT[3] + 0.05), PISO - 0.12, PISO)
+    muros = interior.exterior.buffer(0.08)
+    m_bar += barandal_bordes(L, PA, Z_P1, unary_union([muros, l12.buffer(0.08), asc_n.exterior.buffer(0.08)]))
+    tope_g = LineString([(gu0, grad.bounds[3]), (u1n, grad.bounds[3])]).buffer(0.08)
+    m_bar += barandal_bordes(L, P2f, Z_P2, unary_union([muros, tope_g, asc_n.exterior.buffer(0.08)]))
+    # ---- columnas: P1 en la espina de la isla (entre las de vivienda) y en su orilla; P3 en espina y orilla ----
+    cols_p = []
+    s_lo, s_hi = viv_sc(u0n, v0n)[0] - 20, viv_sc(u1n, v1n)[0] + 20
+    s = VIV['s_b1'] - 4.0 - 8.0 * 12
+    while s < s_hi:
+        for c_ in (c_fondo - 0.1, c_p1 + 0.15):
+            q = viv_uv(s, c_)
+            if s > s_lo and P1.buffer(-0.2).contains(Point(q)) and not asc_n.buffer(0.3).contains(Point(q)):
+                cols_p.append(q)
+        s += 8.0
+    dth = 2 * math.asin(W / 2 / R_VID)
+    du = x12 - ARO[0]
+    th0 = math.atan2(math.sqrt(max(R_VID ** 2 - du ** 2, 0)), du)
+    for r_ in (R_VID + F, R_VID + P3_ANCHO):
+        k = 0
+        while th0 - k * dth > 0:
+            th = th0 - k * dth
+            q = (ARO[0] + r_ * math.cos(th), ARO[1] + r_ * math.sin(th))
+            if P3.buffer(0.05).contains(Point(q)) and not P1.buffer(0.3).contains(Point(q)) and not banos_g.buffer(0.3).contains(Point(q)):
+                cols_p.append(q)
+            k += 3
+    for u, v in cols_p:
+        caja(S['plataforma'], L['plataforma'], u - 0.15, v - 0.15, PISO, u + 0.15, v + 0.15, Z_P1 - LOSA_P)
+    cols_v = [(c['u'], c['v']) for c in viv]
+    cols = cols_v + list(COLUMNAS_ACERO) + cols_p
+    # ---- PB: la isla bajo P1 sobre la línea B1-oeste (al oeste, trapecios que abren afuera; al este, la fila al portal) ----
+    banda_aro = Point(ARO).buffer(R_VID + 2 * F + 1.2, 256)
+    zona_p1 = interior.difference(banda_aro).difference(banos_g.buffer(PASILLO))
+    v_isla0 = v0n
+    borde_o = fila_muro_viv(S, L, u0n, c_fondo, v_isla0, v1n, zona_p1, PISO)
+    s_ini, s_fin = viv_sc(viv_u(c_fondo, v_isla0), v_isla0)[0], viv_sc(viv_u(c_fondo, v1n), v1n)[0]
+    isla_p1 = fila_viv(S, L, c_fondo, c_isla, c_isla, s_ini, s_fin, zona_p1.difference(asc_n.buffer(1.0)), PISO)
+    # arco del aro al patio (bajo P3), con un paso cada 5
+    du = u0n + 2 * F + PASILLO - ARO[0]
+    th0a = math.atan2(math.sqrt(R_VID ** 2 - du ** 2), du)
+    pts_a = [(ARO[0] + R_VID * math.cos(th0a - k * dth), ARO[1] + R_VID * math.sin(th0a - k * dth)) for k in range(int(th0a / dth) + 1)]
+    zona_a = interior.difference(banos_g.buffer(PASILLO)).difference(unary_union(borde_o + isla_p1).buffer(PASILLO) if (borde_o or isla_p1) else Polygon())
+    borde_a = isla_borde(S, L, pts_a, radial, zona_a, interior, PISO, cada=BOCA_CADA)
+    # ---- PB: la fonda del foro (racimo centrado en la columna de vivienda de B3-2: queda en su núcleo) ----
+    suelo = interior.difference(jardin).difference(zaguan)
+    rac, rac_g = [], []
+    for c in ((544.93, 449.0),):
+        h_, g_ = racimo(S, L, c, PISO)
+        rac += h_; rac_g.append(g_)
+    plaza_e = caja2d(*PLAZA_SABINO_N)
+    carga_n = caja2d(*CARGA_NORTE['patio'])
+    cuarto_n = recinto(S, L, 'local', CARGA_NORTE['cuarto'], PISO, ('o', CARGA_NORTE['cuarto'][1] + 0.4, CARGA_NORTE['cuarto'][1] + 1.6))
+    duro = unary_union([jardin, zaguan, escalones_z, banos_g, P2, asc_n, calle_pl, carga_n, cuarto_n] + ([nucleo_s] if nucleo_s else []) + borde_o + borde_a + isla_p1 + rac_g)
+    arrs = poner_arriates(S, L, 'arriate', 'pasto', [((537.8, 459.6), 1.8), ((553.6, 449.4), 2.0)], suelo.difference(duro.buffer(0.05)), PISO, arboles, rng)
+    duro = unary_union([duro] + arrs)
+    libre = suelo.difference(duro)
+    # crujías del centro y este: manzanas en aparejo sobre la retícula de la nave (las columnas de acero en las espinas)
+    lejos = unary_union([banda_aro, duro.buffer(PASILLO), plaza_e, este_de(c_p1 - 1.0).intersection(oeste_de(cB1e + 1.0))])
+    region = suelo.intersection(caja2d(u0n, v0n, u1n, p2v0 - 1.2)).difference(lejos).difference(oeste_de(cB1e + 1.0))
+    celdas = manzanas(S, L, region, libre, [v for v in V_POSTES if v < p2v0], EJES_U[1:], PISO, cols=cols, fase=1)
+    # ---- P1 (+4.28): la isla repetida arriba, con la barra-mirador en la orilla (a la calle de las plantas); P3 junto al
+    # vidrio (3.00 de paso atrás de sus locales) ----
+    barras = []
+    v_p3 = ARO[1] + math.sqrt(max((R_VID + P3_ANCHO) ** 2 - (x12 - ARO[0]) ** 2, 0))
+    for a_, b_ in ((v_p3 + 0.5, vc - ESC['ancho'] / 2 - 0.3), (vc + ESC['ancho'] / 2 + 0.3, asc_n.bounds[1] - 0.3)):
+        if b_ - a_ > 1.5:
+            a, b = (viv_u(c_p1, a_) - 0.02, a_), (viv_u(c_p1, b_) - 0.02, b_)
+            n_ = (-_VN[0], -_VN[1])
+            t_ = tira(a, b, 0, 1.0, 0, n_)
+            if t_ is not None and PA.buffer(0.05).contains(t_):
+                barras.append(barra_mirador(S, L, 'mesa', a, b, n_, Z_P1))
+    pts_3 = arco_pts(R_VID + 2.4, 0.0, math.pi / 2, W)
+    llega = unary_union([l12.buffer(2.0), puente.buffer(1.6)])
+    borde_3 = isla_borde(S, L, pts_3, radial, PA.difference(llega), PA, Z_P1, cada=BOCA_CADA)
+    duro_pa = unary_union(barras + borde_3 + [llega])
+    zona_p1a = P1.difference(duro_pa.buffer(PASILLO)).difference(Point(ARO).buffer(R_VID + 2.4 + 2 * F + 1.2, 256))
+    celdas_pa = fila_muro_viv(S, L, u0n, c_fondo, v_isla0, v1n, zona_p1a, Z_P1)
+    celdas_pa += fila_viv(S, L, c_fondo, c_isla, c_isla, s_ini, s_fin, zona_p1a, Z_P1)
+    # ---- P2 (+2.40): la terraza de las fondas (un racimo en columna de acero) y filas contra el muro norte ----
+    rac2, rac2_g = [], []
+    for c in ((EJES_U[2], V_POSTES[9]),):
+        if P2f.buffer(-2.0).contains(Point(c)):
+            h_, g_ = racimo(S, L, c, Z_P2)
+            rac2 += h_; rac2_g.append(g_)
+    duro2 = unary_union(rac2_g + [e12.buffer(0.6), asc_n])
+    libre2 = P2f.difference(duro2)
+    lejos2 = duro2.buffer(PASILLO)
+    filas2 = manzanas(S, L, P2f.intersection(caja2d(asc_n.bounds[2] + 0.2, v1n - F - 0.01, u1n, v1n)).difference(lejos2).difference(jardin.buffer(1.2)), libre2, [v1n], [], Z_P2, cols=cols, lados=(-1,), pasajes=False)
+    # jardinera colgante en la orilla de la P2 sobre la calle de las plantas (sigue el pórtico)
+    for a_, b_ in ((grad.bounds[3] + 0.2, vc - ESC['ancho'] / 2 - 0.2), (vc + ESC['ancho'] / 2 + 0.2, asc_n.bounds[1] - 0.2)):
+        if b_ - a_ > 1.0:
+            q = banda_viv(cB1e, cB1e + 0.45, a_, b_)
+            losa(S['arriate'], L['arriate'], q, Z_P2, Z_P2 + 0.45)
+            for _ in range(int((b_ - a_) * 5)):
+                y = rng.uniform(a_, b_)
+                x = viv_u(cB1e, y)
+                L['pasto'].append(((x + 0.1, y, Z_P2 + 0.4), (x - rng.uniform(0.05, 0.25), y + rng.uniform(-0.1, 0.1), Z_P2 - rng.uniform(0.3, 1.2))))
+    INFO['norte_pb'] = {'piso': suelo, 'celdas': celdas + isla_p1, 'filas': [], 'bordes': borde_o + borde_a, 'racimos': rac, 'arriates': arrs,
+                        'plazas': [(plaza_e, 'sabino'), (foro.difference(P2), 'foro')], 'calles': [calle_pl, zaguan], 'escaleras': [asc_n], 'vacios': [],
+                        'servicio': [banos_g, carga_n] + ([nucleo_s] if nucleo_s else []), 'jardines': [jardin],
+                        'cuartos': [(banos_g, 'baños'), (cuarto_n, 'cámara y residuos')] + ([(nucleo_s, 'núcleo de servicio')] if nucleo_s else []),
+                        'cols': cols_v + list(COLUMNAS_ACERO) + cols_p, 'plataformas': [(P2, 'P2 +2.40 (encima)')]}
+    INFO['norte_alto'] = {'piso': unary_union([PA, P2f]), 'celdas': celdas_pa + filas2, 'filas': [], 'bordes': borde_3, 'racimos': rac2, 'arriates': [],
+                          'plazas': [], 'calles': [], 'escaleras': [e12, asc_n, grad, puente], 'vacios': [], 'servicio': [], 'barras': barras, 'cols': [],
+                          'plataformas': [(P1, 'P1 +4.28'), (P2, 'P2 +2.40'), (P3, 'P3 +4.28')], 'jardines': [jardin]}
+    for g in borde_a[0::2]:   # los que abren al patio
+        c = g.centroid
+        MESITAS_TH.append(math.atan2(c.y - ARO[1], c.x - ARO[0]))
+    if borde_a:
+        ths = [math.atan2(g.centroid.y - ARO[1], g.centroid.x - ARO[0]) for g in borde_a]
+        VIDRIO_VANOS.append((min(ths) - dth, max(ths) + dth, NIVEL(0) - 0.1, Z_P3 - LOSA_P))
+    loc = {'PB_manzanas': len(celdas), 'PB_isla_bajo_P1': len(isla_p1), 'PB_hacia_afuera': len(borde_o), 'PB_al_patio': len(borde_a), 'PB_fonda_del_jardin': len(rac),
+           'P1_P3_manzanas': len(celdas_pa), 'P3_junto_al_vidrio': len(borde_3), 'P2_racimos': len(rac2), 'P2_filas': len(filas2)}
+    todos = celdas + isla_p1 + borde_o + borde_a + rac + celdas_pa + borde_3 + rac2 + filas2
+    abierto = sum((q[2] - q[0]) * (q[3] - q[1]) for q in esquina_ne_abierto())
+    resumen = {'hoyo_m2': round(hoyo.area, 1), 'jardin_m2': round(jardin.area, 1), 'jardin_abierto_m2': round(abierto, 1), 'alero_m': ESQ_NE['alero'],
+               'foro_m2': round(foro.area, 1), 'plataformas_m2': round(PA.area + P2.area, 1),
+               'plataformas': {'P1_m2': round(P1.area, 1), 'P2_m2': round(P2.area, 1), 'P3_m2': round(P3.area, 1), 'graderia_m2': round(grad.area, 1), 'z': [Z_P1, Z_P2, Z_P3]},
+               'zaguan_m2': round(zaguan.area, 1), 'puestos': len(todos), 'locales': loc, 'm2_locales': round(sum(g.area for g in todos)), 'mesas': 0, 'arboles': len(arboles),
+               'arriates': len(arrs), 'barra_mirador_m': round(sum(b.length / 2 - 1.0 for b in barras)),
+               'ocupantes': round(occ), 'ancho_salidas_m': round(occ * 0.005, 2), 'patios': None,
+               'banos': {'NTC': req, 'proyecto': dis, 'medidas': med}, 'barandal_m': round(m_bar, 1), 'columnas_plataformas': len(cols_p)}
+    print('nave norte', json.dumps(resumen, ensure_ascii=False))
+    return S, L, arboles, resumen
+
+
+# ---- Accesos (2026-10-12): puertas en los muros de Rhino ----
+# Gabriel abre los accesos levantando el panel del muro (en Rhino, el acceso este de la nave norte a +3.09): aquí se hace
+# igual, quitando el muro de la caja (u0, v0, z0, u1, v1, z1) hasta +3.20 del visor. La nave sur no tiene muros sur ni
+# oeste en Rhino (Clavel y el pasaje de la vitrina quedan abiertos).
+PUERTA_NORTE = (536.2, 539.8)                     # u: la calle de las plantas (2026-10-13: entre la orilla de P1 y el pórtico B1-este)
+PLAZA_SABINO_N = (549.6, 445.4, 557.745, 453.5)   # nave norte: la plazuela del acceso Sabino (cierre del valle)
+# (2026-10-13) la carga de la nave norte: por Sabino, al sur de la plazuela; patio de maniobra de diablitos y un cuarto
+# de cámara fría y residuos (la de la sur sigue en su esquina SE)
+CARGA_NORTE = {'puerta': (434.8, 438.8), 'patio': (552.7, 434.0, 557.745, 441.0), 'cuarto': (552.7, 441.0, 557.745, 445.0)}
+PUERTAS_MURO = [(PUERTA_NORTE[0], 487.4, -1.0, PUERTA_NORTE[1], 489.0, 3.2),   # norte · Eulalia Guzmán (calle de las plantas)
+                (547.37, 487.4, -1.0, 551.03, 489.0, 3.2),                      # norte · N1b, junto al jardín (zaguán N–S)
+                (551.03, 484.4, -1.0, 559.6, 489.0, 12.0),                      # la esquina NE abierta (jardín): muro norte
+                (557.6, 473.15, -1.0, 559.6, 489.0, 12.0),                      # la esquina NE abierta: muro este
+                (557.6, 469.61, -1.0, 559.6, 473.15, 3.2),                      # este · N4, junto al jardín (zaguán E–O)
+                (557.6, CARGA_NORTE['puerta'][0], -1.0, 559.6, CARGA_NORTE['puerta'][1], 3.2),   # este · carga norte
+                (557.6, 358.25, -1.0, 559.6, 361.55, 3.2),                      # sur · Sabino (en el eje del vacío)
+                (552.4, 395.6, -1.0, 557.4, 397.4, 3.2),                        # sur · Heliotropo
+                (557.6, 337.6, -1.0, 559.6, 344.0, 3.2)]                        # sur · el jardín sale a la banqueta (celosía verde)
+CELOSIAS = [(551.03, 488.4, 557.745, 488.4, 2.5, 7.0), (558.4, 473.15, 558.4, 484.613, 2.5, 7.0),   # esquina NE: de +2.5 hacia arriba
+            (558.4, 337.6, 558.4, 344.0, 0.2, 3.2)]                                                   # jardín sur: celosía verde
+# (nombre, punto en la puerta, hacia adentro, nivel) para la planta
+ACCESOS = [('Av. Eulalia Guzmán', (538.0, 488.6), (0, -1), 'pb'), ('N1b · jardín', (549.2, 488.6), (0, -1), 'pb'),
+           ('N4 · jardín', (559.6, 471.4), (-1, 0), 'pb'), ('Sabino', (559.6, 449.5), (-1, 0), 'pb'), ('carga N', (559.6, 436.8), (-1, 0), 'pb'),
+           ('Sabino', (559.6, 359.9), (-1, 0), 'pb'), ('Heliotropo', (554.9, 397.2), (0, -1), 'pb'),
+           ('Clavel', (506.4, 322.8), (0, 1), 'pb'), ('carga', (559.6, 330.6), (-1, 0), 'pb'),
+           ('patio del aro', (534.2, 380.6), (0.55, -0.83), 'pb'), ('patio del aro', (533.0, 446.4), (0.6, 0.8), 'pb'),
+           ('cinta +4.28', (546.9, 392.4), (0.5, -0.86), 'alto'), ('cinta +4.28', (549.6, 423.6), (0.3, 0.95), 'alto')]
+
+
+def _corta(pol, eje, val, s):
+    """La parte del polígono convexo pol (puntos 3D) donde s·(p[eje] − val) ≥ 0."""
+    out, n = [], len(pol)
+    for i in range(n):
+        a, b = pol[i], pol[(i + 1) % n]
+        da, db = s * (a[eje] - val), s * (b[eje] - val)
+        if da >= 0:
+            out.append(a)
+        if (da >= 0) != (db >= 0):
+            t = da / (da - db)
+            out.append(tuple(a[j] + (b[j] - a[j]) * t for j in range(3)))
+    return out if len(out) >= 3 else []
+
+
+def fuera_de_caja3(pol, q):
+    """Las partes de pol (convexo, 3D) fuera de la caja q = (u0, v0, z0, u1, v1, z1)."""
+    if any(max(p[k] for p in pol) <= q[k] or min(p[k] for p in pol) >= q[k + 3] for k in range(3)):
+        return [pol]
+    out, resto = [], pol
+    for k in range(3):
+        for val, s in ((q[k], -1), (q[k + 3], 1)):
+            f = _corta(resto, k, val, s)
+            if f:
+                out.append(f)
+            resto = _corta(resto, k, val, -s)
+            if not resto:
+                return out
+    return out
+
+
+def segmento_fuera_caja3(a, b, q):
+    t0, t1, d = 0.0, 1.0, [b[k] - a[k] for k in range(3)]
+    for k in range(3):
+        for p_, s_ in ((-d[k], a[k] - q[k]), (d[k], q[k + 3] - a[k])):
+            if abs(p_) < 1e-12:
+                if s_ <= 0:
+                    return [(a, b)]
+            elif p_ < 0:
+                t0 = max(t0, s_ / p_)
+            else:
+                t1 = min(t1, s_ / p_)
+    if t0 >= t1:
+        return [(a, b)]
+    P = lambda t: tuple(a[j] + (b[j] - a[j]) * t for j in range(3))
+    return ([(a, P(t0))] if t0 > 1e-9 else []) + ([(P(t1), b)] if t1 < 1 - 1e-9 else [])
+
+
+# Tragaluces (2026-10-12, Gabriel: «los tragaluces están súper»): dos nubes de franjas de vidrio con el lenguaje del hoyo
+# (franjas de ¼ de tramo paralelas a la cumbrera, largos y corrimientos sin simetría) sobre las fondas de la P2, en la
+# crujía este (donde la vivienda no tapa el cielo), una a cada lado de la cumbrera E y ninguna sobre el valle. Llevan
+# vidrio: la lluvia no cae en las plataformas (regla de Gabriel); el hoyo del jardín sigue abierto.
+TRAGALUCES = [{'u0': 541.6, 'v': 475.14, 'ritmo': [2.2, 3.6, 2.8], 'corrido': [0.5, -0.2, 0.3]},
+              {'u0': 550.1, 'v': 475.14, 'ritmo': [3.0, 2.4, 3.4], 'corrido': [-0.3, 0.4, 0.0]}]
+
+
+def franjas_tragaluz():
+    w = TRAMO / 4
+    return [(t['u0'] + i * w, t['v'] + dv - l / 2, t['u0'] + (i + 1) * w, t['v'] + dv + l / 2)
+            for t in TRAGALUCES for i, (l, dv) in enumerate(zip(t['ritmo'], t['corrido']))]
+
+
+def vidrio_tragaluces(techo):
+    """El vidrio de cada franja de tragaluz, sobre la cara de arriba de la cubierta (un faldón: plano), con su marco."""
+    tris, lins = [], []
+
+    def z_arriba(u, v):
+        zs = []
+        for t in techo:
+            (x1, y1, z1), (x2, y2, z2), (x3, y3, z3) = t
+            den = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
+            if abs(den) < 1e-12:
+                continue
+            l1 = ((y2 - y3) * (u - x3) + (x3 - x2) * (v - y3)) / den
+            l2 = ((y3 - y1) * (u - x3) + (x1 - x3) * (v - y3)) / den
+            if min(l1, l2, 1 - l1 - l2) >= -1e-6:
+                zs.append(l1 * z1 + l2 * z2 + (1 - l1 - l2) * z3)
+        return max(zs) if zs else None
+    # (2026-10-13: el jardín salió de bajo el hoyo: el hoyo también lleva vidrio; el foro de abajo ya no se moja)
+    for u0, v0, u1, v1 in franjas_tragaluz() + [tuple(q) for q in franjas_hoyo()]:
+        # (la franja ya no tiene cubierta: la altura se toma justo afuera, del mismo faldón)
+        P = []
+        for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1)):
+            z = None
+            for d in (0.05, 0.3, 0.8, 1.5):
+                z = z_arriba(u, v - d if v == v0 else v + d)
+                if z is not None:
+                    break
+            P.append((u, v, (z or 9.0) + 0.04))
+        tris += [(P[0], P[1], P[2]), (P[0], P[2], P[3])]
+        lins += [(P[i], P[(i + 1) % 4]) for i in range(4)]
+        um = (u0 + u1) / 2
+        lins.append(((um, v0, (P[0][2] + P[1][2]) / 2 + 0.01), (um, v1, (P[3][2] + P[2][2]) / 2 + 0.01)))
+    return tris, lins
+
+
+def planta_plano_png():
+    """Plantas rotuladas del mercado (2026-10-12): la PB de las dos naves y lo alto (PA sur +4.28; P1 y P3 +4.28, P2 +2.40
+    en la norte). analisis/mercado/planta_mercado_plano.png"""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Polygon as Pol, Circle, Rectangle, Patch
+    fig, axs = plt.subplots(1, 2, figsize=(15, 21))
+    fig.patch.set_facecolor('#111')
+
+    def pinta(ax, g, **kw):
+        for p in poligonos(g):
+            ax.add_patch(Pol(list(p.exterior.coords), closed=True, **kw))
+            for h in p.interiors:
+                ax.add_patch(Pol(list(h.coords), closed=True, fc='#111', ec=kw.get('ec', 'none'), lw=kw.get('lw', 0.3)))
+    paneles = ((axs[0], ('sur_pb', 'norte_pb'), 'Planta baja (+0.40)'),
+               (axs[1], ('sur_pa', 'norte_alto'), 'Arriba: PA sur +4.28 · norte P1 y P3 +4.28, P2 +2.40'))
+    for ax, claves, titulo in paneles:
+        ax.set_facecolor('#111')
+        Pt = INFO.get('_patios')
+        if Pt and ax is axs[0]:
+            for g in Pt['pat']:
+                pinta(ax, g, fc='#3a2a22', ec='none')
+            for r_ in (PATIO['circ1'][0], PATIO['mesas'][0], PATIO['circ2'][0]):
+                ax.add_patch(Circle(ARO, r_, fc='none', ec='#777', lw=0.4, ls=':'))
+            for g in Pt['hums']:
+                pinta(ax, g, fc='#2f7f4f', ec='w', lw=0.5)
+            for g in Pt['mesitas']:
+                pinta(ax, g, fc='#ffd27f', ec='none')
+            for g in Pt['bancas']:
+                pinta(ax, g, fc='#ff6bd0', ec='none')
+        n_tot = 0
+        for nombre in claves:
+            I = INFO.get(nombre)
+            if not I:
+                continue
+            pinta(ax, I['piso'], fc='#2a2a2a', ec='none')
+            for g in I.get('servicio', []):
+                pinta(ax, g, fc='#7a2a2a', ec='none', alpha=0.5)
+            for g, nom in I.get('plazas', []):
+                pinta(ax, g, fc='#5a4a2a', ec='none', alpha=0.9)
+                if not g.is_empty:
+                    q = g.representative_point()
+                    ax.text(q.x, q.y, nom, color='#ffcc88', fontsize=7, ha='center', style='italic')
+            for g in I.get('calles', []):
+                pinta(ax, g, fc='#4a4a4a', ec='none')
+            for g in I.get('vacios', []):
+                pinta(ax, g, fc='#0b0b0b', ec='#ffcc33', lw=0.8, ls='--')
+            for g in I.get('jardines', []):
+                pinta(ax, g, fc='#2f7f4f', ec='#a8e063', lw=0.6)
+            for g in I.get('respiros', []):
+                pinta(ax, g, fc='#24553a', ec='#a8e063', lw=0.8, hatch='..')
+            for g in I.get('nucleos', []):
+                pinta(ax, g, fc='#3b3b46', ec='none')
+            for k, col in (('celdas', '#8a98ff'), ('filas', '#a7b2ff'), ('bordes', '#7fd0ff'), ('racimos', '#ff9f6b')):
+                for g in I.get(k, []):
+                    pinta(ax, g, fc=col, ec='w', lw=0.25)
+            for cl in I.get('clusters', []):   # los puestos de cada cluster, del color de su familia
+                for g in cl['puestos']:
+                    pinta(ax, g, fc=FAM_COL.get(cl['fam'], '#8a98ff'), ec='w', lw=0.25)
+            for g in I.get('barras', []):
+                pinta(ax, g, fc='#ffd27f', ec='none')
+            for g in I.get('arriates', []):
+                pinta(ax, g, fc='#3f9f5f', ec='w', lw=0.4)
+            for g in I.get('escaleras', []):
+                pinta(ax, g, fc='#ddd', ec='k', lw=0.3)
+            for g, nom in I.get('cuartos', []):
+                pinta(ax, g, fc='#4a4a4a', ec='#bbb', lw=0.4)
+                q = g.centroid
+                ax.text(q.x, q.y, nom, color='#eee', fontsize=4.5, ha='center', va='center', rotation=90 if g.bounds[2] - g.bounds[0] < g.bounds[3] - g.bounds[1] - 1 else 0)
+            for g, nom in I.get('plataformas', []):
+                pinta(ax, g, fc='none', ec='#ffcc33', lw=1.0)
+                q = g.representative_point()
+                ax.text(q.x, q.y, nom, color='#ffcc33', fontsize=8, ha='center')
+            for u, v in I.get('cols', []):
+                ax.add_patch(Rectangle((u - 0.18, v - 0.18), 0.36, 0.36, fc='m', ec='none'))
+            n = sum(len(I.get(k, [])) for k in ('celdas', 'filas', 'bordes', 'racimos'))
+            n_tot += n
+            ax.text(I['piso'].centroid.x, I['piso'].bounds[3] + 1.5, '%s: %d locales' % (nombre.replace('_', ' '), n), color='w', ha='center', fontsize=9)
+        for q in (franjas_tragaluz() if ax is axs[1] else []) + [list(x) for x in franjas_hoyo()]:
+            ax.add_patch(Rectangle((q[0], q[1]), q[2] - q[0], q[3] - q[1], fc='none', ec='#9fe8ff', lw=0.6, ls=':'))
+        for nom, (u, v), (du, dv), niv in ACCESOS:   # los accesos: flecha hacia adentro
+            if (niv == 'pb') != (ax is axs[0]):
+                continue
+            ax.annotate('', xy=(u + du * 3.2, v + dv * 3.2), xytext=(u - du * 0.8, v - dv * 0.8), arrowprops=dict(arrowstyle='-|>', color='#ff8c1a', lw=2.2))
+            ax.text(u - du * 1.8, v - dv * 1.8, nom, color='#ff8c1a', fontsize=7, ha='center', va='center', rotation=90 if abs(du) > abs(dv) else 0, fontweight='bold')
+        ax.add_patch(Circle(ARO, CORTE, fc='none', ec='orange', ls='--'))
+        ax.set_xlim(503, 562); ax.set_ylim(320, 492); ax.set_aspect('equal')
+        ax.tick_params(colors='#888')
+        ax.set_title('%s · %d locales' % (titulo, n_tot), color='w', fontsize=10)
+    ley = [Patch(fc='#8a98ff', label='manzanas y filas (norte, muros)'), Patch(fc='#7fd0ff', label='borde del aro / vidrio'),
+           Patch(fc='#ff9f6b', label='cocinas con barra (cabezas, racimos)'), Patch(fc='#ffd27f', label='barras, bancos y mesitas'), Patch(fc='#3b3b46', label='núcleos: trastiendas'),
+           Patch(fc='#2f7f4f', ec='#a8e063', label='jardines inundables'), Patch(fc='#24553a', ec='#a8e063', hatch='..', label='respiros (tsuboniwa)'),
+           Patch(fc='#5a4a2a', label='plazuelas y foro'), Patch(fc='#7a2a2a', label='servicio, vitrina, baños'), Patch(fc='none', ec='#9fe8ff', label='hoyo y tragaluces')]
+    ley += [Patch(fc=c, label='cluster ' + n) for n, c in FAM_COL.items()]
+    fig.legend(handles=ley, loc='lower center', ncol=5, facecolor='#111', labelcolor='w', fontsize=8, frameon=False)
+    salida = os.path.join(os.path.dirname(RAIZ), 'analisis', 'mercado', 'planta_mercado_plano.png')
+    if not os.path.isdir(os.path.dirname(salida)):   # sin la carpeta del proyecto (nube): no hay dónde dejarla
+        print('sin', os.path.dirname(salida), '· no se dibujó', os.path.basename(salida))
+        plt.close(fig)
+        return
+    fig.savefig(salida, dpi=90, facecolor='#111', bbox_inches='tight')
     print('planta', salida)
 
 
@@ -1826,12 +3827,15 @@ def main():
             continue   # (2026-10-12, Gabriel: la cubierta de la nave sur se quita; luego se genera. Sólo da alturas al vidrio)
         if papel == 'pa':
             continue   # (la PA de Rhino se reemplaza por la plataforma de mercado_sur)
-        rects = franjas if norte else []
+        rects = (franjas + franjas_tragaluz() + esquina_ne_abierto()) if norte else []
+        puertas = PUERTAS_MURO if papel == 'perimetro' else []
         cortes = []
         for T in T3:
             piezas = fuera_del_circulo(T, cortes)
             for q in rects:
                 piezas = [x for pz in piezas for x in fuera_de_rect(pz, q, cortes)]
+            for q in puertas:
+                piezas = [x for pz in piezas for x in fuera_de_caja3(pz, q)]
             for pol in piezas:
                 for i in range(1, len(pol) - 1):
                     for p in (pol[0], pol[i], pol[i + 1]):
@@ -1841,6 +3845,8 @@ def main():
             segs = segmento_fuera(a, b)
             for q in rects:
                 segs = [x for s in segs for x in segmento_fuera_rect(s[0], s[1], q)]
+            for q in puertas:
+                segs = [x for s in segs for x in segmento_fuera_caja3(s[0], s[1], q)]
             for s in segs:
                 lin[papel].extend(round(c, 3) for p in s for c in p)
         for a, b in cortes:
@@ -1850,16 +3856,45 @@ def main():
                 lin[papel].extend(round(c, 3) for p in s for c in p)
         if xs and papel != 'pa':
             huellas.append((min(xs), min(ys), max(xs), max(ys)))
+    for q in PUERTAS_MURO:   # el marco de cada puerta (jambas y dintel, al centro del muro)
+        u0, v0, z0_, u1, v1, z1 = q
+        if z1 > 5:
+            continue   # (la esquina abierta: sin marco)
+        if u1 - u0 >= v1 - v0:   # muro a lo largo de u
+            a, b = (u0, (v0 + v1) / 2), (u1, (v0 + v1) / 2)
+        else:
+            a, b = ((u0 + u1) / 2, v0), ((u0 + u1) / 2, v1)
+        for (x, y) in (a, b):
+            lin['perimetro'].extend(round(c, 3) for c in (x, y, 0.2, x, y, z1))
+        lin['perimetro'].extend(round(c, 3) for c in (a[0], a[1], z1, b[0], b[1], z1))
+    for u0, v0, u1, v1, za, zb in CELOSIAS:   # celosías (verticales cada 0.15) en la esquina NE y en el jardín sur
+        n_ = max(1, int(math.dist((u0, v0), (u1, v1)) / 0.15))
+        for k in range(n_ + 1):
+            x, y = u0 + (u1 - u0) * k / n_, v0 + (v1 - v0) * k / n_
+            lin['perimetro'].extend(round(c, 3) for c in (x, y, za, x, y, zb))
+        lin['perimetro'].extend(round(c, 3) for c in (u0, v0, za, u1, v1, za))
     acero_t, acero_l, cie_t, cie_l, viv_t, viv_l = reticula(techo)
+    tra_t, tra_l = vidrio_tragaluces(techo)
     canalon(cie_t, cie_l)
     sal['cubierta'].extend(plano(cie_t))
     lin['cubierta'].extend(plano(cie_l))
-    vid_t, vid_l, vid_r = vidrio_aro([techo, techo_s])
-    print('fachada al aro (vidrio)', len(vid_t), 'triángulos', len(vid_l), 'marcos')
-    S3, L3, arboles, resumen = mercado_norte(m, capas)
+    S3, L3, arboles, resumen = mercado_norte_plano(m, capas)
     sur, arb_s, resumen['sur'] = mercado_sur()
-    arboles = list(arboles) + arb_s
+    # la cubierta nueva de la nave sur (módulos a tres alturas): lo opaco con las cubiertas; el vidrio y lo translúcido, aparte
+    sal['cubierta'].extend(plano(CUB_SUR.get('tris', [])))
+    lin['cubierta'].extend(plano(CUB_SUR.get('lins', [])))
+    resumen['patios'] = patios_aro(S3, L3, arboles)   # (después de las dos naves: las mesitas siguen a sus locales)
+    print('paso 3', json.dumps({k: v for k, v in resumen.items() if k != 'sur'}, ensure_ascii=False))
     cin_t, cin_l, cinta = cinta_aro()
+    vid_t, vid_l, vid_r = vidrio_aro([techo, CUB_SUR.get('abajo') or techo_s])
+    print('fachada al aro (vidrio)', len(vid_t), 'triángulos', len(vid_l), 'marcos', '· vanos', len(VIDRIO_VANOS))
+    planta_plano_png()
+    disco_c = Point(ARO).buffer(CORTE, 256)
+    comercio = {'vivienda_junto_al_aro (18 módulos × 22)': 396, 'norte_PB': round(caja2d(*NAVES_P[0]).difference(disco_c).area), 'sur_PB': round(caja2d(*NAVES_P[1]).difference(disco_c).area), 'sur_PA': round(resumen['sur']['pa_m2']), 'norte_plataformas': round(resumen['plataformas_m2'])}
+    comercio['TOTAL'] = sum(comercio.values()); comercio['falta_para_7500'] = 7500 - comercio['TOTAL']
+    resumen['comercio_m2'] = comercio
+    print('comercio', json.dumps(comercio, ensure_ascii=False))
+    arboles = list(arboles) + arb_s
     cinta.update({'tris': plano(cin_t), 'lineas': plano(cin_l)})
     # huella de cada nave: la caja de todo lo copiado al norte y al sur de Heliotropo
     naves = []
@@ -1879,6 +3914,10 @@ def main():
              'pa': sal['pa'], 'paL': lin['pa'], 'cinta': cinta,
              # nave sur (mercado_sur): PB de carga, biodigestor y acuaponia; PA con puestos, comedores y baños
              'sur': sur,
+             # tragaluces de la nave norte (vidrio sobre la cubierta, en el lenguaje del hoyo)
+             'tragaluz': plano(tra_t), 'tragaluzL': plano(tra_l),
+             # (2026-10-13) la cubierta sur: franjas de vidrio de los escalones y los módulos altos translúcidos
+             'tragaluz_s': plano(CUB_SUR.get('vid', [])), 'tragaluz_sL': plano(CUB_SUR.get('vidL', [])),
              'hoyo': {'c': [round(x, 3) for x in HOYO['c']], 'D': round(HOYO['D'], 3), 'franjas': [[round(x, 3) for x in q] for q in franjas]},
              'zanja': ZANJA, 'cierres': [[round(a, 3), round(b, 3)] for a, b in CIERRES],
              # paso 3: piso, zanja, jardín, plataformas, locales…: triángulos (k) y líneas (kL); árboles [u, v, z, alto]

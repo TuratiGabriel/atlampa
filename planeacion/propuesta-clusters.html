@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Propuesta de clusters</title>
+<style>
+  :root {
+    --fondo: #f6f5f1; --papel: #ffffff; --tinta: #1c1c1a; --tenue: #66655f; --linea: #dcdad3;
+    --verde: #2f7a4a; --ambar: #b26a00; --rojo: #b3261e; --azul: #2457a6; --chip: #eceae4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fondo: #111111; --papel: #1a1a1a; --tinta: #ecebe6; --tenue: #a19f98; --linea: #2e2e2c;
+      --verde: #8fd17a; --ambar: #f2b04e; --rojo: #ff8a80; --azul: #8ab4ff; --chip: #262624;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fondo: #111111; --papel: #1a1a1a; --tinta: #ecebe6; --tenue: #a19f98; --linea: #2e2e2c;
+    --verde: #8fd17a; --ambar: #f2b04e; --rojo: #ff8a80; --azul: #8ab4ff; --chip: #262624;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--tinta); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 2.2rem; line-height: 1.15; margin: 0 0 6px; letter-spacing: -0.015em; }
+  h2 { font-size: 1.4rem; margin: 44px 0 10px; padding-top: 14px; border-top: 1px solid var(--linea); }
+  h3 { font-size: 1rem; margin: 18px 0 6px; }
+  p, li { max-width: 78ch; }
+  .sub { color: var(--tenue); margin: 0 0 18px; }
+  .aviso { background: color-mix(in srgb, var(--ambar) 10%, var(--papel)); border: 1px solid color-mix(in srgb, var(--ambar) 35%, var(--linea)); padding: 10px 14px; border-radius: 6px; }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 6px; }
+  nav a { font-size: .85rem; text-decoration: none; color: var(--tinta); background: var(--chip); padding: 4px 10px; border-radius: 999px; }
+  nav a:hover { background: var(--linea); }
+  table { border-collapse: collapse; width: 100%; max-width: 760px; background: var(--papel); border: 1px solid var(--linea); border-radius: 6px; overflow: hidden; font-size: .92rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  th { color: var(--tenue); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .03em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .total td { font-weight: 700; }
+  figure { margin: 14px 0 6px; background: var(--papel); border: 1px solid var(--linea); border-radius: 8px; padding: 10px; }
+  figure img { width: 100%; height: auto; display: block; border-radius: 4px; background: #111; }
+  figcaption { color: var(--tenue); font-size: .88rem; margin-top: 8px; }
+  .chip { display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-right: 6px; vertical-align: 1px; }
+  .vigente { background: color-mix(in srgb, var(--verde) 18%, transparent); color: var(--verde); }
+  .parcial { background: color-mix(in srgb, var(--ambar) 18%, transparent); color: var(--ambar); }
+  .hecho { background: color-mix(in srgb, var(--azul) 18%, transparent); color: var(--azul); }
+  ol.dec li, ul.pend li { margin: 4px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } h1 { font-size: 1.75rem; } }
+  a { color: var(--azul); }
+  code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+
+  h1 { font-size: 1.9rem; }
+  h2 { font-size: 1.3rem; }
+  .volver { display: inline-block; margin-bottom: 14px; font-size: .9rem; text-decoration: none; }
+  table { max-width: 100%; display: block; overflow-x: auto; }
+  hr { border: none; border-top: 1px solid var(--linea); margin: 28px 0; }
+  em { color: var(--tenue); }
+</style>
+</head>
+<body>
+<main>
+  <a class="volver" href="./">← Planeación del mercado</a>
+<h1>Propuesta 2: módulos de combinación (clusters), respiros y nave norte</h1>
+<p><em>2026-10-12. Boceto para revisar: <code>prepara-mercado.py</code> sigue sin tocar.</em></p>
+<ul>
+<li>Láminas: <a href="propuesta_clusters.png">propuesta_clusters.png</a> y <a href="propuesta_norte.png">propuesta_norte.png</a>.</li>
+<li>Sigue de <a href="propuesta-mercado.html">propuesta-mercado.md</a>.</li>
+</ul>
+<h2>0. Lo que decidiste</h2>
+<ul>
+<li><strong>Industria:</strong> el café o terraza sobre la industria es de André. No entra en nuestra cuenta de 7,500.</li>
+<li><strong>Biodigestor:</strong> se quita.</li>
+<li><strong>Calles sur:</strong> a 3.00. Las columnas de la PA siguen a las espinas.</li>
+<li><strong>P1:</strong> se quitan unos pocos locales (los 4 con 1.0 de frente, más una fila de cada tres junto a las escaleras). Los giros se quedan.</li>
+</ul>
+<hr />
+<h2>1. Nave norte</h2>
+<h3>Accesos</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Dónde</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N1</td>
+<td>Av. Eulalia Guzmán, puerta de 3.20 en u 534–537. Calle de las plantas → jardín → patio del aro</td>
+<td>existe (principal)</td>
+</tr>
+<tr>
+<td>N2</td>
+<td>Sabino, plazuela en v 445–453 (tu panel a +3.09)</td>
+<td>existe</td>
+</tr>
+<tr>
+<td>N3</td>
+<td>Espuela / Heliotropo → patio del aro → pasos del arco (uno cada 5 locales)</td>
+<td>existe: el sur de la norte es casi todo patio</td>
+</tr>
+<tr>
+<td><strong>N4</strong></td>
+<td><strong>Sabino a la altura de v ≈ 477–481: zaguán bajo la P2 y escalera propia a la P2</strong></td>
+<td><strong>nuevo</strong></td>
+</tr>
+<tr>
+<td>N5</td>
+<td>Oeste, entre los locales que abren afuera bajo P1 (v ≈ 470)</td>
+<td>posible: falta abrir el muro oeste en Rhino</td>
+</tr>
+</tbody>
+</table>
+<p>Con N4, sobre Sabino queda una puerta cada ~30 m, y en la P2 se puede entrar desde la calle sin pasar por la nave.</p>
+<h3>El bloque en (555, 480)</h3>
+<p>Es la <strong>P2</strong>. El generador la levanta como un macizo de +0.40 a +2.40, sin nada adentro. Ni vaciándola alcanzaría la altura para locales: abajo quedarían 1.70 m con losa de 0.30.</p>
+<p>Propuesta: vaciarla y bajar ese piso a −0.20, para que queden <strong>2.30 libres</strong>.</p>
+<ul>
+<li><strong>Zaguán de 3.60</strong> de Sabino a la calle de las plantas. Se entra bajo, y al salir se abre a la calle alta y al jardín.</li>
+<li><strong>Escalera a la P2</strong> desde el zaguán: 2.60 m en 15 peraltes de 0.173 (NTC ≤ 0.18, ≤ 15 por tramo).</li>
+<li><strong>8 bodegas</strong> de 6.6 m², más lockers bajo la gradería.</li>
+<li><strong>Carga norte</strong> con entrada propia por Sabino, cámara fría y residuos. Queda definida la carga que faltaba.</li>
+</ul>
+<h3>Pasillo detrás de los locales de P3</h3>
+<ul>
+<li><strong>Hoy:</strong> P3 mide 8.0 m. Tiene 2.40 al frente (al vidrio), la doble fila de locales de 4.10, y atrás <strong>1.50</strong> a lo largo de 39 m: es el que se ve angosto.</li>
+<li><strong>Propuesta:</strong> ensanchar P3 a <strong>9.5 m</strong>, para que el pasillo trasero quede de <strong>3.00</strong>, como las calles. Suma 53 m² de plataforma (306 → 359).</li>
+<li><strong>Alternativa:</strong> quitar la fila interior (−15 módulos). Me quedo con ensanchar.</li>
+</ul>
+<hr />
+<h2>2. Los clusters: investigación</h2>
+<table>
+<thead>
+<tr>
+<th>Referente</th>
+<th>Qué tomo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Kyo-machiya</strong> (<a href="https://ftn.uns.ac.rs/ojs/index.php/zbornik/article/download/3621/3225" target="_blank" rel="noopener">estudio de Kioto</a>, <a href="https://www.akiyajapan.com/articles/machiya-kyoto-townhouse-guide" target="_blank" rel="noopener">akiyajapan</a>)</td>
+<td>La secuencia de la casa-tienda: <em>mise</em> (tienda a la calle) → <em>tōri-niwa</em> (pasillo de tierra, la «calle interior» por donde pasa la mercancía) → <em>tsuboniwa</em> (patio de luz de ~1 tsubo, 3.3 m²) → <em>kura</em> (bodega). El <em>hibukuro</em> es el vacío alto sobre la cocina que jala humo y calor. <strong>El cluster es una machiya a escala de puesto.</strong></td>
+</tr>
+<tr>
+<td><strong>Tatami shūgijiki</strong> (<a href="https://Www.Wikipedia.org/wiki/Tatami" target="_blank" rel="noopener">Wikipedia</a>, <a href="https://japanobjects.com/features/tatami" target="_blank" rel="noopener">japanobjects</a>)</td>
+<td>En el arreglo de buen augurio nunca se juntan cuatro esquinas, sólo uniones en T. El cuarto de 4½ esteras tiene un medio tatami al centro, que un ensayo lee como el «vacío» del cuarto. <strong>Es la figura que se repite y «hace piso»: aparejo sin cruces de cuatro, con un respiro por grupo.</strong></td>
+</tr>
+<tr>
+<td><strong>Mat-building</strong> (A. Smithson, 1974; Universidad Libre de Berlín, Candilis-Josic-Woods) (<a href="https://postwarcampus.wordpress.ncsu.edu/2018/05/07/free-university-berlin/" target="_blank" rel="noopener">NCSU</a>, <a href="https://worldarchitecture.org/architecture-news/pgmgm/the-strategies-of-mat-building.html" target="_blank" rel="noopener">WA</a>)</td>
+<td>Construcción baja y densa sobre una red flexible, que se adapta a cambios de programa: repetición con variación.</td>
+</tr>
+<tr>
+<td><strong>Hertzberger, Centraal Beheer</strong> (<a href="https://upcommons.upc.edu/server/api/core/bitstreams/011c49ae-cd54-4ee7-89f6-ceee5564dcff/content" target="_blank" rel="noopener">UPC</a>)</td>
+<td>El módulo como núcleo estructural, espacial y funcional, polivalente. <strong>Parametrizar el espacio con la función.</strong></td>
+</tr>
+<tr>
+<td><strong>Kahn, Trenton Bath House</strong> (<a href="https://en.wikipedia.org/wiki/Trenton_Bath_House" target="_blank" rel="noopener">Wikipedia</a>)</td>
+<td>Espacios sirvientes y servidos: cuatro cuartos alrededor de un atrio, luz por la junta entre muro y techo. <strong>El núcleo es el sirviente (bodega, columna, instalaciones); los costados son lo servido.</strong></td>
+</tr>
+<tr>
+<td><strong>Van Eyck, Orfanato de Ámsterdam</strong> (<a href="https://archeyes.com/?p=37474" target="_blank" rel="noopener">ArchEyes</a>)</td>
+<td>Dos tamaños de módulo, cada uno con su espacio exterior, espacios intermedios y ningún centro único.</td>
+</tr>
+<tr>
+<td><strong>Nishiki, Kioto</strong> (<a href="https://en.wikipedia.org/wiki/Nishiki_Market" target="_blank" rel="noopener">Wikipedia</a>)</td>
+<td>~130 tiendas bajo arcada de vidrio, se prueba junto al puesto. El ancho de ~3.3 m sale de una sola guía, sin verificar. <strong>Nuestras calles de 3.00 andan en esa escala.</strong></td>
+</tr>
+<tr>
+<td><strong>Yokocho</strong> (<a href="https://en.japantravel.com/tokyo/ebisu-yokocho/5078" target="_blank" rel="noopener">Japan Travel</a>)</td>
+<td>Barras de 3–5 m² para el cocinero, 4–10 lugares.</td>
+</tr>
+<tr>
+<td><strong>La Boqueria</strong> (<a href="https://www.csmonitor.com/2006/0202/p18s02-hfes.html" target="_blank" rel="noopener">CSMonitor</a>)</td>
+<td>Kioscos-barra con un puñado de bancos entre los puestos de producto (Pinotxo: barra en L, ~12 bancos). <strong>Mercancía y barra juntas.</strong></td>
+</tr>
+<tr>
+<td><strong>Oztotepec</strong> (Mauricio Rocha)</td>
+<td>Islas de 4 locales de 3×3, ampliables.</td>
+</tr>
+</tbody>
+</table>
+<h3>La anatomía (lámina, fila 1)</h3>
+<p><strong>Cluster de 6.00 × 10.00.</strong> La retícula de la sur pone dos columnas adentro: las líneas de columnas van cada 9.0 m y los postes cada 6.6.</p>
+<ol>
+<li>
+<p><strong>Cabeza (6.00 × 2.05).</strong> Barra de 6 m con ~8 bancos, con la comida que sale del producto del mismo cluster (no es restaurante):</p>
+<ul>
+<li>fruta → jugos y cocteles;</li>
+<li>pescado → coctelería;</li>
+<li>carne → tacos;</li>
+<li>maíz y semillas → atole y tamales.</li>
+</ul>
+<p>En los de mercancía, la cabeza es un taller visible (costura, calzado).
+2. <strong>Costados: 3 + 3 módulos de 2.65 × 2.05 (5.4 m²).</strong> Se juntan con mampara, con franja de exhibición de 0.40.
+3. <strong>Núcleo de 1.90 (la <em>kura</em>).</strong>
+  - En los secos, frescos y de mercancía: una trastienda de 0.95 por módulo.
+  - En los húmedos: cámara fría, tarjas y coladera lineal.
+  - Las columnas y las instalaciones corren por aquí.
+4. <strong>Pie: zaguán de 0.90 (el <em>tōri-niwa</em>).</strong> Por ahí entran el locatario y el diablito sin cruzar la venta.</p>
+</li>
+</ol>
+<p><strong>Reglas</strong>
+- <strong>Un cluster es una sola familia más su barra:</strong> húmedo, fresco, seco o mercancía. La mezcla es entre clusters, no dentro: división clara, sin convivencia forzada.
+- <strong>Barrios.</strong> Los clusters de una familia se juntan en barrios:
+    - el húmedo junto a la carga y las cámaras, con piso lavable;
+    - el fresco al centro;
+    - el seco y la mercancía al norte y arriba.
+    - Los barrios se separan por una calle o por un respiro.
+- <strong>Las calles de 3.00 salen solas</strong> de la retícula: 9.0 entre líneas − 6.0 del cluster.
+- <strong>Pasajes</strong> de 3.20 entre cluster y cluster.
+- <strong>Aparejo como tatami bien puesto:</strong> las líneas vecinas van desfasadas un tramo (6.6). Nunca hay un cruce de cuatro y cada pasaje remata en T contra el costado de otro cluster, así no se forman pasillos largos.</p>
+<h3>Densidad: dos versiones del mismo cluster</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Holgado</th>
+<th>Compacto</th>
+<th>Hoy (manzanas)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pasaje entre clusters</td>
+<td>3.20</td>
+<td>1.80</td>
+<td>1.40</td>
+</tr>
+<tr>
+<td>Módulos de venta por cluster</td>
+<td>3 + 3 de 2.65</td>
+<td>4 + 4 de 2.34</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Calle</td>
+<td>3.00</td>
+<td>3.00</td>
+<td>2.26–2.50</td>
+</tr>
+<tr>
+<td>Área de venta / área de piso</td>
+<td>≈ 38 % (con barra)</td>
+<td>≈ 43 %</td>
+<td>≈ 52 %</td>
+</tr>
+<tr>
+<td>Barra</td>
+<td>en cada cabeza</td>
+<td>sólo en las cabezas que dan a un respiro o a una calle</td>
+<td>6 racimos</td>
+</tr>
+<tr>
+<td>Bodega</td>
+<td>trastienda por módulo</td>
+<td>trastienda por módulo</td>
+<td>4 en todo el mercado</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recomendación: compacto en general, y holgado alrededor de los respiros</strong>, donde las barras necesitan espacio para los bancos.</p>
+<ul>
+<li><strong>Con el compacto donde hoy hay manzanas</strong>, el área de venta baja ~8 % en total.</li>
+<li><strong>Con todo holgado</strong>, baja ~15 %.</li>
+<li>A cambio, cada módulo gana su trastienda, aparecen ~20 barras y las calles quedan de 3.00.</li>
+<li>Estos porcentajes son estimados; se confirman al correrlo.</li>
+</ul>
+<h3>El patrón (lámina, fila 2)</h3>
+<p>En un campo de 45 × 53 m sobre la retícula de la sur, sin los cortes del aro, caben:
+- 16 clusters entre enteros y medios (≈ 86 módulos);
+- 9 barras;
+- 4 respiros en rombo, con uno justo entre el barrio húmedo y el fresco.</p>
+<p>Sobre la planta real, el arco, el eje de Sabino, las escaleras y las plazuelas recortan el patrón. Donde no cabe el entero queda <strong>medio cluster</strong>: 3 módulos por lado, sin cabeza, que sigue teniendo núcleo. La banda del arco y las filas contra muro se quedan como están.</p>
+<hr />
+<h2>3. Los vacíos como respiros (lámina, corte)</h2>
+<p>Cada respiro ocupa el lugar de un cluster: 6.00 × 10.00 con sus dos columnas adentro, que quedan como troncos.</p>
+<ul>
+<li><strong>Abajo, un <em>tsuboniwa</em>.</strong><ul>
+<li>Un árbol que sube por el vacío.</li>
+<li>Piedra, tezontle y musgo.</li>
+<li>Una pileta de agua.</li>
+<li>Alrededor, un borde-banca de 0.45 para sentarse viendo el jardín, a la manera de un <em>engawa</em>: el jardín se ve enmarcado desde el borde.</li>
+</ul>
+</li>
+<li><strong>Arriba, el vacío de la PA</strong> con barandal y barras asomadas. Las barras de abajo y de arriba miran al jardín: es el paisaje de fondo de quien come.</li>
+<li><strong>En la cubierta, el módulo alto translúcido</strong> con persianas que se abren. Funciona como el <em>hibukuro</em>: el humo de los comales y el aire caliente salen por ahí.</li>
+<li><strong>Paisaje prestado (<em>shakkei</em>).</strong> El jardín se compone en primer plano, plano medio y fondo, y se «captura» con postes y aleros (<a href="https://en.wikipedia.org/wiki/Borrowed_scenery" target="_blank" rel="noopener">Wikipedia</a>, <a href="https://learn.bowdoin.edu/japanesegardens/elements/borrowed/borrowed.html" target="_blank" rel="noopener">Bowdoin</a>).<ul>
+<li>Las columnas del respiro hacen de marco.</li>
+<li>Los respiros se alinean con los pasos del arco, para que el fondo sea el humedal del patio del aro.</li>
+</ul>
+</li>
+<li><strong>Moriyama House</strong> (Nishizawa): volúmenes sueltos con jardines y callejones compartidos entre ellos (<a href="https://www.dezeen.com/2017/04/14/edmund-sumner-decade-old-photographs-ryue-nishizawa-seminal-moriyama-house-photography-architecture-residential-japanese-houses/amp/" target="_blank" rel="noopener">Dezeen</a>, <a href="https://www.metalocus.es/en/news/moriyama-house" target="_blank" rel="noopener">Metalocus</a>). El respiro es de todos los clusters que lo rodean.</li>
+<li><strong>Tsuboniwa</strong> como jardín casi interior que da luz y una vista de naturaleza (<a href="https://en.wikipedia.org/wiki/Tsubo-niwa" target="_blank" rel="noopener">Wikipedia</a>).</li>
+</ul>
+<hr />
+<h2>4. Balance de m²</h2>
+<p>8,509 hoy:
+- −175 por los vacíos de la PA sur;
+- +53 por ensanchar P3.</p>
+<p><strong>Total ≈ 8,390.</strong> La meta de 7,500 se sigue cumpliendo con ~890 de margen, sin contar lo de André.</p>
+<h2>5. Lo que necesito que decidas</h2>
+<ol>
+<li><strong>¿Te late el cluster de 6.00 × 10.00</strong> con cabeza, costados, núcleo y pie? ¿O lo quieres de otra figura? Por ejemplo, en L o en T para que se trabe con el vecino.</li>
+<li><strong>Densidad:</strong> ¿compacto en general y holgado alrededor de los respiros?</li>
+<li><strong>Nave norte:</strong> ¿vaciamos la P2 para el zaguán, las bodegas y la carga (N4)? ¿Ensanchamos P3 a 9.5?</li>
+<li><strong>Respiros:</strong> ¿árbol, piedra y agua, o algo más seco tipo <em>karesansui</em> con tezontle? Esto último pide menos mantenimiento.</li>
+</ol>
+</main>
+</body>
+</html>

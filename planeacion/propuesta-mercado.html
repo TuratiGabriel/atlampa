@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Propuesta del mercado</title>
+<style>
+  :root {
+    --fondo: #f6f5f1; --papel: #ffffff; --tinta: #1c1c1a; --tenue: #66655f; --linea: #dcdad3;
+    --verde: #2f7a4a; --ambar: #b26a00; --rojo: #b3261e; --azul: #2457a6; --chip: #eceae4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fondo: #111111; --papel: #1a1a1a; --tinta: #ecebe6; --tenue: #a19f98; --linea: #2e2e2c;
+      --verde: #8fd17a; --ambar: #f2b04e; --rojo: #ff8a80; --azul: #8ab4ff; --chip: #262624;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fondo: #111111; --papel: #1a1a1a; --tinta: #ecebe6; --tenue: #a19f98; --linea: #2e2e2c;
+    --verde: #8fd17a; --ambar: #f2b04e; --rojo: #ff8a80; --azul: #8ab4ff; --chip: #262624;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--tinta); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 2.2rem; line-height: 1.15; margin: 0 0 6px; letter-spacing: -0.015em; }
+  h2 { font-size: 1.4rem; margin: 44px 0 10px; padding-top: 14px; border-top: 1px solid var(--linea); }
+  h3 { font-size: 1rem; margin: 18px 0 6px; }
+  p, li { max-width: 78ch; }
+  .sub { color: var(--tenue); margin: 0 0 18px; }
+  .aviso { background: color-mix(in srgb, var(--ambar) 10%, var(--papel)); border: 1px solid color-mix(in srgb, var(--ambar) 35%, var(--linea)); padding: 10px 14px; border-radius: 6px; }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 6px; }
+  nav a { font-size: .85rem; text-decoration: none; color: var(--tinta); background: var(--chip); padding: 4px 10px; border-radius: 999px; }
+  nav a:hover { background: var(--linea); }
+  table { border-collapse: collapse; width: 100%; max-width: 760px; background: var(--papel); border: 1px solid var(--linea); border-radius: 6px; overflow: hidden; font-size: .92rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  th { color: var(--tenue); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .03em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .total td { font-weight: 700; }
+  figure { margin: 14px 0 6px; background: var(--papel); border: 1px solid var(--linea); border-radius: 8px; padding: 10px; }
+  figure img { width: 100%; height: auto; display: block; border-radius: 4px; background: #111; }
+  figcaption { color: var(--tenue); font-size: .88rem; margin-top: 8px; }
+  .chip { display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-right: 6px; vertical-align: 1px; }
+  .vigente { background: color-mix(in srgb, var(--verde) 18%, transparent); color: var(--verde); }
+  .parcial { background: color-mix(in srgb, var(--ambar) 18%, transparent); color: var(--ambar); }
+  .hecho { background: color-mix(in srgb, var(--azul) 18%, transparent); color: var(--azul); }
+  ol.dec li, ul.pend li { margin: 4px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } h1 { font-size: 1.75rem; } }
+  a { color: var(--azul); }
+  code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+
+  h1 { font-size: 1.9rem; }
+  h2 { font-size: 1.3rem; }
+  .volver { display: inline-block; margin-bottom: 14px; font-size: .9rem; text-decoration: none; }
+  table { max-width: 100%; display: block; overflow-x: auto; }
+  hr { border: none; border-top: 1px solid var(--linea); margin: 28px 0; }
+  em { color: var(--tenue); }
+</style>
+</head>
+<body>
+<main>
+  <a class="volver" href="./">← Planeación del mercado</a>
+<h1>Propuesta del mercado: tipologías, zonificación, circulación, bodegas y cubierta</h1>
+<p><em>2026-10-12. Para revisar antes de programarla: <code>prepara-mercado.py</code> no se ha tocado.</em></p>
+<ul>
+<li>Láminas: <a href="propuesta_zonificacion.png">propuesta_zonificacion.png</a> y <a href="propuesta_cubierta_sur.png">propuesta_cubierta_sur.png</a>. Son un boceto sobre la distribución actual.</li>
+<li>Investigación de respaldo: <a href="investigacion-referentes.html">investigacion-referentes.md</a>.</li>
+<li>Los números de la distribución actual salen de scripts que leen el generador sin modificarlo: <code>probe_auditoria.py</code>, <code>probe_propuesta.py</code> y <code>probe_calles.py</code>, en el scratchpad.</li>
+</ul>
+<hr />
+<h2>0. La meta de 7,500 m²: dónde vamos</h2>
+<p>El generador ya lleva esta cuenta (<code>comercio_m2</code> en <code>atlampa-mercado.js</code>). Cuenta huellas brutas, es decir, incluye plazas, baños, carga y la vitrina. Arte y cultura no entra.</p>
+<table>
+<thead>
+<tr>
+<th>Componente</th>
+<th>Hoy</th>
+<th>Con la propuesta</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Locales del aro (18 módulos × 22 m²)</td>
+<td>396</td>
+<td>396</td>
+</tr>
+<tr>
+<td>Nave norte PB (huella sin el aro)</td>
+<td>1,877</td>
+<td>1,877</td>
+</tr>
+<tr>
+<td>Nave sur PB</td>
+<td>2,773</td>
+<td>2,773</td>
+</tr>
+<tr>
+<td>Nave sur PA</td>
+<td>2,346</td>
+<td>≈ 2,171 (−175 por 3 vacíos; −233 con el opcional)</td>
+</tr>
+<tr>
+<td>Plataformas norte (P1 + P2 + P3)</td>
+<td>1,117</td>
+<td>1,117</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>8,509</strong></td>
+<td><strong>≈ 8,334</strong></td>
+</tr>
+<tr>
+<td>Contra la meta de 7,500</td>
+<td>+1,009</td>
+<td>+834</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Ya pasamos la meta.</strong> Los ~800–1,000 m² de sobra son el presupuesto para abrir vacíos de luz y ensanchar calles sin bajar de 7,500.</li>
+<li><strong>Duda: «arriba de industria».</strong> Hoy no se cuenta comercio sobre la industria. La industria (1,215 m², de +0.51 a +7.92) tiene encima vivienda desde el nivel +7.99, y ahí caen 3 de los módulos de comercio del aro. Si la meta debe incluir un piso comercial sobre la industria, dime cuál y lo sumo. Eso cambia cuánto le toca al mercado.</li>
+</ul>
+<hr />
+<h2>1. Tipologías de local por uso</h2>
+<p>El módulo base se queda en <strong>2.50 × 2.05 = 5.1 m²</strong>: cumple la NTC (≥ 4 m², lado ≥ 2.00) y su fondo doble es el ancho de los baños. Lo que cambia es que los módulos se juntan.</p>
+<table>
+<thead>
+<tr>
+<th>Tipo</th>
+<th>Arreglo</th>
+<th>m²</th>
+<th>Giros</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>T1 puesto</strong></td>
+<td>1 módulo</td>
+<td>5.1</td>
+<td>semillas, chiles secos, especias, hierbas, dulces, jugos, servicios con taller</td>
+</tr>
+<tr>
+<td><strong>T2 doble</strong></td>
+<td>2 módulos en línea (5.00 × 2.05)</td>
+<td>10.3</td>
+<td>frutas y verduras (frente largo para exhibir), ropa, calzado, mercería, hogar, pan</td>
+</tr>
+<tr>
+<td><strong>T2P pasante</strong></td>
+<td>2 módulos espalda con espalda (2.50 × 4.10): frente a la calle, trastienda al pasillo de abasto</td>
+<td>10.3</td>
+<td>carnicería, pollería, pescadería</td>
+</tr>
+<tr>
+<td><strong>T3 triple</strong></td>
+<td>3 módulos en línea (7.50 × 2.05)</td>
+<td>15.4</td>
+<td>abarrotes, farmacia, tlapalería</td>
+</tr>
+<tr>
+<td><strong>T4 cuádruple</strong></td>
+<td>2 × 2 módulos (5.00 × 4.10)</td>
+<td>20.5</td>
+<td>tortillería</td>
+</tr>
+<tr>
+<td><strong>Racimo</strong></td>
+<td>4 módulos alrededor de una barra (ya existe)</td>
+<td>20.5 + barra</td>
+<td>fondas, antojitos (no restaurante)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Referentes:</strong> FAO, puestos de 2×2 a 3×4 m en módulos combinables. Oztotepec (Mauricio Rocha), locales de 3×3 que crecen a 3×6 o 6×6. Tepoztlán, retícula de 2.50.</li>
+<li><strong>Regla de fusión:</strong> dentro de una manzana, los módulos se separan con mampara desmontable. Así un locatario crece sin obra, y el mercado se puede ajustar con los locatarios reales (la lección del mercado PMU de Ensenada).</li>
+</ul>
+<h3>La mezcla, estimada</h3>
+<table>
+<thead>
+<tr>
+<th>Familia</th>
+<th>Tipo</th>
+<th>Locales</th>
+<th>Módulos</th>
+<th>Dónde</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Húmedos: carnes, pollo, pescado</td>
+<td>T2P</td>
+<td>12</td>
+<td>24</td>
+<td>sur PB, espina 1; la pescadería frente a la vitrina de acuaponia</td>
+</tr>
+<tr>
+<td>Cremería, salchichonería, huevo</td>
+<td>T2</td>
+<td>6</td>
+<td>12</td>
+<td>sur PB, fila oeste</td>
+</tr>
+<tr>
+<td>Frutas, verduras, hierbas</td>
+<td>T2</td>
+<td>22</td>
+<td>44</td>
+<td>sur PB, al centro, bajo los vacíos</td>
+</tr>
+<tr>
+<td>Flores y plantas</td>
+<td>T1 / T2</td>
+<td>12</td>
+<td>18</td>
+<td>calle de las plantas (norte) y plazuela Heliotropo (sur)</td>
+</tr>
+<tr>
+<td>Abarrotes</td>
+<td>T3</td>
+<td>6</td>
+<td>18</td>
+<td>norte PB este y fila este sur</td>
+</tr>
+<tr>
+<td>Semillas, chiles secos, especias</td>
+<td>T1</td>
+<td>12</td>
+<td>12</td>
+<td>norte PB, la isla bajo P1 (el «pasillo de semillas»)</td>
+</tr>
+<tr>
+<td>Pan y dulces típicos</td>
+<td>T1 / T2</td>
+<td>8</td>
+<td>12</td>
+<td>norte PB y fila este sur</td>
+</tr>
+<tr>
+<td><strong>Tortillería (ancla)</strong></td>
+<td>T4</td>
+<td>2</td>
+<td>8</td>
+<td>norte al borde del jardín; sur al fondo, junto a la vitrina</td>
+</tr>
+<tr>
+<td>Fondas con barra</td>
+<td>racimo</td>
+<td>6</td>
+<td>24</td>
+<td>las 6 actuales</td>
+</tr>
+<tr>
+<td>Antojitos, jugos, café, paletas</td>
+<td>T1</td>
+<td>24</td>
+<td>24</td>
+<td>borde del aro en PB, frente a las mesitas del patio</td>
+</tr>
+<tr>
+<td>Ropa, calzado, telas, mercería</td>
+<td>T2</td>
+<td>28</td>
+<td>56</td>
+<td>PA sur oeste y P1</td>
+</tr>
+<tr>
+<td>Hogar: jarciería, plásticos, barro, cocina</td>
+<td>T2</td>
+<td>10</td>
+<td>20</td>
+<td>PA sur este</td>
+</tr>
+<tr>
+<td>Juguetes, papelería, regalos, artesanía</td>
+<td>T1 / T2</td>
+<td>20</td>
+<td>30</td>
+<td>P3 (arco), terraza de la PA sur, fila este PA</td>
+</tr>
+<tr>
+<td>Servicios con taller visible: costura, calzado, llaves, celulares, estética</td>
+<td>T1</td>
+<td>24</td>
+<td>24</td>
+<td>puntas de manzana arriba</td>
+</tr>
+<tr>
+<td>Servicios de barrio que abren afuera: farmacia, cyber, cobro de servicios</td>
+<td>T2</td>
+<td>10</td>
+<td>20</td>
+<td>franja oeste de la norte PB</td>
+</tr>
+<tr>
+<td><strong>Locales</strong></td>
+<td></td>
+<td><strong>202</strong></td>
+<td><strong>346</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Comunitario: aula-cocina (6 módulos) y ludoteca (4)</td>
+<td></td>
+<td></td>
+<td>10</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Módulos ocupados</strong></td>
+<td></td>
+<td></td>
+<td><strong>≈ 356</strong></td>
+<td>hoy son 424</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Cuenta:</strong> son ~200 locales de seis tamaños sobre ~356 módulos, contra 424 locales iguales hoy.</li>
+<li><strong>Lo que se pierde:</strong> el área de venta baja ~15 % (de ≈ 2,140 a ≈ 1,820 m²). Sale de:<ul>
+<li>los vacíos de luz (−25 módulos);</li>
+<li>calles y frentes más anchos (≈ −15);</li>
+<li>aula y ludoteca (−10);</li>
+<li>nichos en las filas largas (−9);</li>
+<li>las manzanas de un local (−2).</li>
+</ul>
+</li>
+<li><strong>Cada concepto se puede soltar por separado.</strong></li>
+<li><strong>Planta baja:</strong> ~205 módulos con todo lo fresco, lo húmedo y lo diario (tortillería, frutas, carnes, semillas, flores).</li>
+<li><strong>Arriba:</strong> ~155 módulos (42 %, contra 46 % hoy). Son fondas, ropa, hogar, artesanía, servicios con taller y el aula: lo que la gente sube a buscar.</li>
+</ul>
+<h3>Reglas contra la monotonía arriba</h3>
+<ol>
+<li>Se agrupa por calle y se mezcla en las puntas. Cada calle tiene una familia («calle de la ropa», «calle del hogar»), porque juntos compiten mejor (FAO). Las dos puntas de cada manzana son de servicios con taller o de jugos y café, giros que se ven trabajar.</li>
+<li>Ninguna manzana de una sola familia, y nunca más de 3 locales seguidos del mismo giro.</li>
+<li>Las fondas y las barras van alrededor de los vacíos; el aula-cocina asoma a uno.</li>
+<li>En la llegada de la cinta, el mirador y un <strong>tianguis de productores</strong> los fines de semana: mesas plegables en una franja marcada del balcón. Es otra forma de interacción y le da su lugar al puesto semifijo.</li>
+</ol>
+<hr />
+<h2>2. Manzanas y circulación</h2>
+<p>Medí el ancho libre frente a cada local:</p>
+<table>
+<thead>
+<tr>
+<th>Nivel</th>
+<th>Frente al local (m) → cuántos locales</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Norte PB</td>
+<td>21 de 28 tienen ≥ 6 m: aquí no hay problema</td>
+</tr>
+<tr>
+<td>Norte P1</td>
+<td>2.25 → 16 · 1.0 → 4</td>
+</tr>
+<tr>
+<td>Sur PB</td>
+<td>2.50 → 47 · 1.50 → 15 · 1.0 → 11</td>
+</tr>
+<tr>
+<td>Sur PA</td>
+<td>2.50 → 24 · 3.00 → 13 · 1.0 → 11</td>
+</tr>
+</tbody>
+</table>
+<p>Propuesta de jerarquía:</p>
+<table>
+<thead>
+<tr>
+<th>Elemento</th>
+<th>Hoy</th>
+<th>Propuesta</th>
+<th>Por qué</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Eje de acceso</td>
+<td>3.30 (Sabino sur) · 3.60 (calle de las plantas)</td>
+<td>≥ 3.60</td>
+<td>FAO: 6 m el principal</td>
+</tr>
+<tr>
+<td>Calle comercial</td>
+<td>2.26 (P1) · 2.50 (sur)</td>
+<td><strong>3.00</strong> = 0.40 + 2.20 libres + 0.40</td>
+<td>Oztotepec y Sant Antoni: 3.0</td>
+</tr>
+<tr>
+<td>Franja de exhibición</td>
+<td>—</td>
+<td>0.40 marcada en el piso, del locatario</td>
+<td>en la CDMX la mercancía sale al pasillo</td>
+</tr>
+<tr>
+<td>Pasaje entre manzanas</td>
+<td>1.40</td>
+<td><strong>1.80</strong></td>
+<td>diablito (~0.6) + persona (inferencia)</td>
+</tr>
+<tr>
+<td>Frente mínimo</td>
+<td>1.10 (26 locales)</td>
+<td>1.80; el 1.10 sólo en servicio</td>
+<td>NTC 1.10 es el piso legal, no el diseño</td>
+</tr>
+<tr>
+<td>Manzana</td>
+<td>de 1 a 10 locales</td>
+<td>4–8 módulos, ≤ 4 por lado (≤ 10 m)</td>
+<td>FAO: ≤ 12 m entre cruces</td>
+</tr>
+<tr>
+<td>Fila contra muro</td>
+<td>hasta 18 seguidos (44 m en la PA sur)</td>
+<td>nicho cada 5 módulos (banca, bebedero, bodega o ventana)</td>
+<td>evita el pasillo-túnel</td>
+</tr>
+<tr>
+<td>Plazuelas</td>
+<td>cada ~20 m</td>
+<td>igual</td>
+<td>FAO: 20–25 m</td>
+</tr>
+</tbody>
+</table>
+<h3>Cómo se llega a 3.00</h3>
+<ul>
+<li><strong>Sur.</strong><ul>
+<li>Espina 2 de 350.0 a 350.5 y espina 3 de 356.6 a 357.6.</li>
+<li>Las columnas de la PA siguen a las espinas: la PA es estructura nueva, no los postes de la nave.</li>
+<li>Las 4 locales de la espina 4 se van a la plazuela.</li>
+<li>La banda de macetas pasa de 2.2 a 1.6 para que el pasillo de abasto de los húmedos tenga 2.15.</li>
+<li>Costo estimado: −4 a −12 módulos en PB, por verificar al correrlo.</li>
+</ul>
+</li>
+<li><strong>Norte P1.</strong> Las filas están amarradas a los postes existentes (6.36 m), así que la calle no pasa de 2.26.<ul>
+<li>Opción a: quitar una fila de cada tres en las calles que llevan a escaleras (≈ −10 módulos).</li>
+<li>Opción b: dejar 2.26 sin franja, con giros de exhibición vertical (ropa colgada).</li>
+</ul>
+</li>
+<li><strong>Manzanas de 1–2 locales:</strong> son 14 (círculos rojos en la lámina). Los pares se vuelven un T2 y los solos se ceden a la plazuela. Varios caen junto al muro de Sabino, justo donde van los vacíos V3 y V4.</li>
+</ul>
+<hr />
+<h2>3. Zonificación esencial, en orden</h2>
+<ol>
+<li><strong>Húmeda (sur PB, espina 1).</strong> Carnicerías, pollerías y pescadería pasantes. Frente a la calle de 3.00; atrás, tarja y coladera hacia el pasillo de abasto, que llega de la carga SE por la calle de abasto (Toyosu y Sydney a escala de local). Cremería en la fila oeste. <strong>La pescadería, frente a la vitrina:</strong> el pescado y la lechuga de la acuaponia se venden en el local de al lado.</li>
+<li><strong>Semihúmeda.</strong> Frutas, verduras y hierbas al centro de la sur, bajo los vacíos. Flores en la calle de las plantas (norte) y en la plazuela Heliotropo.</li>
+<li><strong>Seca (nave norte).</strong> Abarrotes, semillas, chiles secos, especias, pan y dulces.</li>
+<li><strong>Comida.</strong> Las 6 fondas, más antojitos, jugos y café en el borde del aro frente a las mesitas, para que el patio se use. No hay restaurante.</li>
+<li><strong>Servicios del mercado.</strong><ul>
+<li>Carga sur (existe).</li>
+<li><strong>Carga norte por definir:</strong> propongo Sabino al sur de la plazuela, junto a los baños, de 6 a 10 h.</li>
+<li>Cámaras y residuos a PB (ver 4).</li>
+<li>Administración y baños (existen).</li>
+</ul>
+</li>
+<li><strong>Comunitario.</strong> Aula-cocina en la PA sur y ludoteca junto al jardín. Los mercados que construyó el DDF entre 1952 y 1966 ya incluían guarderías y espacios educativos (<a href="https://rua.uv.mx/index.php/rua/article/view/110/91" target="_blank" rel="noopener">RUA UV</a>, <a href="https://revistas.inah.gob.mx/index.php/gacetamuseos/article/download/1004/959/1712" target="_blank" rel="noopener">Gaceta de Museos INAH</a>).</li>
+</ol>
+<h3>El jardín norte como imán</h3>
+<p>El jardín inundable mide 122 m², bajo el hoyo.</p>
+<ul>
+<li><strong>Tortillería en su borde.</strong> Es la compra diaria; la FAO recomienda los básicos lejos de la entrada para que se cruce el mercado.</li>
+<li><strong>Ludoteca a un lado.</strong> Afuera de lo inundable, con bancas en el borde.</li>
+<li><strong>Gradería de P2 como foro</strong> para talleres, cuentacuentos y clases, como los patios de Sant Antoni.</li>
+<li><strong>Fonda del jardín con mesas al borde.</strong></li>
+<li><strong>Remates:</strong> un bebedero y un vivero al final de la calle de las plantas.</li>
+</ul>
+<p>Con eso, la calle de las plantas y la tortillería jalan a la gente desde Eulalia Guzmán hasta el jardín, y de ahí al patio del aro.</p>
+<hr />
+<h2>4. Bodegas: quitar el biodigestor</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Hoy</th>
+<th>Propuesta</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Biodigestor (sur PB)</td>
+<td>122 m²</td>
+<td>se quita</td>
+</tr>
+<tr>
+<td>Cámaras de refrigeración y congelación</td>
+<td>en la PA</td>
+<td><strong>bajan a PB</strong> donde estaba el biodigestor, junto a los húmedos y la carga</td>
+</tr>
+<tr>
+<td>Residuos</td>
+<td>orgánicos 1.8 m en la PA</td>
+<td>cuarto en PB con orgánicos, inorgánicos y reciclables, salida directa a la carga</td>
+</tr>
+<tr>
+<td>Bodegas</td>
+<td>4</td>
+<td><strong>11</strong> de ~12.6 m² en la franja de servicio de la PA + <strong>4 húmedas</strong> en PB + lockers bajo la gradería P2</td>
+</tr>
+<tr>
+<td>En cada local</td>
+<td>—</td>
+<td>cajón con llave bajo el mostrador (FAO)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Resultado:</strong> ~15 bodegas más lockers, cerca de 1 por cada 13 locales. La proporción es inferencia mía, a validar con los locatarios.</li>
+<li><strong>Lo que se pierde:</strong> el biogás y el biol para la acuaponia. Los orgánicos irían a recolección separada.</li>
+</ul>
+<hr />
+<h2>5. Vanos: luz a la PB sur y cubierta nueva</h2>
+<ul>
+<li><strong>Por qué la PB sur está oscura.</strong> Está bajo la losa de la PA. Los tragaluces actuales están en la nave norte, sobre la P2. Por eso un tragaluz en el techo sur sólo llega a la PB si hay un vacío en la PA.</li>
+<li><strong>Medición hoy.</strong> Distancia de cada local de la PB sur a la luz (vacío actual o vidrio del aro): <strong>mediana 10.8 m, máximo 21.8 m.</strong></li>
+<li><strong>Cómo elegí los vacíos.</strong> Un script probó cada módulo de la retícula de columnas de la PA y se quedó, uno por uno, con el que más acerca la luz:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Vacío (u × v)</th>
+<th>m²</th>
+<th>Módulos de la PA que quita</th>
+<th>PB: mediana / máximo a la luz</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>hoy (sólo el del árbol)</td>
+<td>61</td>
+<td>—</td>
+<td>10.8 / 21.8</td>
+</tr>
+<tr>
+<td>+ V1 540.7–549.5 × 343.4–350.0</td>
+<td>58</td>
+<td>8</td>
+<td>7.4 / 19.9</td>
+</tr>
+<tr>
+<td>+ V2 513.5–522.6 × 343.4–350.0</td>
+<td>60</td>
+<td>8</td>
+<td>4.3 / 17.0</td>
+</tr>
+<tr>
+<td>+ V3 549.5–558.1 × 369.8–376.4</td>
+<td>57</td>
+<td>9</td>
+<td><strong>3.0 / 10.3</strong></td>
+</tr>
+<tr>
+<td>+ V4 opcional 549.5–558.1 × 356.6–363.2</td>
+<td>57</td>
+<td>4</td>
+<td>2.0 / 8.6</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Recomendación: V1–V3.</strong> Cuestan 25 módulos de la PA. Eso también baja el peso de lo de arriba, y cada vacío conecta la vista entre la PB y la PA, como los barandales de San Antón.</li>
+<li><strong>V3 rompe la fila de 44 m</strong> del muro de Sabino en la PA.</li>
+</ul>
+<h3>Cubierta sur por módulos a tres alturas (ref. Mauricio Rocha, Oztotepec)</h3>
+<p><strong>Lo que hace Rocha</strong>, según el artículo de <em>Arquitectura</em> COAM n. 361:
+- Módulos de lámina de acero de 6 × 6 m en tres tonos en la planta de cubiertas. Medidos a escala en la sección publicada, los escalones son de ~1 m (aproximado).
+- Cada escalón deja una franja vidriada. Algunos módulos son de lámina translúcida.
+- Lleva persianas metálicas al poniente y al sur.
+- Según el texto, los módulos «emulan las lonas, mantas y plásticos» de los tianguis.</p>
+<p><strong>Adaptación</strong>, en la lámina de la cubierta:
+- <strong>Módulo = crujía de la PA:</strong> ≈ 9 m (entre cumbres y valles) × 6.6 m (postes). Son 49 módulos sobre la nave sur.
+- <strong>Alturas:</strong>
+    - Alto <strong>+10.30</strong> sobre los 4 vacíos, translúcido: luz cenital y doble altura de ~9.9 m en la PB. Queda a la altura del aro (+10.03), así que desde el aro se lee el campo de techos.
+    - En el resto, damero de medio <strong>+9.30</strong> (18) y bajo <strong>+8.30</strong> (27). El bajo es la PA +4.28 más un local de 3.0 más 1 m de aire.
+    - Bajo corrido sobre la franja de servicio.
+- <strong>Escalones de 1 m.</strong> Los que miran al N o al E llevan vidrio (luz difusa); los que miran al S o al O, persiana metálica (luz indirecta y aire). Es la misma lógica que el diente de sierra del mercado de San Pedro de los Pinos de Ramírez Vázquez (<a href="https://www.chilango.com/cultura/5-mercados-con-valor-artistico-en-el-df/" target="_blank" rel="noopener">Chilango</a>).
+- <strong>Lluvia.</strong> Cada módulo es una charola a 2 % hacia el canalón de su borde bajo, sobre una línea de columnas. Las bajadas van por las columnas a una cisterna, y de ahí a la acuaponia, los humedales y los baños, como en Tapachula. No queda ningún valle encima de un local.
+- <strong>Aire.</strong> Las persianas de los módulos altos se abren para que salga el aire caliente: efecto chimenea, como los monitores medidos en Tokio (1.5–7.9 renovaciones por hora).
+- <strong>Sobre los locales:</strong> opaco y aislado, sin sol directo sobre el producto (FAO).
+- Las alturas son tentativas; el bajo no puede bajar de ~+8.3.</p>
+<hr />
+<h2>6. Lo que no habíamos previsto y ya entra</h2>
+<ul>
+<li>La franja de exhibición de 0.40 como parte del local.</li>
+<li>Los húmedos pasantes con trastienda al pasillo de abasto, para que la carga y los residuos no crucen al público.</li>
+<li>La acuaponia que vende en la pescadería de enfrente.</li>
+<li>El tianguis de productores de fin de semana en el balcón y en la llegada de la cinta.</li>
+<li>El aula-cocina comunitaria y la ludoteca. No hay restaurante.</li>
+<li>La redundancia vertical. Las escaleras son la ruta principal. El montacargas sur lleva cabina apta para personas como respaldo del elevador; en Azogues, los elevadores descompuestos hundieron las ventas.</li>
+<li>Estacionamiento de bicis, motos de reparto y diablitos junto a cada acceso.</li>
+<li>Las mamparas desmontables para juntar módulos y ajustar con los locatarios.</li>
+<li>La lluvia de la cubierta hacia la cisterna, la acuaponia y los humedales.</li>
+</ul>
+<h2>7. Lo que necesito que decidas</h2>
+<ol>
+<li><strong>«Arriba de industria»:</strong> ¿hay un piso comercial sobre la industria que deba contar para los 7,500?</li>
+<li><strong>Biodigestor:</strong> ¿se quita? Recomiendo que sí.</li>
+<li><strong>Calles de la sur a 3.00:</strong> mover las espinas 2 y 3 y las columnas de la PA. ¿Va?</li>
+<li><strong>P1 norte:</strong> ¿opción a (≈ −10 módulos, calles de 3.0) o b (2.26 con ropa colgada)?</li>
+<li><strong>Vacíos:</strong> ¿tres o cuatro?</li>
+<li><strong>Mezcla:</strong> ¿te late, o quieres más T1 para que suba la cuenta de locales?</li>
+</ol>
+<p>Fuentes nuevas de esta ronda:
+- <a href="https://www.coam.org/media/Default%20Files/fundacion/biblioteca/revista-arquitectura-100/2008-2012/docs/revista-articulos/revista-arquitectura-2010-n361-pag28-33.pdf" target="_blank" rel="noopener">Arquitectura COAM 361, Mercado San Pablo Oztotepec</a> (planta de cubiertas, sección y fotos)
+- <a href="https://mexicocity.cdmx.gob.mx/venues/mercado-san-pablo-oztotepec" target="_blank" rel="noopener">Ficha CDMX del mercado de Oztotepec</a>
+- <a href="https://www.excelsior.com.mx/opinion/columnista-invitado-nacional/inversion-historica-en-los-mercados-publicos-de-la-ciudad-de" target="_blank" rel="noopener">Excélsior, F. Akabani</a>: 335 mercados, más de 72 mil locales, 90 giros
+- <a href="https://www.chilango.com/cultura/5-mercados-con-valor-artistico-en-el-df/" target="_blank" rel="noopener">Chilango, 5 mercados con valor artístico</a>
+- <a href="https://rua.uv.mx/index.php/rua/article/view/110/91" target="_blank" rel="noopener">RUA UV</a>
+- <a href="https://revistas.inah.gob.mx/index.php/gacetamuseos/article/download/1004/959/1712" target="_blank" rel="noopener">Gaceta de Museos INAH</a></p>
+</main>
+</body>
+</html>

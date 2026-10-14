@@ -36,7 +36,8 @@ Ejes compositivos: el de la vivienda pasa por el aro; el segundo va de las naves
    modelo sin pisar nada.
 2. **Un script por programa** en `diagrama/herramientas/prepara-<programa>.py`. Lee el `.3dm` con **rhino3dm** (sin abrir Rhino),
    transforma al sistema del visor y **genera** `diagrama/atlampa-<programa>.js`. Los `.js` generados no se editan a mano.
-3. **El visor 3D** (`diagrama/`, Three.js) dibuja cada programa. La versión detallada sólo aparece en su apartado; la general no cambia.
+3. **El visor 3D** (`diagrama/`, Three.js) dibuja cada programa **con todo su detalle en todas las vistas**, la general y cada apartado:
+   lo que se sube no se simplifica (Gabriel, 2026-10-13: «ya necesitamos ponerle detalle»). En un apartado, lo ajeno se apaga, no se simplifica.
 4. **Propuesta propia en un bloque `PROPUESTA — todo editable`** del script: constantes con nombre, cada una con su origen.
    El usuario corrige números y tú regeneras.
 5. **Paso a paso:** primero lo existente tal cual, luego la estructura, al final el programa interior. Cada paso se verifica en el
@@ -53,13 +54,16 @@ Ejes compositivos: el de la vivienda pasa por el aro; el segundo va de las naves
 - **Sé propositivo**, como arquitecto especialista: no te limites a ejecutar.
 - **Mide, no supongas:** lo nuevo debe calzar con `Contexto.3dm` a < 1 cm.
 - **Repo compartido con Gabriel** (`github.com/TuratiGabriel/atlampa`):
-  - Antes de empezar, `git pull`. Trabaja en tu rama (`industria` o `cultura`), nunca en `master`.
+  - Antes de empezar, trae lo nuevo de `master` a tu rama: `python diagrama/herramientas/ramas.py actualiza <tu rama>`.
+    Trabaja en tu rama (`industria` o `cultura`), nunca en `master`.
   - Toca sólo tus archivos (`prepara-<tuyo>.py`, `atlampa-<tuyo>.js`) y los ganchos mínimos (tu bloque en `atlampa-3d.js`, tu ficha en
     `paginas.py`). No reformatees.
   - Commits chicos. Al terminar un paso, sube la rama y abre un pull request: Gabriel lo integra.
   - Si un cambio cae fuera de tu programa (motor, estilo, geo), pregúntale primero al usuario.
   - Nunca sobrescribas un `.3dm` ajeno.
 - Al cambiar datos, sube `V` en `herramientas/paginas.py`; el navegador cachea.
+- Antes de subir, corre `python diagrama/herramientas/revisa.py --base origin/master` (< 1 s). Si sale algo, arréglalo antes del push:
+  la misma revisión corre en cada pull request y lo marca en rojo.
 - Lleva una memoria propia de decisiones (con fecha), pendientes y archivos.
 </reglas_siempre>
 
@@ -77,5 +81,6 @@ No leas todo. Abre **sólo** el archivo de `diagrama/handoff/procesos/` que pida
 | estructura de acero, predimensionamiento, Grasshopper                    | `diagrama/handoff/procesos/estructura.md`          |
 | paisaje, vegetación, sol, estacionamiento                                | `diagrama/handoff/procesos/paisaje-y-estacionamiento.md` |
 | usar Rhino por MCP                                                       | `diagrama/handoff/procesos/rhino-mcp.md`           |
+| ramas, ver una rama en local, mezclar, integrar a master, conflictos     | `diagrama/handoff/procesos/ramas-y-version-local.md` |
 | el sitio de cifras del programa (m², CAS/COS/CUS, árboles) y sus datos manuales | `programa/CLAUDE.md` (reglas propias; no toques el visor) |
 </indice>

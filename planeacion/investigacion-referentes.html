@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mercado contra referentes</title>
+<style>
+  :root {
+    --fondo: #f6f5f1; --papel: #ffffff; --tinta: #1c1c1a; --tenue: #66655f; --linea: #dcdad3;
+    --verde: #2f7a4a; --ambar: #b26a00; --rojo: #b3261e; --azul: #2457a6; --chip: #eceae4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fondo: #111111; --papel: #1a1a1a; --tinta: #ecebe6; --tenue: #a19f98; --linea: #2e2e2c;
+      --verde: #8fd17a; --ambar: #f2b04e; --rojo: #ff8a80; --azul: #8ab4ff; --chip: #262624;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fondo: #111111; --papel: #1a1a1a; --tinta: #ecebe6; --tenue: #a19f98; --linea: #2e2e2c;
+    --verde: #8fd17a; --ambar: #f2b04e; --rojo: #ff8a80; --azul: #8ab4ff; --chip: #262624;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--tinta); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 2.2rem; line-height: 1.15; margin: 0 0 6px; letter-spacing: -0.015em; }
+  h2 { font-size: 1.4rem; margin: 44px 0 10px; padding-top: 14px; border-top: 1px solid var(--linea); }
+  h3 { font-size: 1rem; margin: 18px 0 6px; }
+  p, li { max-width: 78ch; }
+  .sub { color: var(--tenue); margin: 0 0 18px; }
+  .aviso { background: color-mix(in srgb, var(--ambar) 10%, var(--papel)); border: 1px solid color-mix(in srgb, var(--ambar) 35%, var(--linea)); padding: 10px 14px; border-radius: 6px; }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 6px; }
+  nav a { font-size: .85rem; text-decoration: none; color: var(--tinta); background: var(--chip); padding: 4px 10px; border-radius: 999px; }
+  nav a:hover { background: var(--linea); }
+  table { border-collapse: collapse; width: 100%; max-width: 760px; background: var(--papel); border: 1px solid var(--linea); border-radius: 6px; overflow: hidden; font-size: .92rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  th { color: var(--tenue); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .03em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .total td { font-weight: 700; }
+  figure { margin: 14px 0 6px; background: var(--papel); border: 1px solid var(--linea); border-radius: 8px; padding: 10px; }
+  figure img { width: 100%; height: auto; display: block; border-radius: 4px; background: #111; }
+  figcaption { color: var(--tenue); font-size: .88rem; margin-top: 8px; }
+  .chip { display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-right: 6px; vertical-align: 1px; }
+  .vigente { background: color-mix(in srgb, var(--verde) 18%, transparent); color: var(--verde); }
+  .parcial { background: color-mix(in srgb, var(--ambar) 18%, transparent); color: var(--ambar); }
+  .hecho { background: color-mix(in srgb, var(--azul) 18%, transparent); color: var(--azul); }
+  ol.dec li, ul.pend li { margin: 4px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } h1 { font-size: 1.75rem; } }
+  a { color: var(--azul); }
+  code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+
+  h1 { font-size: 1.9rem; }
+  h2 { font-size: 1.3rem; }
+  .volver { display: inline-block; margin-bottom: 14px; font-size: .9rem; text-decoration: none; }
+  table { max-width: 100%; display: block; overflow-x: auto; }
+  hr { border: none; border-top: 1px solid var(--linea); margin: 28px 0; }
+  em { color: var(--tenue); }
+</style>
+</head>
+<body>
+<main>
+  <a class="volver" href="./">← Planeación del mercado</a>
+<h1>Mercado de Atlampa contra los referentes: investigación y checklist</h1>
+<p><em>2026-10-12. 27 fuentes consultadas. Confianza media: hay buenos datos de proyecto en Sant Antoni, Oztotepec, Tepoztlán, Tapachula y FAO; de Huimanguillo, Nicolás Bravo y Matamoros sólo se confirmó la autoría.</em></p>
+<p>Las cifras de Atlampa salen de correr <code>prepara-mercado.py</code> en su estado actual (versión 20261012i) con un script de auditoría (<code>scratchpad/probe_auditoria.py</code>).</p>
+<h2>Resumen</h2>
+<p>El mercado ya hace bien varias cosas: las plazuelas cada ~20 m con un motivo, las manzanas cortas, el pasillo legal de 1.10, los asientos y las mesitas, los accesos en tres calles y la cinta como entrada directa a la planta alta.</p>
+<p>Hay cuatro choques fuertes con los referentes:</p>
+<ol>
+<li><strong>Demasiado mercado arriba.</strong> El 46 % de los locales (197 de 424) está en planta alta. En los referentes que funcionan, arriba va la comida, la terraza o un programa destino, y los frescos se quedan a nivel de calle.</li>
+<li><strong>Locales al mínimo.</strong> Promedian 5 m² y tienen 2.05 de fondo. Los referentes van de 6.25 a 9 m² con 2.5 de fondo, y se pueden juntar.</li>
+<li><strong>Calles angostas.</strong> Las calles entre manzanas miden 2.26 en la norte y 2.50 en la sur. Los referentes usan 3.0, y la FAO pide de 3.5 a 6. Además, en México el locatario saca la mercancía al pasillo.</li>
+<li><strong>Faltan zonificación, ancla y bodegas.</strong> No hay zonificación por giro, no hay un ancla y hay 4 bodegas para 424 locales.</li>
+</ol>
+<hr />
+<h2>1. Hallazgos por tema</h2>
+<h3>Circulaciones</h3>
+<ul>
+<li><strong>FAO, <em>Retail Markets Planning Guide</em> (Tracey-White, 1995):</strong><ul>
+<li>Pasillos interiores de 3.5 a 6 m. Con 3.5, un grupo de tres puede rebasar a una persona parada frente a un puesto; 6 m es para el pasillo principal.</li>
+<li>Máximo 12 m entre pasillos transversales.</li>
+<li>Los pasillos deben dejar pasar diablitos y carros de entrega.</li>
+<li>Los espacios abiertos no deben pasar de 20–25 m de lado y necesitan un foco (fuente, reloj o tablero), asientos y lugar para eventos. El espacio sobrado «no favorece la venta».</li>
+<li>«La peatonalización total rara vez funciona.»</li>
+<li>(<a href="https://www.fao.org/4/V8390E/V8390E07.htm" target="_blank" rel="noopener">FAO cap. 4</a>, <a href="https://www.fao.org/4/V8390E/V8390E08.htm" target="_blank" rel="noopener">FAO cap. 5</a>)</li>
+</ul>
+</li>
+<li><strong>Mercat de Sant Antoni (Ravetllat Ribas, Barcelona, 2018):</strong> pasillos de 3 m y puestos de 2.5 m de fondo. Los frescos pasaron de 180 puestos chicos a 52. La planta es una cruz griega con un crucero octogonal más alto. (<a href="https://www.metalocus.es/es/noticias/rehabilitacion-del-mercat-de-sant-antoni-por-ravetllat-ribas-arquitectes" target="_blank" rel="noopener">Metalocus</a>, <a href="https://ajuntament.barcelona.cat/mercats/en/refurbishment-mercat-de-sant-antoni" target="_blank" rel="noopener">Ajuntament</a>)</li>
+<li><strong>Mercado de San Pablo Oztotepec (Mauricio Rocha, Milpa Alta, CDMX, 2003):</strong> pasillos de 3 m y 79 locales de 3×3 que se pueden ampliar a 3×6 o 6×6, en 1,550 m². Persianas metálicas regulan el sol y la ventilación. (<a href="https://www.coam.org/media/Default%20Files/fundacion/biblioteca/revista-arquitectura-100/2008-2012/docs/revista-articulos/revista-arquitectura-2010-n361-pag28-33.pdf" target="_blank" rel="noopener">Arquitectura COAM n. 361</a>)</li>
+<li><strong>Mercado Roma (Rojkind, CDMX, 2014):</strong> 53 locales en PB con un trazo «orgánico» que reinterpreta la retícula del mercado tradicional; 1,750 m². (<a href="https://world-architects.com/ja/projects/view/roma-market" target="_blank" rel="noopener">World-Architects</a>)</li>
+<li><strong>Mercado Guadalupe, Tapachula (Colectivo C733, PMU, 2021):</strong> corredores lineales con accesos laterales que conectan plazas y jardines exteriores. (<a href="https://arquitecturaviva.com/obras/mercado-de-guadalupe-en-tapachula" target="_blank" rel="noopener">Arquitectura Viva</a>)</li>
+<li><strong>Práctica en CDMX:</strong> los locatarios exhiben mercancía en los pasillos «como normalmente lo hacen» (<a href="https://www.jornada.com.mx/2001/12/17/040n1cap.html" target="_blank" rel="noopener">La Jornada, 2001</a>). En La Merced, los puestos semifijos obstruyen los accesos a las naves (<a href="https://politica.expansion.mx/cdmx/2022/06/12/mercados-de-la-cdmx-en-el-limbo" target="_blank" rel="noopener">Expansión, 2022</a>).<ul>
+<li>Consecuencia de diseño: el pasillo real es el dibujado menos lo que cada locatario saca.</li>
+</ul>
+</li>
+</ul>
+<h3>Locales y cómo se maximizan</h3>
+<ul>
+<li><strong>FAO:</strong><ul>
+<li>Puesto típico de 2×2 a 3×4 m.</li>
+<li>Frutas y verduras: frente de 1.5–1.8 y fondo de 1.5–2.5.</li>
+<li>Con el vendedor atrás del mostrador, unos 2 m libres para pararse y apilar cajas.</li>
+<li>Módulos combinables para giros grandes (granos, abarrotes).</li>
+<li>Un cajón con llave bajo el puesto suele bastar de bodega.</li>
+</ul>
+</li>
+<li><strong>Tepoztlán (Ramírez Suárez + Laboratorio Regional de Arquitectura, PMU, 2024):</strong> 195 locales en una retícula IPR de 2.50×2.50, todos iguales. (<a href="https://divisare.com/projects/525703-ramirez-suarez-arquitectos-laboratorio-regional-de-arquitectura-mercado-de-tepoztlan" target="_blank" rel="noopener">Divisare</a>)</li>
+<li><strong>Santa Caterina (EMBT, Barcelona, 2005):</strong> redujeron los puestos y metieron un supermercado y un restaurante. Quedan unos 60 puestos de fresco en 3,000 m². Tiene sótano de basura, almacenes y andenes de carga. (<a href="https://ajuntament.barcelona.cat/mercats/en/refurbishment-mercat-de-santa-caterina" target="_blank" rel="noopener">Ajuntament</a>)</li>
+<li><strong>Ratio de m² construidos por local:</strong><ul>
+<li>Oztotepec: 1,550 / 79 = 19.6.</li>
+<li>Tapachula: 4,145 / 200 = 20.7.</li>
+<li>Atlampa: 8,509 / 424 ≈ 20.1, casi igual.</li>
+<li><strong>La diferencia está en el área de venta.</strong> En Oztotepec es el ~46 % del edificio (79 × 9 m²); en Atlampa es el ~25 % (≈2,140 m² de locales). Con los mismos m² por local, aquí el área se va a plazas, vacíos y patios, y el local mide la mitad. Es una inferencia propia: Oztotepec es de una planta y no tiene patios.</li>
+</ul>
+</li>
+<li><strong>Mercados que fracasaron:</strong><ul>
+<li>Bacalar (PMU): 6 de más de 30 locales abiertos. La gente lo usa de paso y de sombra; la ubicación y la gestión fallaron. (<a href="https://www.poresto.com/quintana-roo/chetumal/2025/10/18/mercado-municipal-de-bacalar-con-menos-de-seis-locales-en-funcion.amp.html" target="_blank" rel="noopener">Por Esto!, 2025</a>)</li>
+<li>Mercado PMU de Ensenada: hubo que rediseñar los locales porque no correspondían a lo que necesitaban los locatarios. (<a href="https://zetatijuana.com/2024/07/mercado-municipal-obra-deficiente-de-sedatu-afecta-a-comerciantes/" target="_blank" rel="noopener">Zeta Tijuana, 2024</a>)</li>
+<li>Gastelum (Ensenada): sólo 5 locales abiertos. (<a href="https://www.elimparcial.com/tij/ensenada/2026/04/08/ayuntamiento-abandona-mercado-publico-gastelum-de-ensenada/" target="_blank" rel="noopener">El Imparcial, 2026</a>)</li>
+</ul>
+</li>
+</ul>
+<h3>Circulación vertical y plantas altas</h3>
+<ul>
+<li><strong>FAO:</strong> se prefiere una sola planta. Dos o tres sólo en zonas urbanas densas, y con protección contra incendio completa: salidas, hidrantes y compartimentación. (<a href="https://www.fao.org/4/V8390E/V8390E08.htm" target="_blank" rel="noopener">FAO cap. 5</a>)</li>
+<li><strong>Contraejemplo, Azogues (Ecuador):</strong> las ventas bajaron por la distancia entre giros repartidos en tres pisos de dos edificios, la falta de accesos para adultos mayores y los ascensores y montacargas que no funcionan. Los comerciantes piden todo en planta baja. (<a href="https://elmercurio.com.ec/?p=920617" target="_blank" rel="noopener">El Mercurio</a>)</li>
+<li><strong>Lo que sí funciona arriba:</strong><ul>
+<li><strong>San Antón (Madrid):</strong><ul>
+<li>Frescos abajo.</li>
+<li>Planta de degustación con barandales que miran al vacío, la zona más fotografiada.</li>
+<li>Restaurante con terraza de 400 m² arriba.</li>
+<li>Escaleras mecánicas, según una guía turística que no está verificada.</li>
+<li>(<a href="https://www.spain.info/es/lugares-interes/mercado-san-anton/" target="_blank" rel="noopener">spain.info</a>, <a href="https://www.nomadotravel.app/es/attractions/mercado-de-san-anton" target="_blank" rel="noopener">Nomado</a>)</li>
+</ul>
+</li>
+<li><strong>Bolhão (Nuno Valentim, Porto):</strong> todo lo fresco abajo, restaurantes arriba con entrada propia desde la calle alta, conexión directa al metro y una cava logística con su propia entrada de carga. (<a href="https://observador.pt/2025/01/04/bolhao-historia-duma-renovacao-exemplar/" target="_blank" rel="noopener">Observador</a>, <a href="https://www.imovirtual.com/noticias/imobiliario/a-visita-guiada-do-arquiteto-nuno-valentim-as-obras/" target="_blank" rel="noopener">Imovirtual</a>)</li>
+<li><strong>Barceló (Nieto Sobejano, Madrid):</strong> mercado abajo, gimnasio municipal de 4,000 m² arriba y azotea pública con restaurante y jardín. (<a href="https://arquitecturaviva.com/obras/mercado-barcelo" target="_blank" rel="noopener">Arquitectura Viva</a>, <a href="https://www.esmadrid.com/compras/mercado-de-barcelo" target="_blank" rel="noopener">esMadrid</a>)</li>
+<li><strong>Markthal (MVRDV, Rotterdam):</strong> 96 puestos en una sola planta. Supermercado y estacionamiento abajo, vivienda arriba. (<a href="https://www.dezeen.com/?p=557618" target="_blank" rel="noopener">Dezeen</a>)</li>
+<li><strong>Tepoztlán:</strong> abasto abajo, dos niveles de comida y un mirador.</li>
+<li><strong>Kampung Admiralty (WOHA, Singapur):</strong><ul>
+<li>Plaza comunitaria abierta abajo, como «sala del barrio».</li>
+<li>Hawker centre de 900 asientos.</li>
+<li>Vivienda arriba.</li>
+<li>Tragaluz central sobre la plaza.</li>
+<li>(<a href="https://architectureau.com/articles/kampung-admiralty/" target="_blank" rel="noopener">ArchitectureAU</a>, <a href="https://asia.uli.org/kampung-admiralty" target="_blank" rel="noopener">ULI</a>)</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Patrón:</strong> a nivel de calle va lo fresco y lo diario. Arriba va un destino (comer, terraza, deporte), con acceso propio desde otra cota o visible desde abajo por un vacío. Ningún referente pone el mismo tipo de local de 5 m² arriba que abajo.</li>
+</ul>
+<h3>Áreas verdes, luz y ventilación</h3>
+<ul>
+<li><strong>FAO:</strong><ul>
+<li>Techo de 3.5 a 6 m, con el centro más alto.</li>
+<li>Patios interiores para la ventilación cruzada, abiertos a la actividad; si no, se vuelven espacio muerto.</li>
+<li>El pescado necesita extracción y coladeras.</li>
+<li>El huevo va en el lugar más fresco.</li>
+</ul>
+</li>
+<li><strong>Tapachula:</strong> cubiertas en zigzag cuyas crestas dejan pasar la luz. La misma cubierta capta lluvia para los baños y el riego.</li>
+<li><strong>Mercado de mayoreo en Tokio:</strong> monitores a todo lo largo de la nave, con 1.5 a 7.9 renovaciones por hora con viento de 2–5 m/s, medidas en sitio. (<a href="https://www.aivc.org/sites/default/files/airbase_6082.pdf" target="_blank" rel="noopener">AIVC</a>)</li>
+<li><strong>MVRDV, mercado en Taiwán:</strong> techos altos y ondulados para la ventilación natural, con cubierta verde en terrazas. (<a href="https://www.archdaily.com/912704" target="_blank" rel="noopener">ArchDaily</a>)</li>
+<li><strong>Mercado Roma:</strong> patio abierto rodeado por un huerto vertical que vende al propio mercado.</li>
+<li><strong>Kampung Admiralty:</strong> terrazas verdes en todos los niveles y retención de agua pluvial.</li>
+</ul>
+<h3>Accesos, bordes y vida social</h3>
+<ul>
+<li><strong>Sant Antoni:</strong><ul>
+<li>Accesos por los chaflanes.</li>
+<li>Patios triangulares recuperados para cuentacuentos y espectáculos.</li>
+<li>Plaza deprimida que llega al vestíbulo en −1.</li>
+</ul>
+</li>
+<li><strong>FAO:</strong><ul>
+<li>El acceso principal va desde la calle principal y desde las paradas de transporte.</li>
+<li>Los productos básicos se ponen lejos de las entradas para que el cliente atraviese el mercado.</li>
+<li>Los usos incompatibles se separan, por lo menos con un pasillo principal.</li>
+</ul>
+</li>
+<li><strong>Mercados de Hanói (Project for Public Spaces / HealthBridge):</strong><ul>
+<li>Asientos y lugares de reunión adentro.</li>
+<li>Bodega por puesto, oculta al cliente.</li>
+<li>Mezzanine para cafés y demostraciones de cocina.</li>
+<li>Parque en la azotea y fachadas vivas.</li>
+<li>(<a href="https://thecityateyelevel.com/stories/a-new-vision-for-wet-markets-in-hanoi/" target="_blank" rel="noopener">The City at Eye Level</a>)</li>
+</ul>
+</li>
+<li><strong>Referentes mexicanos que pasaste:</strong> Huimanguillo (128 arquitectura y diseño urbano), Nicolás Bravo (AIDIA Studio), Matamoros (Colectivo C733) y Chicxulub (Estudio MMX). Comparten la plaza central como núcleo cívico, las calles que agrupan puestos, la ventilación natural, la sombra y los materiales locales. (<a href="https://www.archdaily.com/1032757/the-market-plaza-as-civic-core-5-projects-that-explore-contemporary-approaches-to-market-design-in-mexico" target="_blank" rel="noopener">ArchDaily</a>)</li>
+</ul>
+<h3>Logística</h3>
+<ul>
+<li>Sant Antoni, Santa Caterina y Bolhão sacan la carga, las bodegas de locatarios y la basura a un sótano o cava con su propia entrada.</li>
+<li>FAO:<ul>
+<li>Entregas en horario restringido, temprano.</li>
+<li>Basura al cierre.</li>
+<li>Estacionamiento de locatarios separado del público.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2>2. Checklist: Atlampa contra los referentes</h2>
+<p>✅ cumple · ⚠️ revisar · ❌ falta</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Criterio</th>
+<th>Referente</th>
+<th>Atlampa hoy</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Pasillo mínimo frente a un local</td>
+<td>NTC 2024: 1.10</td>
+<td>1.10</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Calles entre manzanas</td>
+<td>3.0 (Sant Antoni, Oztotepec); FAO 3.5–6</td>
+<td>2.26 norte (postes a 6.36) · 2.50 sur (espinas a 6.6)</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Mercancía en el pasillo</td>
+<td>Práctica en CDMX</td>
+<td>No está prevista: con 0.35 por lado, quedan 1.56–1.80</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Distancia entre pasillos transversales</td>
+<td>FAO ≤ 12 m</td>
+<td>Pasajes de 1.40 cada ~7.5–9 m</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Ancho de los pasajes</td>
+<td>Diablito + persona</td>
+<td>1.40</td>
+<td>⚠️ justo</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Plazuelas</td>
+<td>FAO 20–25 m máx., con foco</td>
+<td>Cada ~20 m con árbol, escalera, fonda o vitrina</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Tamaño del local</td>
+<td>6.25 (Tepoztlán) · 9 (Oztotepec) · FAO 4–12</td>
+<td>Promedio 4.9–5.25 m², fondo 2.05</td>
+<td>⚠️ al mínimo</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Locales que se pueden juntar</td>
+<td>Oztotepec 3×3 → 3×6 / 6×6</td>
+<td>No hay regla</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Locales sueltos</td>
+<td>Tu criterio: no inflar la cuenta</td>
+<td><strong>2 manzanas de 1 local + 12 de 2 = 26 locales</strong> (norte PB 1+3, norte alto 0+2, sur PB 1+4, sur PA 0+3)</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>10</td>
+<td>m² construidos por local</td>
+<td>19.6 Oztotepec · 20.7 Tapachula</td>
+<td>≈ 20.1</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Área de venta / área construida</td>
+<td>~46 % (Oztotepec)</td>
+<td>~25 %</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Locales en planta alta</td>
+<td>FAO: una planta; referentes: arriba va un destino</td>
+<td><strong>197 / 424 = 46 %</strong>, el mismo local de 5 m²</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Giros por nivel</td>
+<td>San Antón, Bolhão, Tepoztlán: comida arriba</td>
+<td>Sin asignar</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Planta alta visible desde PB</td>
+<td>San Antón, con barandales al vacío</td>
+<td>Sur: un solo vacío de 61 m². Norte: P1/P3 se ven desde el jardín</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Acceso directo a la planta alta desde otra cota</td>
+<td>Bolhão (calle alta) · Tepoztlán (pendiente)</td>
+<td>La cinta del aro llega a +4.28 en la sur; en la norte, puente y elevador</td>
+<td>✅ aprovecharlo más</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Redundancia vertical</td>
+<td>Azogues (elevadores descompuestos)</td>
+<td>1 elevador por nave + montacargas sur</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Distancia de un local a la escalera más cercana</td>
+<td>FAO: salidas suficientes</td>
+<td>Sur PA: máx. 29.6 m. Norte alto: máx. 37.8 m</td>
+<td>⚠️ verificar con NTC</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Zonificación por giro (húmedo / semihúmedo / seco / comida)</td>
+<td>FAO; <a href="https://repositorio.uisek.edu.ec/bitstream/123456789/5191/1/VELASQUEZ%20VEGA%20MIGUEL%20%c3%81NGEL.pdf" target="_blank" rel="noopener">tesis UISEK</a></td>
+<td>No definida</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>19</td>
+<td>Ancla</td>
+<td>Súper + restaurante (Santa Caterina) · súper (Markthal)</td>
+<td>Ninguna</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Bodega por local</td>
+<td>FAO: cajón bajo el puesto · Hanói · sótanos en Barcelona y Porto</td>
+<td>4 bodegas para 424 locales</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>21</td>
+<td>Carga y descarga</td>
+<td>Entrada propia, horario temprano</td>
+<td>Sur: SE con andén y montacargas. Norte: sin definir</td>
+<td>⚠️ / ❌</td>
+</tr>
+<tr>
+<td>22</td>
+<td>Luz natural en la PB sur</td>
+<td>FAO: centro alto · Kampung: tragaluz central</td>
+<td>Mediana de 14 m a un vacío (máx. 27). Altura libre 3.58</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>23</td>
+<td>Ventilación</td>
+<td>Monitores (Tokio) · crestas (Tapachula) · extracción del pescado</td>
+<td>Tragaluces en la norte; cubierta sur pendiente; sin extracción</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>24</td>
+<td>Áreas verdes</td>
+<td>Terrazas verdes · huerto (Roma) · azotea (Barceló)</td>
+<td>Arriates, jardín del hoyo, 4 humedales de 48 m², macetas, jardinera colgante</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>25</td>
+<td>Verde productivo o azotea</td>
+<td>Mercado Roma · Barceló · Hanói</td>
+<td>No hay</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>26</td>
+<td>Agua de lluvia</td>
+<td>Tapachula: riego y baños</td>
+<td>Humedales y biodigestor; la cubierta no se conecta</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>27</td>
+<td>Asientos y reunión</td>
+<td>Hanói · Kampung</td>
+<td>39 mesitas, gradería norte, barras de 6 fondas</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>28</td>
+<td>Peso de la comida</td>
+<td>San Antón · Tepoztlán (2 niveles) · Roma</td>
+<td>6 fondas (24 locales) ≈ 6 %</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>29</td>
+<td>Programa comunitario</td>
+<td>Patios de Sant Antoni · Kampung · cocina demostrativa en Hanói</td>
+<td>Gradería; nada más</td>
+<td>⚠️</td>
+</tr>
+<tr>
+<td>30</td>
+<td>Accesos</td>
+<td>Calle principal + transporte · esquinas</td>
+<td>Norte: 2 + aro. Sur: 4 + boca</td>
+<td>✅ falta ligarlo a paradas</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>3. Choques entre la investigación y el diseño, con propuestas</h2>
+<ol>
+<li><strong>Planta alta (#12–16).</strong><ul>
+<li>La PA sur y P1/P3 deberían ser un destino:<ul>
+<li>Fondas y comida alrededor del vacío y en la llegada de la cinta, con barras al barandal, como San Antón.</li>
+<li>Terraza y mirador al aro.</li>
+<li>Giros secos: ropa, artesanía, servicios, oficios.</li>
+</ul>
+</li>
+<li>Todo lo húmedo y lo diario baja a la PB.</li>
+<li>La cinta es el equivalente de la calle alta de Bolhão; conviene poner ahí la puerta más atractiva de la PA.</li>
+</ul>
+</li>
+<li><strong>Contar módulos, no locales (#7–9).</strong><ul>
+<li>El módulo base se queda en 2.50×2.05.</li>
+<li>Regla de fusión de 2 y 3 módulos sobre la misma manzana.</li>
+<li>Una mezcla tentativa (inferencia, a validar con locatarios, que es la lección de Ensenada): ~55 % sencillos, ~35 % dobles y ~10 % triples o fondas.</li>
+<li>Las 14 manzanas de 1–2 locales se vuelven locales dobles de punta o se ceden a la plazuela.</li>
+</ul>
+</li>
+<li><strong>Calles con franja de exhibición (#2–3).</strong><ul>
+<li>Opción A: pintar 0.35–0.40 frente a cada local como zona del locatario y dejar libre el centro (1.56 en la norte, 1.80 en la sur). Cumple la NTC y legaliza lo que pasa de todos modos.</li>
+<li>Opción B: abrir las calles de la sur a 3.0 quitando una espina. Estimado: unos −24 locales entre PB y PA, que se compensan con la fusión.</li>
+</ul>
+</li>
+<li><strong>Zonificación y ancla (#18–19).</strong><ul>
+<li>Húmedos (carnicería, pollería y pescadería junto a la vitrina de acuaponia) en la PB sur, pegados a la carga del SE y con extracción.</li>
+<li>Flores y plantas en la «calle de las plantas» del norte.</li>
+<li>Abarrotes y semillas en la norte, en locales dobles.</li>
+<li>Comida arriba.</li>
+<li>Ancla al fondo del eje Sabino → patio de luz: tortillería, cocina comunitaria o comedor público, o una cooperativa de abasto. Los básicos van lejos de la puerta (FAO).</li>
+</ul>
+</li>
+<li><strong>Bodegas (#20).</strong> Cajón con llave bajo el mostrador en cada módulo, que cabe si el fondo pasa a 2.25–2.50, más bodegas de renta por módulo en la franja de servicio o bajo la gradería norte.</li>
+<li><strong>Luz en la PB sur (#22).</strong><ul>
+<li>Uno o dos vacíos más en la PA, alineados con las plazuelas de PB.</li>
+<li>Cada vacío da luz abajo y vista hacia arriba, lo que ataca también el punto 1.</li>
+<li>Cuesta algunos locales de la PA, que de todos modos sobran si arriba es comida.</li>
+</ul>
+</li>
+<li><strong>Cubierta sur (#23, #26).</strong> Monitores continuos sobre las calles y no sobre los locales (el sol directo daña el producto), con ventilas operables, más el canalón hacia los humedales y la acuaponia.</li>
+<li><strong>Carga de la nave norte (#21).</strong> Definir la entrada de servicio y el horario. Sabino, al sur de la plazuela, parece lo natural.</li>
+</ol>
+<h2>4. Cosas que no habíamos previsto</h2>
+<ul>
+<li>La mercancía en el pasillo como dato de diseño, no como falta.</li>
+<li>Redundancia vertical: escaleras anchas como ruta principal, el elevador como apoyo y un montacargas que también sirva al público en emergencias.</li>
+<li>Programa comunitario:<ul>
+<li>Aula o cocina demostrativa en un mezzanine (Hanói).</li>
+<li>Guardería para hijos de locatarias (Kampung).</li>
+<li>Patios del aro con calendario de eventos (Sant Antoni).</li>
+</ul>
+</li>
+<li>Verde productivo: huerto o vivero que venda en la calle de las plantas (Mercado Roma).</li>
+<li>Estacionamiento de bicis, motos de reparto y diablitos junto a cada acceso (Hanói: el 70 % llegaba en moto).</li>
+<li>Gestión: diseño con los locatarios y apertura por fases. Los fracasos del PMU (Bacalar, Ensenada) son de gestión y de ajuste a las necesidades, no de forma.</li>
+</ul>
+<h2>5. Huecos y método</h2>
+<ul>
+<li><strong>NTC 2024:</strong> el PDF pesa más de 10 MB y no se pudo abrir aquí. El 1.10 de pasillos viene de la lectura de sesiones anteriores. Conviene confirmar en la NTC la distancia máxima a una salida para las plantas altas (#17).</li>
+<li><strong>SEDESOL:</strong> no se encontró la ficha de mercado público del Sistema Normativo de Equipamiento (m² por puesto).</li>
+<li><strong><a href="https://www.gob.mx/cms/uploads/attachment/file/893226/LIBRO_MERCADOS._pdf.pdf" target="_blank" rel="noopener">Libro «Mercados» de SEDATU</a>:</strong> dio 404 al abrirlo.</li>
+<li><strong>Huimanguillo, Nicolás Bravo y Matamoros:</strong> sin plantas ni cifras en línea.</li>
+<li><strong>Escaleras mecánicas de San Antón:</strong> sólo aparecen en una guía turística.</li>
+<li><strong>Búsqueda:</strong> ~15 consultas web y 10 páginas leídas completas.</li>
+<li><strong>Auditoría de Atlampa:</strong> agrupa los locales que se tocan para medir manzanas y mide distancias de centroide a escaleras y vacíos.</li>
+</ul>
+</main>
+</body>
+</html>

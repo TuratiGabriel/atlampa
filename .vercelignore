@@ -1,0 +1,10 @@
+# Lo que Vercel no publica: no es parte del sitio. El repo lo conserva todo.
+# (programa/ sí va: el tablero lee programa/programa.json.)
+
+# Modelos de Rhino: la fuente de trabajo (Contexto.3dm pesa 20 MB) no se descarga desde la página
+*.3dm
+
+# Scripts que generan los datos y notas del equipo
+herramientas/
+handoff/
+.github/
