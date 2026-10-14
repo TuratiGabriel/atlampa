@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261014c'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261014a'      # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -105,7 +105,7 @@ APARTADOS = {
                 'la cisterna, el cuarto de máquinas y los biodigestores en el primer sótano, y las dos rampas helicoidales '
                 'dobles que bajan un sótano por vuelta desde la planta baja.',
         'datos': ['2 bloques independientes', '4 sótanos de 3.5 m', '263 cajones por sótano · 1052 en total',
-                  'Norte 130 · sur 133 por sótano', 'Helicoidales dobles desde la planta baja'],
+                  'Norte 130 · sur 133 por sótano', '4 elevadores: del último sótano a la azotea y su espacio reglamentario', 'Helicoidales dobles desde la planta baja'],
         'extra': SOTANOS,
         'leyenda': ['<li><i class="ad-leyenda__est"></i>Sótano</li>', '<li><i class="ad-leyenda__cajon"></i>Cajón</li>',
                     '<li><i class="ad-leyenda__helice"></i>Helicoidal</li>'],
