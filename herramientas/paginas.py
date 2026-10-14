@@ -279,6 +279,8 @@ PLANTILLA = '''<!doctype html>
 <script src="atlampa-estacionamiento.js?v={v}"></script>
 <script src="atlampa-paisaje.js?v={v}"></script>
 <script src="atlampa-mercado.js?v={v}"></script>
+<script src="atlampa-estructura.js?v={v}"></script>
+<script src="atlampa-industria.js?v={v}"></script>
 <script src="atlampa-infraestructura.js?v={v}"></script>
 <script src="atlampa-geo.js?v={v}"></script>
 <script src="atlampa-pagina.js?v={v}"></script>
