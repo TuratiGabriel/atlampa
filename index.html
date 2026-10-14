@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlampa · Predio</title>
-<link rel="stylesheet" href="atlampa.css?v=20261013i">
-<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261013i">
+<link rel="stylesheet" href="atlampa.css?v=20261013k">
+<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261013k">
 <!-- Three.js 0.170.0 y los complementos que se usan van en lib/ (sin CDN): el sitio funciona sin internet -->
 <script type="importmap">{"imports": {"three": "./lib/three-0.170.0.module.min.js", "three/addons/": "./lib/three-0.170.0-addons/"}}</script>
 </head>
@@ -110,16 +110,16 @@
               <output data-corte-valor="y">Completo</output>
             </label>
             <div class="hud-cortes__horizontales">
-              <label class="hud-corte">
-                <span class="hud-corte__nombre">Norte · Sur</span>
-                <span class="hud-corte__linea"><small>N</small><input type="range" min="0" max="100" value="100" step="1" data-corte-eje="z" aria-label="Corte norte sur"><small>S</small></span>
+              <div class="hud-corte">
+                <span class="hud-corte__cabecera"><span class="hud-corte__nombre" data-corte-direccion="z">Sur → Norte</span><button type="button" class="hud-corte__invierte" data-corte-invierte="z" aria-pressed="false" title="Invertir corte norte-sur" aria-label="Invertir corte norte-sur"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h13l-3-3M19 17H6l3 3"/></svg></button></span>
+                <span class="hud-corte__linea"><small data-corte-desde="z">S</small><input type="range" min="0" max="100" value="100" step="1" data-corte-eje="z" aria-label="Corte norte sur"><small data-corte-hasta="z">N</small></span>
                 <output data-corte-valor="z">Completo</output>
-              </label>
-              <label class="hud-corte">
-                <span class="hud-corte__nombre">Poniente · Oriente</span>
-                <span class="hud-corte__linea"><small>O</small><input type="range" min="0" max="100" value="100" step="1" data-corte-eje="x" aria-label="Corte poniente oriente"><small>E</small></span>
+              </div>
+              <div class="hud-corte">
+                <span class="hud-corte__cabecera"><span class="hud-corte__nombre" data-corte-direccion="x">Este → Oeste</span><button type="button" class="hud-corte__invierte" data-corte-invierte="x" aria-pressed="false" title="Invertir corte este-oeste" aria-label="Invertir corte este-oeste"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h13l-3-3M19 17H6l3 3"/></svg></button></span>
+                <span class="hud-corte__linea"><small data-corte-desde="x">E</small><input type="range" min="0" max="100" value="100" step="1" data-corte-eje="x" aria-label="Corte poniente oriente"><small data-corte-hasta="x">O</small></span>
                 <output data-corte-valor="x">Completo</output>
-              </label>
+              </div>
             </div>
           </div>
         </div>
@@ -198,13 +198,13 @@
 
   <p class="ad-ayuda">Arrastrar (derecho o izquierdo): orbitar · Shift + arrastrar o botón central: mover · rueda: zoom al cursor · clic en una parte: entrar · doble clic: aislarla (en el vacío: encuadre)</p>
 </main>
-<script src="atlampa-datos.js?v=20261013i"></script>
-<script src="atlampa-modulos.js?v=20261013i"></script>
-<script src="atlampa-estacionamiento.js?v=20261013i"></script>
-<script src="atlampa-paisaje.js?v=20261013i"></script>
-<script src="atlampa-mercado.js?v=20261013i"></script>
-<script src="atlampa-infraestructura.js?v=20261013i"></script>
-<script src="atlampa-geo.js?v=20261013i"></script>
-<script src="atlampa-pagina.js?v=20261013i"></script>
+<script src="atlampa-datos.js?v=20261013k"></script>
+<script src="atlampa-modulos.js?v=20261013k"></script>
+<script src="atlampa-estacionamiento.js?v=20261013k"></script>
+<script src="atlampa-paisaje.js?v=20261013k"></script>
+<script src="atlampa-mercado.js?v=20261013k"></script>
+<script src="atlampa-infraestructura.js?v=20261013k"></script>
+<script src="atlampa-geo.js?v=20261013k"></script>
+<script src="atlampa-pagina.js?v=20261013k"></script>
 </body>
 </html>

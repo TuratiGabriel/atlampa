@@ -81,26 +81,46 @@
 
   function guarda(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
   function lee(k, borra) { try { var v = sessionStorage.getItem(k); if (borra) sessionStorage.removeItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
-  var cortes = lee('atlampa-cortes') || { x: 1, y: 1, z: 1 };
+  var cortes = lee('atlampa-cortes') || { x: 1, y: 1, z: 1, ix: false, iz: false };
   ['x', 'y', 'z'].forEach(function (eje) { if (typeof cortes[eje] !== 'number') cortes[eje] = 1; });
+  cortes.ix = !!cortes.ix; cortes.iz = !!cortes.iz;
+  function corteInvertido(eje) { return eje === 'x' ? cortes.ix : eje === 'z' ? cortes.iz : false; }
 
   function reflejaCorte(eje) {
     var t = Math.max(0, Math.min(1, cortes[eje])), s = document.querySelector('[data-corte-eje="' + eje + '"]');
     var o = document.querySelector('[data-corte-valor="' + eje + '"]');
     if (s) s.value = String(Math.round(t * 100));
     if (o) o.textContent = t >= 0.999 ? 'Completo' : Math.round(t * 100) + '%';
+    if (eje === 'x' || eje === 'z') {
+      var inv = corteInvertido(eje), nombres = eje === 'z' ? ['Sur', 'Norte'] : ['Este', 'Oeste'];
+      if (inv) nombres.reverse();
+      var desde = document.querySelector('[data-corte-desde="' + eje + '"]'), hasta = document.querySelector('[data-corte-hasta="' + eje + '"]');
+      var nombre = document.querySelector('[data-corte-direccion="' + eje + '"]'), boton = document.querySelector('[data-corte-invierte="' + eje + '"]');
+      if (desde) desde.textContent = nombres[0].charAt(0);
+      if (hasta) hasta.textContent = nombres[1].charAt(0);
+      if (nombre) nombre.textContent = nombres[0] + ' → ' + nombres[1];
+      if (boton) boton.setAttribute('aria-pressed', String(inv));
+    }
   }
   function aplicaCortes() {
-    ['x', 'y', 'z'].forEach(function (eje) { reflejaCorte(eje); if (dib && dib.corta) dib.corta(eje, cortes[eje]); });
+    ['x', 'y', 'z'].forEach(function (eje) { reflejaCorte(eje); if (dib && dib.corta) dib.corta(eje, cortes[eje], corteInvertido(eje)); });
   }
   function ponCorte(eje, t) {
     cortes[eje] = Math.max(0, Math.min(1, t));
     guarda('atlampa-cortes', cortes);
     reflejaCorte(eje);
-    if (dib && dib.corta) dib.corta(eje, cortes[eje]);
+    if (dib && dib.corta) dib.corta(eje, cortes[eje], corteInvertido(eje));
+  }
+  function invierteCorte(eje) {
+    if (eje === 'x') cortes.ix = !cortes.ix;
+    else if (eje === 'z') cortes.iz = !cortes.iz;
+    else return;
+    guarda('atlampa-cortes', cortes);
+    reflejaCorte(eje);
+    if (dib && dib.corta) dib.corta(eje, cortes[eje], corteInvertido(eje));
   }
   function restableceCortes() {
-    cortes = { x: 1, y: 1, z: 1 };
+    cortes = { x: 1, y: 1, z: 1, ix: false, iz: false };
     guarda('atlampa-cortes', cortes);
     aplicaCortes();
   }
@@ -693,9 +713,10 @@
     else if (aislado && !yendo) saleAislado();
   });
   document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-capa], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset]');
+    var b = ev.target.closest('[data-capa], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte]');
     if (!b || !dib) return;
     if (b.hasAttribute('data-corte-reset')) { restableceCortes(); return; }
+    if (b.hasAttribute('data-corte-invierte')) { invierteCorte(b.getAttribute('data-corte-invierte')); return; }
     if (b.hasAttribute('data-ir')) { ev.preventDefault(); cierraMenus(); if (aislado) saleAislado(); ir(b.getAttribute('data-ir')); return; }
     if (yendo) return;
     if (b.hasAttribute('data-aisla')) { cierraMenus(); aislar(b.getAttribute('data-aisla')); }

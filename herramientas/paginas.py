@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261013i'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261013k'      # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -101,16 +101,16 @@ CORTES = '''
               <output data-corte-valor="y">Completo</output>
             </label>
             <div class="hud-cortes__horizontales">
-              <label class="hud-corte">
-                <span class="hud-corte__nombre">Norte · Sur</span>
-                <span class="hud-corte__linea"><small>N</small><input type="range" min="0" max="100" value="100" step="1" data-corte-eje="z" aria-label="Corte norte sur"><small>S</small></span>
+              <div class="hud-corte">
+                <span class="hud-corte__cabecera"><span class="hud-corte__nombre" data-corte-direccion="z">Sur → Norte</span><button type="button" class="hud-corte__invierte" data-corte-invierte="z" aria-pressed="false" title="Invertir corte norte-sur" aria-label="Invertir corte norte-sur"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h13l-3-3M19 17H6l3 3"/></svg></button></span>
+                <span class="hud-corte__linea"><small data-corte-desde="z">S</small><input type="range" min="0" max="100" value="100" step="1" data-corte-eje="z" aria-label="Corte norte sur"><small data-corte-hasta="z">N</small></span>
                 <output data-corte-valor="z">Completo</output>
-              </label>
-              <label class="hud-corte">
-                <span class="hud-corte__nombre">Poniente · Oriente</span>
-                <span class="hud-corte__linea"><small>O</small><input type="range" min="0" max="100" value="100" step="1" data-corte-eje="x" aria-label="Corte poniente oriente"><small>E</small></span>
+              </div>
+              <div class="hud-corte">
+                <span class="hud-corte__cabecera"><span class="hud-corte__nombre" data-corte-direccion="x">Este → Oeste</span><button type="button" class="hud-corte__invierte" data-corte-invierte="x" aria-pressed="false" title="Invertir corte este-oeste" aria-label="Invertir corte este-oeste"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h13l-3-3M19 17H6l3 3"/></svg></button></span>
+                <span class="hud-corte__linea"><small data-corte-desde="x">E</small><input type="range" min="0" max="100" value="100" step="1" data-corte-eje="x" aria-label="Corte poniente oriente"><small data-corte-hasta="x">O</small></span>
                 <output data-corte-valor="x">Completo</output>
-              </label>
+              </div>
             </div>
           </div>
         </div>'''
