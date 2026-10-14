@@ -8,3 +8,4 @@ Las reglas del proyecto están en `handoff/CLAUDE.md`: léelas antes de trabajar
   (`modelo/`); `prepara-modulos.py` (`nuevos bloques.3dm`) y `prepara-estacionamiento.py` (el DWG de sótanos) no: pide esos archivos.
   Para regenerar datos hace falta `pip install rhino3dm shapely matplotlib`.
 - Antes de subir: `python herramientas/revisa.py --base origin/master`.
+- Ramas, vista local y mezclas: `python herramientas/ramas.py` (guía en `handoff/procesos/ramas-y-version-local.md`).

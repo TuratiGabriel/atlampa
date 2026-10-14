@@ -1,44 +1,23 @@
-"""Módulos de vivienda de 'nuevos bloques.3dm' → atlampa-modulos.js
+"""Módulos de vivienda (ponerestructura_LRFD_v2.3dm) → atlampa-modulos.js.
 
     python herramientas/prepara-modulos.py      (desde diagrama/)
 
-Lee las capas de módulos (modulos44, modulos66, modulos88, 44med,
-modulosamenidades, modulosextra) con rhino3dm, sin abrir Rhino.
-Todos los módulos son cajas iguales (5.5 × 4 × 3 m) con el mismo giro, así
-que cada uno se guarda como centro + nivel + tipo.
+2026-10-13: la fuente pasó a ser el Rhino de la estructura (ponerestructura_LRFD_v2.3dm, capas Módulos::…): es el
+modelo bueno, con los módulos y los niveles correctos, y el visor lo copia TAL CUAL. El archivo (62 MB) no va al repo:
+se busca junto a la carpeta diagrama/. Ya no se usan nuevos bloques.3dm ni los gemelos de Contexto.3dm (sólo la
+industria, que sigue saliendo de Contexto.3dm).
 
-1. Shell: de cada caja sólo se guardan las caras que dan al exterior (las
-   que no tapa una caja vecina del mismo nivel o la de arriba), recortadas
-   a la parte descubierta. Las bases nunca se ven (la cámara mira desde
-   arriba) y no se guardan. Las cajas sin ninguna cara exterior se omiten.
-2. Visibilidad: para cada grado de azimut se pintan las cajas en el mismo
-   orden que el navegador (de lejos a cerca, de abajo arriba) en un búfer de
-   identificadores, y se anota cuáles quedan a la vista; esto a varias alturas
-   de cámara (de 6° a 70°), porque la cámara sube y baja. Por sector de 10°
-   se guarda la unión (con 3° de margen): el navegador sólo construye y
-   pinta las cajas del sector de la cámara.
+Cada objeto de las capas Módulos::44m2, 66m2, 88m2, loft44m2, modulosamenidades, modulosextra y moduloscomercio es un
+DEPARTAMENTO (varios módulos juntos en un mismo nivel): se parte en módulos de 5.5 × 4 m sobre la retícula girada
+−10° y cada uno hereda el departamento (las aristas entre módulos del mismo departamento no se dibujan).
+Niveles: el módulo mide 2.70 de alto y el nivel sube cada 3.30 (0.60 de entrepiso: Módulos::entrepiso, que el
+visor dibuja con losas, ver prepara-estructura.py). Primer nivel en z 3.683 del archivo.
+Marco: archivo (m) → diagrama: u = x + 497.99562, v = y + 392.09942, z = z + 7.1601 (medido contra el predio y
+130 módulos de Contexto.3dm, ver prepara-estructura.py --calce). NO se quita ningún módulo por el aro: el modelo ya lo
+respeta; los de la capa moduloscomercio van como «comercio» y se abren hacia el aro.
 
-3. Juntas: con herramientas/departamentos.json (qué departamento es cada
-   módulo), las aristas entre caras coplanares del mismo departamento no se
-   dibujan: cada departamento se lee como un solo volumen.
-
-4. Industria (capa 'industry_bake - Copy'): un prisma; se guarda su planta
-   (el contorno de la cara de abajo) y sus alturas.
-
-0. El aro (antes de todo): su cubierta pasa entre los módulos. Los que
-   estorban el paso (cruzan la banda del aro a la altura de la cubierta y
-   2.5 m libres encima) se quitan; los que quedan junto al paso se abren
-   hacia el aro (esa cara no se cierra) y pasan a comercio (tipo 'comercio').
-
-Marco (revisado 2026-10-09 contra Rhino/Contexto.3dm, el modelo sobre el que
-se desarrolla): Gabriel pasó los módulos a Contexto.3dm corridos (+0.41, +0.37)
-respecto a nuevos bloques y con los 33 de B1 (y 3 de B3) ya acomodados. Manda
-Contexto: cada módulo de nuevos bloques (que da la identidad: capa y
-departamento) toma la posición de su gemelo en Contexto.3dm (mismo paso que el
-mercado y el sitio: u = x/1000 + 503.255, v = y/1000 + 404.153, z = z/1000 + 0.11).
-La industria también sale de Contexto.3dm (allí está 3.6 m más al norte). Lo
-existente de nuevos bloques (la chimenea) calza con las naves de Contexto con el
-paso de antes (497.59, 391.73); sólo sube 0.20 como todo lo demás.
+Qué sigue siendo de antes (de Gabriel): la salida (cajas con muros por tramos y tapa, juntas, sectores de visibilidad,
+industria y chimenea) y el formato; la chimenea se toma del atlampa-modulos.js anterior (nuevos bloques.3dm no está).
 """
 import base64
 import json
@@ -55,7 +34,8 @@ from shapely.ops import unary_union
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-MODELO = os.path.join(RAIZ, '..', 'Rhino', 'nuevos bloques.3dm')
+MODELO = os.path.join(os.path.dirname(RAIZ), 'ponerestructura_LRFD_v2.3dm')   # junto a la carpeta diagrama/ (62 MB, fuera del repo)
+CHIMENEA_RHINO = os.path.join(RAIZ, '..', 'Rhino', 'nuevos bloques.3dm')
 CONTEXTO = os.path.join(RAIZ, '..', 'Rhino', 'Contexto.3dm')
 # sin la carpeta del proyecto (colaboradores): la copia que va en el repo, diagrama/modelo/
 if not os.path.exists(CONTEXTO):
@@ -63,9 +43,13 @@ if not os.path.exists(CONTEXTO):
 SALIDA = os.path.join(RAIZ, 'atlampa-modulos.js')
 DEPTOS = os.path.join(AQUI, 'departamentos.json')   # de herramientas/departamentos.py
 
-CAPAS = ['modulos44', '44SOC', 'modulos66', 'modulos88', 'modulosamenidades', 'modulosextra']   # subcapas de 'Módulos'
+CAPAS = ['44m2', '66m2', '88m2', 'loft44m2', 'modulosamenidades', 'modulosextra']   # subcapas de 'Módulos' (tipos); moduloscomercio va como 'comercio'
+CAPA_COMERCIO = 'moduloscomercio'
+ALTO, PASO = 2.7, 3.3                     # alto del módulo y de nivel a nivel (0.60 de entrepiso)
+CELDA = (5.5, 4.0)                        # un módulo
+GIRO = math.radians(-10)
 RX, RY, RZ = 503.255, 404.153, 0.11       # Contexto.3dm (mm) → marco del diagrama (como el mercado y el sitio)
-DU, DV, DZ = 497.9956, 392.0994, 7.16      # nuevos bloques → diagrama: así calza con los módulos de Contexto.3dm
+DU, DV, DZ = 497.99562, 392.09942, 7.1601  # archivo de la estructura (m) → diagrama (medido contra Contexto.3dm)
 EU, EV = 497.59, 391.73                    # lo existente de nuevos bloques (chimenea): calza así con las naves de Contexto
 TOL = 0.03
 SECTOR, MARGEN = 10, 3                    # grados
@@ -127,63 +111,72 @@ LIBRE = 2.5                                   # altura libre sobre la cubierta
 JUNTO = 1.5                                   # a menos de esto del paso, un módulo da al aro
 
 
+def _triangulos(g):
+    out = []
+    for f in g.Faces:
+        m = f.GetMesh(rhino3dm.MeshType.Any)
+        if not m:
+            continue
+        V = m.Vertices
+        for i in range(len(m.Faces)):
+            q = m.Faces[i]
+            P = [(V[k].X, V[k].Y, V[k].Z) for k in (q[0], q[1], q[2], q[3])]
+            out.append(P[:3])
+            if q[2] != q[3]:
+                out.append([P[0], P[2], P[3]])
+    return out
+
+
 def lee():
+    """Los módulos del Rhino de la estructura: cada departamento (objeto) se parte en celdas de 5.5 × 4 sobre la
+    retícula girada −10°. c = centro (x, y) en el marco del archivo; depto = el objeto; z0/h en el marco del archivo."""
+    if not os.path.exists(MODELO):
+        sys.exit('Falta %s: copia el archivo junto a la carpeta diagrama/.' % MODELO)
     m = rhino3dm.File3dm.Read(MODELO)
-    cajas = []
-    for o in m.Objects:
-        capa = m.Layers[o.Attributes.LayerIndex].FullPath.split('::')[-1]
-        if capa not in CAPAS:
+    eu, ev = (math.cos(GIRO), math.sin(GIRO)), (-math.sin(GIRO), math.cos(GIRO))
+    cajas, raros, entre = [], [], defaultdict(list)
+    for n, o in enumerate(m.Objects):
+        lp = m.Layers[o.Attributes.LayerIndex].FullPath
+        if not lp.startswith('M') or '::' not in lp:
             continue
+        capa = lp.split('::')[-1]
         g = o.Geometry
-        vs = [(g.Vertices[i].X, g.Vertices[i].Y, g.Vertices[i].Z) for i in range(len(g.Vertices))]
-        z0 = min(v[2] for v in vs)
-        z1 = max(v[2] for v in vs)
-        base = []
-        for v in vs:
-            if abs(v[2] - z0) < 1e-3 and all(math.dist(v[:2], b) > 1e-3 for b in base):
-                base.append(v[:2])
-        if len(base) != 4:
-            sys.exit('módulo que no es caja en ' + capa)
-        cx = sum(b[0] for b in base) / 4
-        cy = sum(b[1] for b in base) / 4
-        lados = [(base[i], base[(i + 1) % 4]) for i in range(4)]
-        largo = max(lados, key=lambda l: math.dist(*l))
-        ang = math.atan2(largo[1][1] - largo[0][1], largo[1][0] - largo[0][0])
-        ang = (ang + math.pi / 2) % math.pi - math.pi / 2           # dirección del lado largo, en (−90°, 90°]
-        cajas.append({'capa': capa, 'c': (cx, cy), 'z0': z0, 'h': z1 - z0, 'ang': ang,
-                      'a': math.dist(*largo), 'b': min(math.dist(*l) for l in lados)})
-    gemelos(cajas)
-    return cajas
-
-
-def gemelos(cajas):
-    """Cada caja toma la posición de su gemelo en Contexto.3dm (misma capa y
-    nivel, el más cercano a menos de 1.2 m). 'clave' guarda la de nuevos bloques
-    (la de departamentos.json)."""
-    m = rhino3dm.File3dm.Read(CONTEXTO)
-    ctx = defaultdict(list)
-    for o in m.Objects:
-        capa = m.Layers[o.Attributes.LayerIndex].FullPath
-        if not capa.startswith('M') or capa.split('::')[-1] not in CAPAS or not isinstance(o.Geometry, rhino3dm.Mesh):
+        if capa == 'entrepiso':
+            # losas del entrepiso (extrusión del contorno, con huecos): para saber qué tapas ya cubre
+            z0 = min(g.PathStart.Z, g.PathEnd.Z) + DZ
+            perf = []
+            for i in range(g.ProfileCount):
+                c = g.Profile3d(i, 0.0)
+                if c is not None:
+                    perf.append([(c.Point(k).X + DU, c.Point(k).Y + DV) for k in range(c.PointCount)])
+            pol = Polygon(perf[0]).buffer(0)
+            for h in perf[1:]:
+                pol = pol.difference(Polygon(h))
+            entre[round(z0, 2)].append(pol)
             continue
-        b = o.Geometry.GetBoundingBox()
-        # al marco local de nuevos bloques
-        ctx[capa.split('::')[-1]].append(((b.Min.X + b.Max.X) / 2000 + RX - DU, (b.Min.Y + b.Max.Y) / 2000 + RY - DV, b.Min.Z / 1000 + RZ - DZ))
-    usados, movidos = set(), 0
-    for c in cajas:
-        cand = [(math.dist(c['c'], g[:2]), i) for i, g in enumerate(ctx[c['capa']]) if abs(g[2] - c['z0']) < 0.05]
-        d, i = min(cand)
-        if d > 1.2 or (c['capa'], i) in usados:
-            sys.exit('módulo sin gemelo en Contexto.3dm: %s %s' % (c['capa'], c['c']))
-        usados.add((c['capa'], i))
-        g = ctx[c['capa']][i]
-        c['clave'] = c['c']
-        if d > 0.02:
-            movidos += 1
-        c['c'] = g[:2]
-    if len(usados) != sum(len(v) for v in ctx.values()):
-        sys.exit('Contexto.3dm tiene módulos que no están en nuevos bloques')
-    print('gemelos en Contexto.3dm:', len(usados), '· movidos respecto a nuevos bloques:', movidos)
+        if capa not in CAPAS + [CAPA_COMERCIO]:
+            continue
+        T = _triangulos(g)
+        zmin = min(p[2] for t in T for p in t)
+        zmax = max(p[2] for t in T for p in t)
+        pols = [Polygon([(p[0] * eu[0] + p[1] * eu[1], p[0] * ev[0] + p[1] * ev[1]) for p in t]).buffer(1e-4, join_style=2)
+                for t in T if all(abs(p[2] - zmin) < 1e-3 for p in t)]
+        pie = unary_union([q for q in pols if q.area > 1e-8]).buffer(-1e-4, join_style=2)
+        u0, v0, u1, v1 = pie.bounds
+        nu, nv = max(1, round((u1 - u0) / CELDA[0])), max(1, round((v1 - v0) / CELDA[1]))
+        su, sv = (u1 - u0) / nu, (v1 - v0) / nv
+        if abs(su - CELDA[0]) > 0.1 or abs(sv - CELDA[1]) > 0.1 or abs(zmax - zmin - ALTO) > 0.01:
+            raros.append((capa, round(su, 2), round(sv, 2), round(zmax - zmin, 2)))
+        for i in range(nu):
+            for j in range(nv):
+                cu, cv = u0 + (i + 0.5) * su, v0 + (j + 0.5) * sv
+                if pie.contains(Point(cu, cv)):
+                    cajas.append({'capa': capa, 'depto': n, 'c': (cu * eu[0] + cv * ev[0], cu * eu[1] + cv * ev[1]),
+                                  'z0': zmin, 'h': zmax - zmin, 'ang': GIRO, 'a': CELDA[0], 'b': CELDA[1]})
+    if raros:
+        print('módulos que NO son 5.5 × 4 × 2.7 (van como estándar; el visor sólo maneja una medida):', raros)
+    print('departamentos', len({c['depto'] for c in cajas}), '· módulos', len(cajas))
+    return cajas, {z: unary_union(v) for z, v in entre.items()}
 
 
 def industria():
@@ -219,9 +212,12 @@ def industria():
 
 
 def chimenea():
+    if not os.path.exists(CHIMENEA_RHINO):
+        s = open(SALIDA, encoding='utf-8').read()
+        return json.loads(s[s.index('window.ATLAMPA_MODULOS = ') + len('window.ATLAMPA_MODULOS = '):].strip().rstrip(';'))['chimenea']
     """La chimenea existente (capa 'site::existing - Copy'): el prisma que se
     afila, de 8 vértices. Base y remate como rectángulos en el marco del diagrama."""
-    m = rhino3dm.File3dm.Read(MODELO)
+    m = rhino3dm.File3dm.Read(CHIMENEA_RHINO)
     for o in m.Objects:
         if m.Layers[o.Attributes.LayerIndex].FullPath != 'site::existing - Copy':
             continue
@@ -240,18 +236,19 @@ def chimenea():
 
 
 def main():
-    cajas = lee()
+    cajas, entrepisos = lee()
     giro = sum(c['ang'] for c in cajas) / len(cajas)
     A = round(sum(c['a'] for c in cajas) / len(cajas), 3)
     B = round(sum(c['b'] for c in cajas) / len(cajas), 3)
-    H = round(sum(c['h'] for c in cajas) / len(cajas), 3)
+    H = ALTO
     print('cajas', len(cajas), 'giro', round(math.degrees(giro), 3), 'medidas', A, B, H)
     assert all(abs(c['ang'] - giro) < 0.002 and abs(c['a'] - A) < 0.02 and abs(c['b'] - B) < 0.02 for c in cajas)
+    A, B = CELDA
     Z0 = min(c['z0'] for c in cajas)
     eg, sg = math.cos(giro), math.sin(giro)
     for c in cajas:
-        c['k'] = round((c['z0'] - Z0) / H)
-        assert abs(Z0 + c['k'] * H - c['z0']) < 0.01
+        c['k'] = round((c['z0'] - Z0) / PASO)
+        assert abs(Z0 + c['k'] * PASO - c['z0']) < 0.01
         # marco local girado: X a lo largo del lado largo
         c['X'] = c['c'][0] * eg + c['c'][1] * sg
         c['Y'] = -c['c'][0] * sg + c['c'][1] * eg
@@ -267,36 +264,30 @@ def main():
         unicas.append(c)
     cajas = unicas
 
-    # 0. El aro: quita los que estorban el paso; abre y pasa a comercio los de junto
+    # 0. El aro: NO se quita nada (el Rhino ya lo respeta). Los de la capa moduloscomercio son los de junto al
+    # aro: van como «comercio» y se abren las caras que miran al paso.
     AU, AV, RI, RE, AZ = ANILLO
     banda = Point(AU, AV).buffer(RE, 256).difference(Point(AU, AV).buffer(RI, 256)).union(azotea_cultura())   # con la azotea de arte y cultura
     ex0, ey0 = (eg, sg), (-sg, eg)
 
     def esquina(c, lx, ly):
         return (c['c'][0] + DU + ex0[0] * lx + ey0[0] * ly, c['c'][1] + DV + ex0[1] * lx + ey0[1] * ly)
-    quedan, quitadas = [], 0
+    cruzan = 0
     for c in cajas:
-        z0 = Z0 + DZ + c['k'] * H
         c['abre'] = []
-        if z0 + H <= AZ - 0.35 or z0 >= AZ + LIBRE:
-            quedan.append(c)
-            continue
+        z0 = Z0 + DZ + c['k'] * PASO
         pol = Polygon([esquina(c, x * A / 2, y * B / 2) for x, y in ((-1, -1), (1, -1), (1, 1), (-1, 1))])
-        if pol.intersection(banda).area > 0.3:
-            quitadas += 1
+        if not (z0 + H <= AZ - 0.35 or z0 >= AZ + LIBRE) and pol.intersection(banda).area > 0.3:
+            cruzan += 1
+        if c['capa'] != CAPA_COMERCIO:
             continue
-        if pol.distance(banda) < JUNTO:
-            # las caras que miran al paso: las que, al salir de ellas, se acercan a él
-            for lado, (mx, my, nx, ny) in enumerate(((0, -B / 2, 0, -1), (A / 2, 0, 1, 0), (0, B / 2, 0, 1), (-A / 2, 0, -1, 0))):
-                m = esquina(c, mx, my)
-                fuera = esquina(c, mx + nx, my + ny)
-                if Point(m).distance(banda) < JUNTO + 1 and Point(fuera).distance(banda) < Point(m).distance(banda) - 0.3:
-                    c['abre'].append(lado)
-            if c['abre']:
-                c['comercio'] = True
-        quedan.append(c)
-    cajas = quedan
-    print('aro: quitados', quitadas, '· a comercio', sum(1 for c in cajas if c.get('comercio')))
+        c['comercio'] = True
+        for lado, (mx, my, nx, ny) in enumerate(((0, -B / 2, 0, -1), (A / 2, 0, 1, 0), (0, B / 2, 0, 1), (-A / 2, 0, -1, 0))):
+            m = esquina(c, mx, my)
+            fuera = esquina(c, mx + nx, my + ny)
+            if Point(m).distance(banda) < JUNTO + 1 and Point(fuera).distance(banda) < Point(m).distance(banda) - 0.3:
+                c['abre'].append(lado)
+    print('aro: no se quita ninguno · a comercio', sum(1 for c in cajas if c.get('comercio')), '· cruzan la banda del aro a su altura (sólo informativo)', cruzan)
 
     por_nivel = defaultdict(list)
     for c in cajas:
@@ -342,6 +333,13 @@ def main():
         tapa = sbox(-A / 2, -B / 2, A / 2, B / 2)
         if arriba:
             tapa = tapa.difference(unary_union(arriba))
+        # la losa del entrepiso (0.60, a ras de la tapa) ya cubre casi todas: sólo queda lo que ella no tapa
+        ent = entrepisos.get(round(Z0 + DZ + c['k'] * PASO + H, 2))
+        if ent is not None and not tapa.is_empty:
+            ex, ey = (eg, sg), (-sg, eg)
+            huella = Polygon([(c['c'][0] + DU + ex[0] * lx + ey[0] * ly, c['c'][1] + DV + ex[1] * lx + ey[1] * ly) for lx, ly in ((-A / 2, -B / 2), (A / 2, -B / 2), (A / 2, B / 2), (-A / 2, B / 2))])
+            if huella.intersection(ent).area >= 0.95 * huella.area:
+                tapa = sbox(0, 0, 0, 0)
         polis = []
         geoms = getattr(tapa, 'geoms', [tapa])
         for gm in geoms:
@@ -369,7 +367,7 @@ def main():
 
     NORMALES = [(-ey[0], -ey[1]), ex, ey, (-ex[0], -ex[1])]
     for c in shell:
-        z0 = Zb + c['k'] * H
+        z0 = Zb + c['k'] * PASO
         z1 = z0 + H
         c['z0d'] = z0
         lista = []
@@ -467,7 +465,6 @@ def main():
     # 4. Juntas: las aristas entre caras coplanares de módulos del mismo
     # departamento no se dibujan; sólo se marca el cambio de departamento.
     cajas_js = [caja_js(c) for c in shell]
-    deptos = json.load(open(DEPTOS, encoding='utf-8'))
     LADOS = [(0, -B / 2, A / 2), (1, A / 2, B / 2), (0, B / 2, A / 2), (1, -A / 2, B / 2)]   # eje del tramo, coordenada fija, medio largo
 
     def aristas(c, js):
@@ -506,7 +503,7 @@ def main():
 
     grupos = defaultdict(list)
     for n, (c, js) in enumerate(zip(shell, cajas_js)):
-        d = deptos['%s|%.1f|%.1f|%d' % (c['capa'], c['clave'][0], c['clave'][1], c['k'])]
+        d = c['depto']   # el departamento es el objeto del Rhino
         for cod, plano, p, q in aristas(c, js):
             grupos[(d, plano)].append((n, cod, p, q, recta(p, q)))
     quita = defaultdict(list)
@@ -535,7 +532,7 @@ def main():
     print('juntas sin dibujar', juntas, '· aristas cortadas en parte', parciales)
 
     datos = {
-        'giro': round(math.degrees(giro), 4), 'a': A, 'b': B, 'alto': H, 'z0': round(Zb, 2),
+        'giro': round(math.degrees(giro), 4), 'a': A, 'b': B, 'alto': H, 'paso': PASO, 'z0': round(Zb, 2),
         'tipos': CAPAS + ['comercio'], 'sector': SECTOR, 'banda': CORTE_BANDA,
         'cajas': cajas_js,
         'sectores': sectores,
@@ -544,8 +541,9 @@ def main():
     }
     cuenta = Counter(c['capa'] for c in cajas)
     cab = ('/* Módulos de vivienda. Generado por herramientas/prepara-modulos.py: no editar a mano.\n'
-           '   Fuente: Rhino/nuevos bloques.3dm, capas ' + ', '.join(CAPAS) + ' (en la posición de Contexto.3dm); industria de Contexto.3dm.\n'
-           '   ' + str(len(cajas)) + ' módulos (' + ', '.join('%s %d' % (k, cuenta[k]) for k in CAPAS) + '); '
+           '   Fuente: ponerestructura_LRFD_v2.3dm, capas Módulos::' + ', '.join(CAPAS + [CAPA_COMERCIO]) + ' (partidos en módulos); industria de Contexto.3dm.\n'
+           '   alto = módulo (2.70); paso = de nivel a nivel (3.30: 0.60 de entrepiso); z0 = primer nivel.\n'
+           '   ' + str(len(cajas)) + ' módulos (' + ', '.join('%s %d' % (k, cuenta[k]) for k in CAPAS + [CAPA_COMERCIO]) + '); '
            'aquí sólo los ' + str(len(shell)) + ' con alguna cara al exterior, y sólo esas caras.\n'
            '   cajas: [u, v, nivel, tipo, muro −Y, muro +X, muro +Y, muro −X, tapa, juntas(, abiertas)]; muro 1 = completo,\n'
            '   0 = tapado, lista = tramos descubiertos (coordenadas locales). juntas: aristas que no se\n'

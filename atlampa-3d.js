@@ -35,6 +35,10 @@ const CULTURA_DET = await import('./atlampa-3d-cultura.js' + (VER ? '?' + VER : 
 const { PB, GU, GF, S, HE, CEN, PIEZAS, ANILLO, CORTE, COLUMNAS, ESPUELA, ESP_FIN, CULTURA, PLAZA_C, GIRO, MOD, EST, PAI, MEX, MEY } = G;
 // El mercado de Gabriel (Rhino, por herramientas/prepara-mercado.py): sólo en el apartado Comercio
 const MERC = window.ATLAMPA_MERCADO || null;
+// La estructura de acero de la vivienda (ponerestructura_LRFD_v2.3dm, por herramientas/prepara-estructura.py): capa Estructura
+const ESTR = window.ATLAMPA_ESTRUCTURA || null;
+// La industria del usuario (Rhino: industry_geometry/upload, por herramientas/prepara-industria.py): reemplaza el prisma simple
+const IND = window.ATLAMPA_INDUSTRIA || null;
 const INFRA = window.ATLAMPA_INFRAESTRUCTURA || null;
 const RAD = Math.PI / 180;
 // caja [u0, v0, u1, v1] menos otra caja: las (hasta 4) cajas que quedan
@@ -463,9 +467,9 @@ const ARBOLES_TEX = (() => {
 function crea(svg, op) {
   op = op || {};
   const ESC = op.escena || 'general', GENERAL = ESC === 'general';
-  /* El mercado de Rhino, completo en la vista general y en Comercio (la vista general iba ligera, sin acero ni
-     interior de la nave norte, mientras el motor gráfico no aguantaba el detalle; ya no). */
-  const MERCADO = ESC === 'comercio' || GENERAL ? MERC : null;
+  /* El mercado de Rhino, completo en todas las vistas (2026-10-13: lo que se sube va con todo su detalle;
+     antes iba ligero en la general y como naves simples en los otros apartados). */
+  const MERCADO = MERC;
   const trabajo = svg.parentNode;
   svg.style.display = 'none';
   // el lienzo y el renderer son de la sesión (ver RENDERER): la escena vieja se
@@ -925,7 +929,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     // plantas: todo estático
     const pasto = new Lineas(), tallo = new Lineas(), junco = new Lineas(), flores = [[], [], []];
     const domo = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), arb = [];
-    G.plantasDe(ESC === 'paisajismo' ? 2 : 1).forEach(c => {
+    G.plantasDe(2).forEach(c => {   // completas en todas las vistas (antes, fuera de Paisajismo, un tercio)
       let a = c.pasto;
       for (let i = 0; i < a.length; i += 4) {
         const u = a[i], v = a[i + 1], h = a[i + 2], w = a[i + 3] * h, b = W(u, v, Z), ang = (u * 7.3 + v * 3.1) % Math.PI;
@@ -1252,8 +1256,21 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   /* ===== 4. Industria (la chimenea existente ya no va) ===== */
   if (MOD && MOD.industria) {
-    const g = pieza('industria', 'industria', 0.4), m = new Malla(), I = MOD.industria;
-    prisma(m, G.pares(I.planta), I.z0, I.z1); pon(g, m, 'industria', 'industria', 20);
+    const g = pieza('industria', 'industria', 0.4), I = MOD.industria;
+    if (IND) {
+      // La geometría de Rhino, por partes (para aislar: muros y celosías por nivel, losas, cantos, chacuacos, chimenea).
+      // El despiece las sube por niveles.
+      const SUBE = k => /_PB$/.test(k) ? 0 : /_N1$/.test(k) ? 2.5 : /_N2$/.test(k) ? 5 : k === 'losa_azotea' ? 7.5 : k === 'cantos' ? 3 : 10;
+      Object.keys(IND.partes).forEach(k => {
+        const p = IND.partes[k], m = new Malla(), sg = new THREE.Group();
+        for (let i = 0; i < p.tris.length; i += 9) m.tri(W(p.tris[i], p.tris[i + 1], p.tris[i + 2]), W(p.tris[i + 3], p.tris[i + 4], p.tris[i + 5]), W(p.tris[i + 6], p.tris[i + 7], p.tris[i + 8]));
+        g.add(sg); pon(sg, m, 'industria', 'industria', 20);
+        parte('industria', k, p.nombre, [sg], SUBE(k) ? [0, SUBE(k), 0] : null);
+      });
+    } else {
+      const m = new Malla();
+      prisma(m, G.pares(I.planta), I.z0, I.z1); pon(g, m, 'industria', 'industria', 20);
+    }
   }
 
 
@@ -1364,8 +1381,11 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     piezas.forEach(p => { if (p.g.name === 'cultura') p.g.userData.oculto = true; });
     // por partes (para aislarlo: cada una se oculta sola)
     const g = pieza('cultura-detalle', 'cultura', 0.45);
-    const PARTES_CD = [['losa', 'Losas y módulos', ['m-losa', 'l-borde']], ['nucleo', 'Núcleos', ['m-nucleo']], ['acero', 'Estructura de acero', ['m-acero']],
-      ['escalera', 'Escaleras y rampas', ['m-escalera', 'l-huella']], ['auditorio', 'Auditorio', ['m-auditorio']], ['aro', 'Parasoles', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]];
+    // en su apartado se ve por dentro (muros, vidrios como marcos y mobiliario); en las demás escenas, módulos y núcleos como cajas
+    const PARTES_CD = [['losa', 'Losas', ['m-losa', 'l-borde']], ['acero', 'Estructura de acero', ['m-acero']],
+      ['escalera', 'Escaleras', ['m-escalera', 'l-huella']], ['auditorio', 'Auditorio', ['m-auditorio']], ['aro', 'Sombrillas', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]]
+      .concat(ESC === 'cultura' ? [['interior', 'Muros interiores', ['m-muro']], ['vidrio', 'Vidrios (marcos)', ['l-vidrio']], ['mobiliario', 'Mobiliario', ['m-mueble']]]
+        : [['modulos', 'Módulos', ['m-modulo']], ['nucleo', 'Núcleos', ['m-nucleo']]]);
     PARTES_CD.forEach(([id, nombre, ks]) => {
       const sg = new THREE.Group(); sg.name = 'cultura-' + id; g.add(sg);
       ks.forEach(k => {
@@ -1385,7 +1405,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const NIVELES = fija('modulos', () => {
     const A = MOD.a / 2, Bm = MOD.b / 2, porNivel = {}, COM = MOD.tipos.indexOf('comercio'), SOC = MOD.tipos.indexOf('44SOC');
     MOD.cajas.forEach(r => {
-      const nivel = r[2], z0 = MOD.z0 + nivel * MOD.alto, z1 = z0 + MOD.alto, com = r[3] === COM, soc = r[3] === SOC, clave = (com ? 'c' : '') + (soc ? 's' : '') + nivel;
+      const nivel = r[2], z0 = MOD.z0 + nivel * (MOD.paso || MOD.alto), z1 = z0 + MOD.alto, com = r[3] === COM, soc = r[3] === SOC, clave = (com ? 'c' : '') + (soc ? 's' : '') + nivel;
       if (!porNivel[clave]) porNivel[clave] = { m: new Malla(), l: new Lineas(), com, soc, nivel };
       const { m, l } = porNivel[clave];
       const P = (x, y, z) => W(r[0] + MEX[0] * x + MEY[0] * y, r[1] + MEX[1] * x + MEY[1] * y, z);
@@ -1435,6 +1455,25 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       // fondo de la caja (se ve desde abajo y en los volados)
       m.quad(P(-A, -Bm, z0), P(-A, Bm, z0), P(A, Bm, z0), P(A, -Bm, z0));
     });
+    // El entrepiso del Rhino (0.60 entre un nivel y otro, y la losa de azotea): losas con hueco, del archivo de la
+    // estructura (atlampa-estructura.js). Cada una va con los módulos del nivel que lleva encima (la de azotea, con el último).
+    if (ESTR && ESTR.entrepiso) {
+      const paso = MOD.paso || MOD.alto, nMax = Math.max(...MOD.cajas.map(q => q[2]));
+      ESTR.entrepiso.forEach(e => {
+        const nivel = Math.min(nMax, Math.max(0, Math.round((e[1] - MOD.z0) / paso))), clave = String(nivel);
+        if (!porNivel[clave]) porNivel[clave] = { m: new Malla(), l: new Lineas(), com: false, soc: false, nivel };
+        const { m, l } = porNivel[clave], z0 = e[0], z1 = e[1];
+        const cont = ccw(G.pares(e[2])), huecos = e.slice(3).map(h => ccw(G.pares(h)).reverse()), todos = cont.concat(...huecos);
+        const tr = THREE.ShapeUtils.triangulateShape(cont.map(q => new THREE.Vector2(q[0], q[1])), huecos.map(h => h.map(q => new THREE.Vector2(q[0], q[1]))));
+        tr.forEach(t => {
+          m.tri(...t.map(k => W(todos[k][0], todos[k][1], z1)));
+          m.tri(...t.slice().reverse().map(k => W(todos[k][0], todos[k][1], z0)));
+        });
+        muros(m, cont, z0, z1);
+        l.poli(cont.map(q => W(q[0], q[1], z0)), true); l.poli(cont.map(q => W(q[0], q[1], z1)), true);
+        cont.forEach(q => l.seg(W(q[0], q[1], z0), W(q[0], q[1], z1)));
+      });
+    }
     const r = {};
     Object.keys(porNivel).forEach(k => { const p = porNivel[k]; r[k] = { com: p.com, soc: p.soc, nivel: p.nivel, c: fijas(geos(p.m, p.com ? 'modcom' : p.soc ? 'social' : 'modulo', false, p.l)) }; });
     return r;
@@ -1460,13 +1499,57 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   /* ===== 8. Estructura: columnas que llegan al piso ===== */
   const gCol = pieza('estructura', 'paisajismo', 0.5);
   gCol.userData.capa = 'estructura';
-  if (PAI) {
+  if (PAI && !ESTR) {
     const l = new Lineas();
     PAI.columnas.forEach(c => {
       l.seg(W(c[0], c[1], 0.24), W(c[0], c[1], c[2]));
       const s = 0.175; l.poli(rect(c[0] - s, c[1] - s, c[0] + s, c[1] + s).map(q => W(q[0], q[1], 0.25)), true);
     });
     ponLineas(gCol, l, 'columna', 0xffffff, null, null);
+  }
+
+  // La estructura de acero de la vivienda (ponerestructura_LRFD_v2.3dm, por herramientas/prepara-estructura.py):
+  // cada miembro como caja de aristas, de su eje y su sección (ancho horizontal, peralte ⟂ al eje; en las columnas el
+  // ancho va en el eje u de la retícula girada). Con ella no se dibujan las columnas del PDF. Sólo en la capa Estructura.
+  const gEstr = pieza('estructura-acero', 'paisajismo', 0.5);
+  gEstr.userData.capa = 'estructura';
+  if (ESTR) {
+    const aristasCaja = (l, c0, c1) => { l.poli(c0, true); l.poli(c1, true); for (let i = 0; i < 4; i++) l.seg(c0[i], c1[i]); };
+    const esq = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    const miembroCaja = (l, m) => {
+      let a = [m[3] - m[0], m[4] - m[1], m[5] - m[2]]; const L = Math.hypot(a[0], a[1], a[2]); if (L < 1e-6) return;
+      a = a.map(x => x / L);
+      let s, n;
+      if (Math.abs(a[2]) > 0.999) { s = [MEX[0], MEX[1], 0]; n = [MEY[0], MEY[1], 0]; }
+      else {
+        const k = Math.hypot(a[0], a[1]); s = [-a[1] / k, a[0] / k, 0];
+        n = [a[1] * s[2] - a[2] * s[1], a[2] * s[0] - a[0] * s[2], a[0] * s[1] - a[1] * s[0]];
+      }
+      const hw = m[6] / 2, hh = m[7] / 2;
+      const C = p => esq.map(q => W(p[0] + s[0] * q[0] * hw + n[0] * q[1] * hh, p[1] + s[1] * q[0] * hw + n[1] * q[1] * hh, p[2] + s[2] * q[0] * hw + n[2] * q[1] * hh));
+      aristasCaja(l, C([m[0], m[1], m[2]]), C([m[3], m[4], m[5]]));
+    };
+    const cajaGirada = (l, u, v, z0, z1, du, dv) => {
+      const P = z => esq.map(q => W(u + MEX[0] * q[0] * du / 2 + MEY[0] * q[1] * dv / 2, v + MEX[1] * q[0] * du / 2 + MEY[1] * q[1] * dv / 2, z));
+      aristasCaja(l, P(z0), P(z1));
+    };
+    const GRUPOS = {   // [nombre, color, tipos]
+      columnas: ['estr-columnas', 0xffffff, ['columna', 'cubo_columna']],
+      trabes: ['estr-trabes', 0xdfe4e8, ['trabe_u', 'trabe_v', 'cubo_trabe']],
+      viguetas: ['estr-viguetas', 0x9aa3aa, ['vigueta']],
+      amarres: ['estr-amarres', 0x7d868d, ['amarre']],
+      diagonales: ['estr-diagonales', 0xffffff, ['cubo_diag']],
+    };
+    const lin = { losas: new Lineas(), cubos: new Lineas() };
+    Object.keys(GRUPOS).forEach(k => { lin[k] = new Lineas(); });
+    Object.values(ESTR.bloques).forEach(b => {
+      Object.keys(GRUPOS).forEach(k => GRUPOS[k][2].forEach(t => (b.miembros[t] || []).forEach(m => miembroCaja(lin[k], m))));
+      (b.losas || []).forEach(r => cajaGirada(lin.losas, r[0], r[1], r[2], r[3], r[4], r[5]));
+      (b.cubos || []).forEach(r => cajaGirada(lin.cubos, r[1], r[2], r[3], r[4], r[5], r[6]));
+    });
+    Object.keys(GRUPOS).forEach(k => ponLineas(gEstr, lin[k], GRUPOS[k][0], GRUPOS[k][1], null, null));
+    ponLineas(gEstr, lin.losas, 'estr-losas', 0x6f7a82, null, null);
+    ponLineas(gEstr, lin.cubos, 'estr-cubos', 0xffffff, null, null);
   }
 
   /* Los dos accesos siguen las bocas reales de las helicoidales. Se comparten
@@ -1546,7 +1629,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   /* ===== 9. Estacionamiento: en rayos X (se ve a través del piso) ===== */
   const gEst = pieza('estacionamiento', 'estacionamiento', 0.05);
-  let estNivel = 0;
+  let estNivel = 0, elevTope = 0;   // elevTope: hasta dónde suben los elevadores (para el encuadre)
   const estLineas = [], estRampas = [];
   if (EST) {
     const N = EST.sotanos, e = EST.entrepiso, xray = {};
@@ -1554,7 +1637,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const l = new Lineas(), z = -k * e;
       EST.bloques.forEach(b => {
         l.poli(G.pares(b.planta).map(q => W(q[0], q[1], z)), true);
-        if (ESC === 'estacionamiento') b.cajones.forEach(c => l.poli(rect(c[0], c[1], c[2], c[3]).map(q => W(q[0], q[1], z)), true));
+        if (ESC === 'estacionamiento') b.cajones.forEach(c => l.poli((c.length === 8 ? G.pares(c) : rect(c[0], c[1], c[2], c[3])).map(q => W(q[0], q[1], z)), true));
       });
       const ob = ponLineas(gEst, l, 'est-' + k, 0xffffff, PROGRAMA.est, 'estacionamiento', xray);
       if (ob) estLineas.push(ob);
@@ -1588,6 +1671,31 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       pon(g, m, 'rampa', 'estacionamiento', false);
       ponLineas(g, lr, 'rampa-borde', 0xffffff, PROGRAMA.est, 'estacionamiento');
       estRampas.push(g);
+    }
+    /* Elevadores: el desplante del CAD (EST.elevadores) sube desde el último sótano, cruza todo el conjunto hasta el nivel
+       más alto del edificio (la azotea: la losa de entrepiso de la estructura, si está, o la tapa del último nivel de los
+       módulos) y, encima, su espacio reglamentario (EST.espacioElevador: SUPUESTO sin verificar, ver prepara-estacionamiento.py). */
+    if (EST.elevadores && EST.elevadores.length) {
+      const paso = MOD ? (MOD.paso || MOD.alto) : 3, nMax = MOD ? Math.max(...MOD.cajas.map(q => q[2])) : 7, ES = window.ATLAMPA_ESTRUCTURA;
+      const zMod = MOD ? MOD.z0 + nMax * paso + MOD.alto : 24, zLosa = ES && ES.entrepiso && ES.entrepiso.length ? Math.max(...ES.entrepiso.map(q => q[1])) : 0;
+      const zTope = Math.max(zMod, zLosa), zEsp = zTope + (EST.espacioElevador || 0), fondo = -N * e;
+      const niveles = [fondo];
+      for (let k = N - 1; k >= 1; k--) niveles.push(-k * e);
+      niveles.push(0.2);
+      if (MOD) for (let k = 0; k <= nMax; k++) niveles.push(MOD.z0 + k * paso);
+      niveles.push(zTope);
+      const ls = new Lineas(), le = new Lineas();
+      EST.elevadores.forEach(el => {
+        const pol = G.pares(el.pol);
+        niveles.forEach(z => ls.poli(pol.map(q => W(q[0], q[1], z)), true));
+        pol.forEach(q => { ls.seg(W(q[0], q[1], fondo), W(q[0], q[1], zTope)); le.seg(W(q[0], q[1], zTope), W(q[0], q[1], zEsp)); });
+        le.poli(pol.map(q => W(q[0], q[1], zEsp)), true);
+        le.seg(W(pol[0][0], pol[0][1], zEsp), W(pol[2][0], pol[2][1], zEsp)); le.seg(W(pol[1][0], pol[1][1], zEsp), W(pol[3][0], pol[3][1], zEsp));   // la tapa del espacio, en X
+        le.seg(W(pol[0][0], pol[0][1], zTope), W(pol[2][0], pol[2][1], zEsp)); le.seg(W(pol[1][0], pol[1][1], zTope), W(pol[3][0], pol[3][1], zEsp));   // y diagonales: se lee como volumen distinto del cubo
+      });
+      ponLineas(gEst, ls, 'elevador', 0xffffff, PROGRAMA.est, 'estacionamiento');
+      ponLineas(gEst, le, 'elevador-espacio', 0xf2a33a, '#f2a33a', 'estacionamiento');
+      elevTope = zEsp;
     }
   }
 
@@ -2197,7 +2305,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
         const pts = [];
         x.forEach(r => [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(q => {
           const u = r[0] + MEX[0] * q[0] * MOD.a / 2 + MEY[0] * q[1] * MOD.b / 2, v = r[1] + MEX[1] * q[0] * MOD.a / 2 + MEY[1] * q[1] * MOD.b / 2;
-          pts.push([(u - c[0]) * ea[0] + (v - c[1]) * ea[1], (u - c[0]) * eb[0] + (v - c[1]) * eb[1], MOD.z0 + (r[2] + 1) * MOD.alto]);
+          pts.push([(u - c[0]) * ea[0] + (v - c[1]) * ea[1], (u - c[0]) * eb[0] + (v - c[1]) * eb[1], MOD.z0 + r[2] * (MOD.paso || MOD.alto) + MOD.alto]);
         }));
         const a0 = Math.min(...pts.map(p => p[0])), a1 = Math.max(...pts.map(p => p[0])), b0 = Math.min(...pts.map(p => p[1])), b1 = Math.max(...pts.map(p => p[1]));
         // la altura de cada extremo: la más alta en su cuarto de la franja
@@ -2214,7 +2322,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const p = pol.map(q => [q[0], q[1]]), m = centroide(ccw(p));
       masas.push({ n: 'nave', c: m.c, peso: m.area, pol: p, z0: 0, z1: 9 });
     });
-    if (MOD && MOD.industria) { const p = G.pares(MOD.industria.planta), m = centroide(ccw(p)); masas.push({ n: 'industria', c: m.c, peso: m.area, pol: p, z0: MOD.industria.z0, z1: MOD.industria.z1 }); }
+    if (MOD && MOD.industria) { const p = G.pares(MOD.industria.planta), m = centroide(ccw(p)); masas.push({ n: 'industria', c: m.c, peso: m.area, pol: p, z0: IND ? IND.bbox[0][2] : MOD.industria.z0, z1: IND ? IND.bbox[1][2] : MOD.industria.z1 }); }
     if (CD) { const p = CD.losa1.map(q => [q[0], q[1]]), m = centroide(ccw(p)); masas.push({ n: 'cultura', c: m.c, peso: m.area, pol: p, z0: 0, z1: ANILLO.z - 0.35 }); }
     // los ejes: el diámetro de la vivienda; y el de las naves contra la industria + arte y cultura
     const pesa = l => { const P = l.reduce((s, m) => s + m.peso, 0); return [l.reduce((s, m) => s + m.c[0] * m.peso, 0) / P, l.reduce((s, m) => s + m.c[1] * m.peso, 0) / P]; };
@@ -2312,7 +2420,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     // inspeccionando algo (un apartado), los módulos se van
     gMods.forEach(g => { g.visible = !n && GENERAL && capas.modulos && !ocultos.has('vivienda'); });
     gPai.visible = gPlantas.visible = !n && capas.paisaje && !gPai.userData.oculto;
-    gCol.visible = !n && capas.estructura;
+    gCol.visible = gEstr.visible = !n && capas.estructura;
     gEst.visible = !n && ESC === 'estacionamiento';
     gEstEntradas.visible = !n && GENERAL && !ocultos.has('estacionamiento');
     gSol.visible = !n && capas.sol;
@@ -2360,15 +2468,15 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (aisl) return aisl.caja;
     if (capas.nolli) return [S.u0 - 110, S.u1 + 110, S.v0 - 90, S.v1 + 90, 0, 1];
     if (capas.sol) return [CEN[0] - R_SOL, CEN[0] + R_SOL, CEN[1] - R_SOL, CEN[1] + R_SOL, 0, R_SOL];
-    if (GENERAL) return [S.u0, S.u1, S.v0, S.v1, 0, MOD ? MOD.z0 + 8 * MOD.alto : 14];
+    if (GENERAL) return [S.u0, S.u1, S.v0, S.v1, 0, MOD ? MOD.z0 + 7 * (MOD.paso || MOD.alto) + MOD.alto : 14];
     return cajaAp(ESC);
   }
   function cajaAp(ap) {
     const us = [], vs = []; let z0 = 0, z1 = 10;
     const mete = q => { us.push(q[0]); vs.push(q[1]); };
-    if (ap === 'estacionamiento' && EST) { EST.bloques.forEach(b => G.pares(b.planta).forEach(mete)); z0 = -EST.sotanos * EST.entrepiso; z1 = 0; }
+    if (ap === 'estacionamiento' && EST) { EST.bloques.forEach(b => G.pares(b.planta).forEach(mete)); z0 = -EST.sotanos * EST.entrepiso; z1 = elevTope; }
     else if (ap === 'comercio') { G.NAVES.forEach(nv => { mete([nv.L.u0, nv.L.v0]); mete([nv.L.u1, nv.L.v1]); }); if (MERC) MERC.naves.forEach(h => { mete([h[0], h[1]]); mete([h[2], h[3]]); }); z1 = 9; }
-    else if (ap === 'industria' && MOD && MOD.industria) { G.pares(MOD.industria.planta).forEach(mete); z1 = MOD.industria.z1; }
+    else if (ap === 'industria' && MOD && MOD.industria) { G.pares(MOD.industria.planta).forEach(mete); z1 = IND ? IND.bbox[1][2] : MOD.industria.z1; }
     else if (ap === 'cultura') { [[PLAZA_C.u0, PLAZA_C.v0], [PLAZA_C.u1, PLAZA_C.v1]].forEach(mete); mete([ANILLO.u - ANILLO.re, ANILLO.v - ANILLO.re]); z1 = ANILLO.z; }
     else if (ap === 'aro') { G.aroPoli(ANILLO.re, 72).forEach(mete); z1 = ANILLO.z + 1; }
     else { mete([PB.u0, PB.v0]); mete([PB.u1, PB.v1]); z1 = 2; }

@@ -8,6 +8,7 @@
 | `atlampa-pagina.js` | Tablero. Cambia de apartado sin recargar (pushState) y conserva las capas en sessionStorage. |
 | `herramientas/paginas.py` | Genera `index.html` y cada apartado (ficha: título, desc, datos). No edites los HTML a mano. Tiene `V`, la versión que hay que subir. |
 | `herramientas/servidor.py` | Servidor local sin caché, puerto 8130 (`.claude/launch.json`). |
+| `herramientas/ramas.py` | Estado de las ramas, ver cualquier rama (o todas mezcladas) en local y mezclar sin pelear con `V` ni las páginas. Ver `ramas-y-version-local.md`. |
 | `herramientas/revisa.py` | Revisión antes de subir (< 1 s): conflictos, sintaxis, páginas al día, archivos que pide el sitio, `programa/` y, con `--base origin/master`, que `V` haya subido. Corre sola en cada PR (`.github/workflows/revisa.yml`). |
 | `lib/` | Three.js 0.170.0 y los complementos que se usan, copiados del paquete de npm. El sitio no depende de ningún CDN. |
 
@@ -31,7 +32,7 @@ Vercel no publica `*.3dm`, `herramientas/`, `handoff/` ni `.github/` (`.vercelig
 
 ## Cómo entra un programa
 1. Su script genera `window.ATLAMPA_<PROG>`.
-2. En `atlampa-3d.js`: `const X = ESC === '<apartado>' ? DATOS : null`. Arma con `pieza('<prog>-<parte>', '<programa>', orden)`
+2. En `atlampa-3d.js`: `const X = DATOS` (en todas las escenas, con todo su detalle; no lo condiciones a `ESC`). Arma con `pieza('<prog>-<parte>', '<programa>', orden)`
    y registra partes con `parte(...)`. Modelo a seguir: bloque `if (MERCADO)`.
 3. En `paginas.py` añade el script y la ficha, y sube `V`.
 

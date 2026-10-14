@@ -11,7 +11,7 @@
 1. Lee con rhino3dm el archivo del usuario (`diagrama/modelo/Industria.3dm`, en el sistema de Contexto.3dm). Lista sus capas y pídele que
    las ordene en `Layer 01::INDUSTRIA::<nave>::<parte>`. Comprueba que calce con la industria de Contexto.3dm (< 1 cm).
 2. Crea `herramientas/prepara-industria.py` (copia la estructura de `prepara-mercado.py`) y genera `atlampa-industria.js`.
-   Se dibuja sólo con `ESC === 'industria'`; la general queda con el prisma.
+   Reemplaza al prisma en todas las vistas (la general y cada apartado), con todo su detalle.
 3. Primera ronda de preguntas: qué tipo de industria, qué programa y qué quiere ver primero.
 4. Después la estructura: acero independiente que rigidiza lo existente.
 5. Al final el programa interior. Busca normativa específica de industria (andenes, carga, ventilación, salidas) y cítala.
