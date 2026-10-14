@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261013g'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261013h'      # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -83,6 +83,37 @@ SOTANOS = '''
       </div>
       <button class="hud-op hud-op--linea" type="button" data-capa="separa" aria-pressed="false">{separa}<span>Separar niveles</span></button>'''.format(
           nivel=opcion_icono('nivel'), separa=opcion_icono('separa'))
+
+CORTES = '''
+        <div class="hud-cortes" data-cortes>
+          <div class="hud-cortes__encabezado">
+            <p class="hud-panel__t">Cortes</p>
+            <button class="hud-cortes__reset" type="button" data-corte-reset title="Restablecer cortes" aria-label="Restablecer cortes">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M5.5 9A8 8 0 1 1 4 15"/></svg>
+            </button>
+          </div>
+          <div class="hud-cortes__controles">
+            <label class="hud-corte hud-corte--vertical">
+              <span class="hud-corte__nombre">Altura</span>
+              <span class="hud-corte__extremo">Nivel superior</span>
+              <input type="range" min="0" max="100" value="100" step="1" data-corte-eje="y" aria-label="Corte vertical por altura">
+              <span class="hud-corte__extremo">S4</span>
+              <output data-corte-valor="y">Completo</output>
+            </label>
+            <div class="hud-cortes__horizontales">
+              <label class="hud-corte">
+                <span class="hud-corte__nombre">Norte · Sur</span>
+                <span class="hud-corte__linea"><small>N</small><input type="range" min="0" max="100" value="100" step="1" data-corte-eje="z" aria-label="Corte norte sur"><small>S</small></span>
+                <output data-corte-valor="z">Completo</output>
+              </label>
+              <label class="hud-corte">
+                <span class="hud-corte__nombre">Poniente · Oriente</span>
+                <span class="hud-corte__linea"><small>O</small><input type="range" min="0" max="100" value="100" step="1" data-corte-eje="x" aria-label="Corte poniente oriente"><small>E</small></span>
+                <output data-corte-valor="x">Completo</output>
+              </label>
+            </div>
+          </div>
+        </div>'''
 
 GENERAL_DESC = ('Axonometría del predio de Atlampa entre las calles del Fresno, Sabino y Clavel y la avenida Profesora '
                 'Eulalia Guzmán: las dos naves de comercio cortadas por el círculo del aro, el aro elevado, la industria, '
@@ -215,6 +246,7 @@ PLANTILLA = '''<!doctype html>
       <summary class="hud-menu__t">{icon_capas}<span>Capas</span></summary>
       <div class="hud-panel">
 {capas}
+{cortes}
       </div>
     </details>
     <details class="hud-menu" name="hud">
@@ -327,7 +359,7 @@ def main():
     for clave, a in APARTADOS.items():
         html = PLANTILLA.format(
             clave=clave, v=V, titulo=a['titulo'], titulo_doc='Predio' if clave == 'general' else a['titulo'],
-            desc=a['desc'], ruta=a.get('ruta', '/ ' + a['titulo']), capas=botones(CAPAS), diagramas=botones(DIAGRAMAS),
+            desc=a['desc'], ruta=a.get('ruta', '/ ' + a['titulo']), capas=botones(CAPAS), cortes=CORTES, diagramas=botones(DIAGRAMAS),
             resalta=resalta, propuesto=propuesto(), leyenda=LEYENDA, ficha=ficha(a), ficha_oculta='' if a['datos'] else ' hidden',
             icon_propuesto=icono('propuesto'), icon_capas=icono('capas'), icon_diagramas=icono('diagramas'),
             icon_vista=icono('vista'), icon_leyenda=icono('leyenda'), icon_predio=opcion_icono('predio'),

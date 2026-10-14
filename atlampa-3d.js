@@ -141,7 +141,10 @@ const ARBOL_JOVEN = 0.6;
    columnas que lo cruzan, un cuadrito. Las líneas se recortan con el plano
    de la cámara (clippingPlanes). */
 const CORTE_ALTO = 1.75;
-const CORTE_Y = { value: 1e5 };   // altura del corte (m, y del mundo; enorme = sin corte)
+// Los tres controles comparten uniforms para que todo material del modelo se
+// recorte en el mismo sitio. x/z son los ejes del predio; y es la altura.
+const CORTE_POS = { value: new THREE.Vector3(1e5, 1e5, 1e5) };
+const CORTE_ACT = { value: new THREE.Vector3(0, 0, 0) };
 
 /* Dibujar como a mano (las transiciones): cada arista se traza desde una de
    sus puntas, en un orden que mezcla un barrido (desde un punto, radial, o en
@@ -222,7 +225,7 @@ const VERT = /* glsl */`
   }`;
 const FRAG = /* glsl */`
   uniform vec3 uFondo; uniform vec3 uTinta; uniform float uModo; uniform float uTono; uniform float uPaso; uniform float uMundo;
-  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform float uCorte;
+  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform vec3 uCortePos; uniform vec3 uCorteAct;
   varying vec3 vN; varying vec3 vW;` + DIB_GLSL + `
   // una raya cada periodo de c (antialias con fwidth; si es muy denso, el promedio)
   float raya(float c, float grueso) {
@@ -232,7 +235,9 @@ const FRAG = /* glsl */`
     return mix(r, grueso * 1.4, smoothstep(0.25, 0.6, w));
   }
   void main() {
-    if (vW.y > uCorte) discard;
+    if ((uCorteAct.x > 0.5 && vW.x > uCortePos.x) ||
+        (uCorteAct.y > 0.5 && vW.y > uCortePos.y) ||
+        (uCorteAct.z > 0.5 && vW.z > uCortePos.z)) discard;
     // dibujándose: lo que no se ha rellenado no tapa; al frente del relleno, una banda de rayado
     if (uDib.y < 0.999) {
       float s = dibBarrido(vW) * 0.82 + 0.18 * dibAzar(floor(vW * 0.6));
@@ -243,7 +248,7 @@ const FRAG = /* glsl */`
       }
     }
     // lo cortado: el interior del sólido, liso (poché)
-    if (uCorte < 1e4 && !gl_FrontFacing) { gl_FragColor = vec4(uTinta * 0.2 * uBrillo, uOpacidad); return; }
+    if (dot(uCorteAct, vec3(1.0)) > 0.5 && !gl_FrontFacing) { gl_FragColor = vec4(uTinta * 0.2 * uBrillo, uOpacidad); return; }
     // normal plana de la cara (de las derivadas): el rayado no hace anillos en las esferas
     vec3 n = normalize(cross(dFdx(vW), dFdy(vW)));
     if (dot(n, vN) < 0.0) n = -n;
@@ -335,12 +340,12 @@ const R_SOL = 150, CICLO_SOL = 24000;
 // (U: canal de dibujo; dibujándose, cada figura aparece de abajo hacia arriba)
 function matAtlas(tex, cols, filas, U) {
   return new THREE.ShaderMaterial({
-    uniforms: Object.assign({ uMapa: { value: tex }, uN: { value: cols }, uP: { value: filas }, uTinta: { value: new THREE.Color(1, 1, 1) }, uPlano: { value: 0 }, uOpacidad: { value: 1 }, uCorte: CORTE_Y }, U || canalDib()),
+    uniforms: Object.assign({ uMapa: { value: tex }, uN: { value: cols }, uP: { value: filas }, uTinta: { value: new THREE.Color(1, 1, 1) }, uPlano: { value: 0 }, uOpacidad: { value: 1 }, uCortePos: CORTE_POS, uCorteAct: CORTE_ACT }, U || canalDib()),
     vertexShader: /* glsl */`
       attribute vec3 aPos; attribute vec2 aEsc; attribute float aTile; attribute float aVolt; attribute float aPose;
-      uniform float uN; uniform float uP; varying vec2 vUv; varying float vY; varying float vK; varying float vAlto;` + DIB_GLSL + `
+      uniform float uN; uniform float uP; varying vec2 vUv; varying vec3 vW; varying float vK; varying float vAlto;` + DIB_GLSL + `
       void main() {
-        vY = aPos.y + position.y * aEsc.y;
+        vW = aPos + vec3(0.0, position.y * aEsc.y, 0.0);
         vec4 c = viewMatrix * vec4(aPos, 1.0);
         c.xy += position.xy * aEsc;
         gl_Position = projectionMatrix * c;
@@ -350,9 +355,11 @@ function matAtlas(tex, cols, filas, U) {
         vK = uDib.x < 0.999 ? clamp((uDib.x - dibInicio(aPos, 6.0)) / 0.09, 0.0, 1.0) : 1.0;
       }`,
     fragmentShader: /* glsl */`
-      uniform sampler2D uMapa; uniform vec3 uTinta; uniform float uPlano; uniform float uOpacidad; uniform float uCorte; varying vec2 vUv; varying float vY; varying float vK; varying float vAlto;
+      uniform sampler2D uMapa; uniform vec3 uTinta; uniform float uPlano; uniform float uOpacidad; uniform vec3 uCortePos; uniform vec3 uCorteAct; varying vec2 vUv; varying vec3 vW; varying float vK; varying float vAlto;
       void main() {
-        if (vY > uCorte || vAlto > vK) discard;
+        if ((uCorteAct.x > 0.5 && vW.x > uCortePos.x) ||
+            (uCorteAct.y > 0.5 && vW.y > uCortePos.y) ||
+            (uCorteAct.z > 0.5 && vW.z > uCortePos.z) || vAlto > vK) discard;
         vec4 t = texture2D(uMapa, vUv);
         if (t.a < 0.5) discard;
         gl_FragColor = vec4(mix(t.rgb * uTinta, uTinta, uPlano), uOpacidad);
@@ -479,6 +486,32 @@ function crea(svg, op) {
   const lienzo = LIENZO, renderer = RENDERER;
   if (lienzo.parentNode !== trabajo) trabajo.insertBefore(lienzo, svg);
   renderer.clippingPlanes = [];
+  CORTE_POS.value.set(1e5, 1e5, 1e5);
+  CORTE_ACT.value.set(0, 0, 0);
+  const CORTE_LIM = {
+    x: [S.u0 - CEN[0], S.u1 - CEN[0]],
+    y: [-14, Math.max(14, MOD ? MOD.z0 + 8 * MOD.alto : 14)],
+    z: [-(S.v1 - CEN[1]), -(S.v0 - CEN[1])]
+  };
+  const cortes = { x: 1, y: 1, z: 1 };
+  let corteFijo = false;
+  function actualizaCortes() {
+    const ax = cortes.x < 0.999, ay = corteFijo || cortes.y < 0.999, az = cortes.z < 0.999;
+    const valor = (eje, t) => CORTE_LIM[eje][0] + (CORTE_LIM[eje][1] - CORTE_LIM[eje][0]) * t;
+    const px = valor('x', cortes.x), py = corteFijo ? CORTE_ALTO : valor('y', cortes.y), pz = valor('z', cortes.z);
+    CORTE_POS.value.set(px, py, pz);
+    CORTE_ACT.value.set(ax ? 1 : 0, ay ? 1 : 0, az ? 1 : 0);
+    renderer.clippingPlanes = [];
+    if (ax) renderer.clippingPlanes.push(new THREE.Plane(new THREE.Vector3(-1, 0, 0), px));
+    if (ay) renderer.clippingPlanes.push(new THREE.Plane(new THREE.Vector3(0, -1, 0), py));
+    if (az) renderer.clippingPlanes.push(new THREE.Plane(new THREE.Vector3(0, 0, -1), pz));
+    pide();
+  }
+  function corta(eje, t) {
+    if (!Object.prototype.hasOwnProperty.call(cortes, eje)) return;
+    cortes[eje] = Math.max(0, Math.min(1, Number(t)));
+    actualizaCortes();
+  }
   // los canales del dibujo a mano (ver DIB_GLSL): el sitio y el contexto urbano
   const DIB = { base: canalDib(), ctx: canalDib() };
   const canalDe = n => /^(ctx|contexto|carro|flecha-ctx)/.test(n) ? DIB.ctx : DIB.base;
@@ -520,7 +553,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
       uniforms: Object.assign({ uFondo: { value: new THREE.Color(0, 0, 0) }, uTinta: { value: new THREE.Color(1, 1, 1) }, uModo: { value: 0 }, uTono: { value: 0.5 },
         uPaso: { value: 3 }, uMundo: { value: 0 }, uGris: { value: 0.1 }, uGrano: { value: 0 }, uOpacidad: { value: 1 }, uLuz: { value: luz }, uPx: { value: renderer.getPixelRatio() },
-        uBrillo: { value: 1 }, uGrueso: { value: 0.22 }, uCorte: CORTE_Y }, canalDe(papel))
+        uBrillo: { value: 1 }, uGrueso: { value: 0.22 }, uCortePos: CORTE_POS, uCorteAct: CORTE_ACT }, canalDe(papel))
     });
     m.userData.papel = papel;
     return (MATS[papel] = m);
@@ -2469,8 +2502,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (nombre === 'esquema') { conEsquema = !!si; aplicaEstilo(); return; }
     if (nombre === 'estructura' && !si && enEstr) { enEstr = false; aplicaEstilo(); }
     if (nombre === 'corte') {
-      CORTE_Y.value = si ? CORTE_ALTO : 1e5;
-      renderer.clippingPlanes = si ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), CORTE_ALTO)] : [];
+      corteFijo = !!si;
+      actualizaCortes();
       camaraSegun(); if (era !== capas.corte) vuelaA();
       visibles(); gCorte.visible = !!si; if (si) armaCorte(); pide(); return;
     }
@@ -2500,7 +2533,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     };
     escena.updateMatrixWorld(true);
     escena.traverse(o => {
-      if (!o.isMesh || !o.material.uniforms || !o.material.uniforms.uCorte || o.geometry.isInstancedBufferGeometry) return;
+      if (!o.isMesh || !o.material.uniforms || !o.material.uniforms.uCortePos || o.geometry.isInstancedBufferGeometry) return;
       for (let p = o; p; p = p.parent) if (!p.visible || p === gCorte || p === gNolli) return;
       const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count;
       const n0 = o.isInstancedMesh ? o.count : 1;
@@ -2800,7 +2833,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   return {
     vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura,
-    aisla, partes, ponParte, despiece, aislado: () => aisl ? aisl.ap : null, camara,
+    aisla, partes, ponParte, despiece, aislado: () => aisl ? aisl.ap : null, camara, corta,
     naveNorteEn,
     depura: () => ({ escena, capas }),   // para revisar desde la consola
     preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); },

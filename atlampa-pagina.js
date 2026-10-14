@@ -81,6 +81,29 @@
 
   function guarda(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
   function lee(k, borra) { try { var v = sessionStorage.getItem(k); if (borra) sessionStorage.removeItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  var cortes = lee('atlampa-cortes') || { x: 1, y: 1, z: 1 };
+  ['x', 'y', 'z'].forEach(function (eje) { if (typeof cortes[eje] !== 'number') cortes[eje] = 1; });
+
+  function reflejaCorte(eje) {
+    var t = Math.max(0, Math.min(1, cortes[eje])), s = document.querySelector('[data-corte-eje="' + eje + '"]');
+    var o = document.querySelector('[data-corte-valor="' + eje + '"]');
+    if (s) s.value = String(Math.round(t * 100));
+    if (o) o.textContent = t >= 0.999 ? 'Completo' : Math.round(t * 100) + '%';
+  }
+  function aplicaCortes() {
+    ['x', 'y', 'z'].forEach(function (eje) { reflejaCorte(eje); if (dib && dib.corta) dib.corta(eje, cortes[eje]); });
+  }
+  function ponCorte(eje, t) {
+    cortes[eje] = Math.max(0, Math.min(1, t));
+    guarda('atlampa-cortes', cortes);
+    reflejaCorte(eje);
+    if (dib && dib.corta) dib.corta(eje, cortes[eje]);
+  }
+  function restableceCortes() {
+    cortes = { x: 1, y: 1, z: 1 };
+    guarda('atlampa-cortes', cortes);
+    aplicaCortes();
+  }
 
   // --k: unidades del viewBox por píxel; con el dibujo chico se ocultan los rótulos menores
   function escala() {
@@ -650,6 +673,11 @@
     [].forEach.call(document.querySelectorAll('.hud-menu[open]'), function (d) { if (d !== salvo) d.open = false; });
   }
   document.addEventListener('pointerdown', function (ev) { if (!ev.target.closest('.hud-menu')) cierraMenus(); });
+  document.addEventListener('input', function (ev) {
+    var s = ev.target.closest('[data-corte-eje]');
+    if (!s || !dib) return;
+    ponCorte(s.getAttribute('data-corte-eje'), Number(s.value) / 100);
+  });
   // Esc: cierra el menú; aislado, sale
   document.addEventListener('keydown', function (ev) {
     if (ev.key !== 'Escape') return;
@@ -658,8 +686,9 @@
     else if (aislado && !yendo) saleAislado();
   });
   document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-capa], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece]');
+    var b = ev.target.closest('[data-capa], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset]');
     if (!b || !dib) return;
+    if (b.hasAttribute('data-corte-reset')) { restableceCortes(); return; }
     if (b.hasAttribute('data-ir')) { ev.preventDefault(); cierraMenus(); if (aislado) saleAislado(); ir(b.getAttribute('data-ir')); return; }
     if (yendo) return;
     if (b.hasAttribute('data-aisla')) { cierraMenus(); aislar(b.getAttribute('data-aisla')); }
@@ -707,6 +736,7 @@
       var n = b.getAttribute('data-capa');
       if (n !== 'contexto') ponCapa(n, b.getAttribute('aria-pressed') === 'true');
     });
+    aplicaCortes();
     [].forEach.call(document.querySelectorAll('[data-parte]'), function (d) { aplicaOculta(d.getAttribute('data-parte')); });
     ponResalta(resAct);
     marcaApartado();
