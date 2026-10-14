@@ -20,7 +20,11 @@ Lo que se guarda (planta tipo, en el marco del diagrama):
   bloques   dos estacionamientos independientes (norte y sur): el contorno
             exterior del muro (capa 'Muro') y sus cajones (capa
             'Estacionamiento', rectángulos de 5 × 2.7–2.8 m; y las capas de
-            cajones accesibles, ver CAPAS_CAJONES)
+            cajones accesibles, ver CAPAS_CAJONES). Cada cajón se guarda con sus
+            4 esquinas, TAL CUAL el CAD (van girados como el bloque), no como caja.
+  elevadores el desplante de cada elevador: el rectángulo cerrado de la capa 'Muro' (≈ 2 × 2.3 m) que lleva
+            el texto «Elevador» (MTEXT, capa '0') del plano. El visor lo sube desde el último sótano hasta
+            el nivel más alto del edificio y, encima, el espacio reglamentario (ESPACIO_ELEVADOR).
   rampas    helicoidales dobles: centro y radios de los muros (interior,
             entre carriles, exterior); dos carriles concéntricos
   accesos   las curvas y los muros rectos de las rampas en planta baja
@@ -53,6 +57,14 @@ X_MIN, X_MAX = 150, 400          # la planta tipo de sótanos (la planta baja es
 # P01_ACCESIBILIDAD (16 franjas de 4.77 × 1.34 junto a ellos) son los cajones de estacionamiento
 # ACCESIBLES (personas con discapacidad). En el visor van como cajones más, sin distinguirlos de los demás.
 CAPAS_CAJONES = ('Estacionamiento', 'P01_CAJONES_N', 'P01_ACCESIBILIDAD')
+
+# ================= PROPUESTA — todo editable =================
+# Espacio reglamentario de los elevadores sobre el nivel más alto (sobrerrecorrido / cuarto de máquinas), en m.
+# SUPUESTO SIN VERIFICAR: no se encontró la cifra en las NTC Proyecto Arquitectónico CDMX (Gaceta 12/12/2024) ni en
+# NOM-053-SCFI-2000; 4.20 m es sólo la referencia de un manual (sobrerrecorrido mínimo hasta la losa de la sala de
+# máquinas) y depende del equipo (velocidad, con o sin cuarto de máquinas). Corregir con la norma o el fabricante.
+ESPACIO_ELEVADOR = 4.20
+RADIO_TEXTO_ELEVADOR = 2.0                # m: el texto «Elevador» y su rectángulo van a menos de esto
 ACCESIBLES = ('P01_CAJONES_N', 'P01_ACCESIBILIDAD')
 
 
@@ -135,11 +147,13 @@ def main():
         if not izq(e):
             continue
         pts = list(e.get_points('xy'))
+        if len(pts) > 4 and math.dist(pts[0], pts[-1]) < 1e-6:
+            pts = pts[:-1]                                # (algunas vienen cerradas con el primer punto repetido)
         xs, ys = [p[0] for p in pts], [p[1] for p in pts]
         c = Point((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2)
         for b in bloques:
             if b['P'].buffer(0.3).contains(c):
-                b['cajones'].append(uv(min(xs), min(ys)) + uv(max(xs), max(ys)))
+                b['cajones'].append([v for p in pts for v in uv(*p)])   # las 4 esquinas, como el CAD
                 break
         else:
             print('cajón fuera de los bloques', c)
@@ -191,8 +205,33 @@ def main():
         if X_MIN < c.x < X_MAX:
             cuartos.append({'n': nombre(c.x, c.y), 'c': uv(c.x, c.y), 'r': round(e.dxf.radius, 2)})
 
+    # elevadores: el rectángulo cerrado de 'Muro' (4 puntos, < 3 m) más cercano a cada texto «Elevador»
+    cajas_ascensor = []
+    for e in m.query('LWPOLYLINE[layer=="Muro"]'):
+        pts = list(e.get_points('xy'))
+        if e.closed and len(pts) == 4 and izq(e):
+            xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+            if max(xs) - min(xs) < 3.5 and max(ys) - min(ys) < 3.5:
+                cajas_ascensor.append(pts)
+    elevadores, usados = [], set()
+    for nom, x, y in textos:
+        if not nom.lower().startswith('elevador'):
+            continue
+        cand = [(math.dist((x, y), (sum(p[0] for p in q) / 4, sum(p[1] for p in q) / 4)), i) for i, q in enumerate(cajas_ascensor) if i not in usados]
+        d, i = min(cand)
+        if d > RADIO_TEXTO_ELEVADOR:
+            print('texto «Elevador» sin rectángulo a menos de', RADIO_TEXTO_ELEVADOR, 'm:', (round(x, 1), round(y, 1)))
+            continue
+        usados.add(i)
+        q = cajas_ascensor[i]
+        c = Point(sum(p[0] for p in q) / 4, sum(p[1] for p in q) / 4)
+        bl = min(bloques, key=lambda b: b['P'].distance(c))['nombre']
+        elevadores.append({'bloque': bl, 'pol': [v for p in q for v in uv(*p)]})
+    elevadores.sort(key=lambda x: (x['bloque'], -x['pol'][1]))
+    print('elevadores', [(x['bloque'], x['pol'][:2]) for x in elevadores])
+
     datos = {
-        'sotanos': SOTANOS, 'entrepiso': ENTREPISO,
+        'sotanos': SOTANOS, 'entrepiso': ENTREPISO, 'elevadores': elevadores, 'espacioElevador': ESPACIO_ELEVADOR,
         'bloques': [{'nombre': b['nombre'], 'planta': [v for p in list(b['P'].exterior.coords)[:-1] for v in uv(*p)],
                      'cajones': b['cajones']} for b in bloques],
         'rampas': rampas, 'accesos': accesos, 'cuartos': cuartos,
@@ -203,8 +242,10 @@ def main():
     print('accesos', len(accesos), '· cuartos', [c['n'] for c in cuartos])
     cab = ('/* Estacionamiento. Generado por herramientas/prepara-estacionamiento.py: no editar a mano.\n'
            '   Fuente: Sotanos y PB para HTML.dwg (planta tipo de sótanos), trasladada al marco del diagrama.\n'
-           '   bloques: planta = contorno exterior del muro [u, v, …]; cajones = [u0, v0, u1, v1]\n'
+           '   bloques: planta = contorno exterior del muro [u, v, …]; cajones = las 4 esquinas [u, v, …] (como el CAD)\n'
            '   (incluyen los accesibles: capas ' + ' y '.join(ACCESIBLES) + ', sin distinguirlos).\n'
+           '   elevadores: [{bloque, pol: 4 esquinas [u, v, …]}] (desplante; suben hasta el nivel más alto y el espacio\n'
+           '   reglamentario espacioElevador, supuesto: ver PROPUESTA en prepara-estacionamiento.py).\n'
            '   rampas: helicoidales dobles, centro, radio interior y exterior, carriles [r0, r1].\n'
            '   accesos: ["a", u, v, r, ángulo inicial, final] (arco, grados) o ["l", u0, v0, u1, v1].\n'
            '   ' + str(SOTANOS) + ' sótanos de ' + str(ENTREPISO) + ' m en cada bloque. */\n')
