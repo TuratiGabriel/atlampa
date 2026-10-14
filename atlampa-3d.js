@@ -1340,8 +1340,11 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     piezas.forEach(p => { if (p.g.name === 'cultura') p.g.userData.oculto = true; });
     // por partes (para aislarlo: cada una se oculta sola)
     const g = pieza('cultura-detalle', 'cultura', 0.45);
-    const PARTES_CD = [['losa', 'Losas y módulos', ['m-losa', 'l-borde']], ['nucleo', 'Núcleos', ['m-nucleo']], ['acero', 'Estructura de acero', ['m-acero']],
-      ['escalera', 'Escaleras y rampas', ['m-escalera', 'l-huella']], ['auditorio', 'Auditorio', ['m-auditorio']], ['aro', 'Parasoles', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]];
+    // en su apartado se ve por dentro (muros, vidrios como marcos y mobiliario); en las demás escenas, módulos y núcleos como cajas
+    const PARTES_CD = [['losa', 'Losas', ['m-losa', 'l-borde']], ['acero', 'Estructura de acero', ['m-acero']],
+      ['escalera', 'Escaleras', ['m-escalera', 'l-huella']], ['auditorio', 'Auditorio', ['m-auditorio']], ['aro', 'Sombrillas', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]]
+      .concat(ESC === 'cultura' ? [['interior', 'Muros interiores', ['m-muro']], ['vidrio', 'Vidrios (marcos)', ['l-vidrio']], ['mobiliario', 'Mobiliario', ['m-mueble']]]
+        : [['modulos', 'Módulos', ['m-modulo']], ['nucleo', 'Núcleos', ['m-nucleo']]]);
     PARTES_CD.forEach(([id, nombre, ks]) => {
       const sg = new THREE.Group(); sg.name = 'cultura-' + id; g.add(sg);
       ks.forEach(k => {
