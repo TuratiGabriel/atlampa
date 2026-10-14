@@ -37,6 +37,8 @@ const { PB, GU, GF, S, HE, CEN, PIEZAS, ANILLO, CORTE, COLUMNAS, ESPUELA, ESP_FI
 const MERC = window.ATLAMPA_MERCADO || null;
 // La estructura de acero de la vivienda (ponerestructura_LRFD_v2.3dm, por herramientas/prepara-estructura.py): capa Estructura
 const ESTR = window.ATLAMPA_ESTRUCTURA || null;
+// La industria del usuario (Rhino: industry_geometry/upload, por herramientas/prepara-industria.py): reemplaza el prisma simple
+const IND = window.ATLAMPA_INDUSTRIA || null;
 const INFRA = window.ATLAMPA_INFRAESTRUCTURA || null;
 const RAD = Math.PI / 180;
 // caja [u0, v0, u1, v1] menos otra caja: las (hasta 4) cajas que quedan
@@ -1213,8 +1215,21 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   /* ===== 4. Industria (la chimenea existente ya no va) ===== */
   if (MOD && MOD.industria) {
-    const g = pieza('industria', 'industria', 0.4), m = new Malla(), I = MOD.industria;
-    prisma(m, G.pares(I.planta), I.z0, I.z1); pon(g, m, 'industria', 'industria', 20);
+    const g = pieza('industria', 'industria', 0.4), I = MOD.industria;
+    if (IND) {
+      // La geometría de Rhino, por partes (para aislar: muros y celosías por nivel, losas, cantos, chacuacos, chimenea).
+      // El despiece las sube por niveles.
+      const SUBE = k => /_PB$/.test(k) ? 0 : /_N1$/.test(k) ? 2.5 : /_N2$/.test(k) ? 5 : k === 'losa_azotea' ? 7.5 : k === 'cantos' ? 3 : 10;
+      Object.keys(IND.partes).forEach(k => {
+        const p = IND.partes[k], m = new Malla(), sg = new THREE.Group();
+        for (let i = 0; i < p.tris.length; i += 9) m.tri(W(p.tris[i], p.tris[i + 1], p.tris[i + 2]), W(p.tris[i + 3], p.tris[i + 4], p.tris[i + 5]), W(p.tris[i + 6], p.tris[i + 7], p.tris[i + 8]));
+        g.add(sg); pon(sg, m, 'industria', 'industria', 20);
+        parte('industria', k, p.nombre, [sg], SUBE(k) ? [0, SUBE(k), 0] : null);
+      });
+    } else {
+      const m = new Malla();
+      prisma(m, G.pares(I.planta), I.z0, I.z1); pon(g, m, 'industria', 'industria', 20);
+    }
   }
 
 
@@ -2238,7 +2253,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const p = pol.map(q => [q[0], q[1]]), m = centroide(ccw(p));
       masas.push({ n: 'nave', c: m.c, peso: m.area, pol: p, z0: 0, z1: 9 });
     });
-    if (MOD && MOD.industria) { const p = G.pares(MOD.industria.planta), m = centroide(ccw(p)); masas.push({ n: 'industria', c: m.c, peso: m.area, pol: p, z0: MOD.industria.z0, z1: MOD.industria.z1 }); }
+    if (MOD && MOD.industria) { const p = G.pares(MOD.industria.planta), m = centroide(ccw(p)); masas.push({ n: 'industria', c: m.c, peso: m.area, pol: p, z0: IND ? IND.bbox[0][2] : MOD.industria.z0, z1: IND ? IND.bbox[1][2] : MOD.industria.z1 }); }
     if (CD) { const p = CD.losa1.map(q => [q[0], q[1]]), m = centroide(ccw(p)); masas.push({ n: 'cultura', c: m.c, peso: m.area, pol: p, z0: 0, z1: ANILLO.z - 0.35 }); }
     // los ejes: el diámetro de la vivienda; y el de las naves contra la industria + arte y cultura
     const pesa = l => { const P = l.reduce((s, m) => s + m.peso, 0); return [l.reduce((s, m) => s + m.c[0] * m.peso, 0) / P, l.reduce((s, m) => s + m.c[1] * m.peso, 0) / P]; };
@@ -2392,7 +2407,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const mete = q => { us.push(q[0]); vs.push(q[1]); };
     if (ap === 'estacionamiento' && EST) { EST.bloques.forEach(b => G.pares(b.planta).forEach(mete)); z0 = -EST.sotanos * EST.entrepiso; z1 = 0; }
     else if (ap === 'comercio') { G.NAVES.forEach(nv => { mete([nv.L.u0, nv.L.v0]); mete([nv.L.u1, nv.L.v1]); }); if (MERC) MERC.naves.forEach(h => { mete([h[0], h[1]]); mete([h[2], h[3]]); }); z1 = 9; }
-    else if (ap === 'industria' && MOD && MOD.industria) { G.pares(MOD.industria.planta).forEach(mete); z1 = MOD.industria.z1; }
+    else if (ap === 'industria' && MOD && MOD.industria) { G.pares(MOD.industria.planta).forEach(mete); z1 = IND ? IND.bbox[1][2] : MOD.industria.z1; }
     else if (ap === 'cultura') { [[PLAZA_C.u0, PLAZA_C.v0], [PLAZA_C.u1, PLAZA_C.v1]].forEach(mete); mete([ANILLO.u - ANILLO.re, ANILLO.v - ANILLO.re]); z1 = ANILLO.z; }
     else if (ap === 'aro') { G.aroPoli(ANILLO.re, 72).forEach(mete); z1 = ANILLO.z + 1; }
     else { mete([PB.u0, PB.v0]); mete([PB.u1, PB.v1]); z1 = 2; }
