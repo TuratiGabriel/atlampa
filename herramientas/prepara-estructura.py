@@ -17,8 +17,8 @@ Capas leídas:
   Estructura::Losacero 12 cm (referencia)::B1…B8
   Módulos::entrepiso
 NO se leen (a propósito, 2026-10-13, el usuario): «Estructura::Indicadores - no alcanza (cubo rojo)» (354 cubos con
-el índice de uso > 1; quedan en el .3dm), los volúmenes de elevadores («Cubos de circulacion::Bn::Elevadores
-(volumen)») ni site::polygon. Los módulos van por prepara-modulos.py.
+el índice de uso > 1; quedan en el .3dm), los elevadores, TODOS (2026-10-13: su volumen «Cubos de circulacion::Bn::Elevadores
+(volumen)» y los 704 miembros de «Estructura del cubo» con cubo = elevadores; quedan las escaleras) ni site::polygon. Los módulos van por prepara-modulos.py.
 
 Marco: el archivo está en METROS y en el marco de «nuevos bloques» (el mismo de prepara-modulos.py):
   u = x + 497.9956, v = y + 392.0994, z = z + 7.16
@@ -175,6 +175,9 @@ def main():
                 continue
             bl = p[2] if lp.startswith('Estructura::Base::') else p[2]
             t = o.Attributes.GetUserString('tipo')
+            if o.Attributes.GetUserString('cubo') == 'elevadores':   # sin elevadores: ni su estructura (704 miembros) ni su volumen
+                saltados['cubos de elevadores (a propósito)'] += 1
+                continue
             if t not in TIPOS or bl not in por_bloque:
                 saltados[lp] += 1
                 continue
@@ -206,7 +209,7 @@ def main():
           '   miembros[tipo] = [u0, v0, z0, u1, v1, z1, ancho, peralte] (eje de inicio a fin; sección centrada en el eje;\n'
           '   ancho horizontal, peralte ⟂ al eje), tipo = columna | cubo_columna | trabe_u | trabe_v | cubo_trabe |\n'
           '   cubo_diag | amarre | vigueta; losas = [u, v, z0, z1, du, dv] (losacero de 12 cm, caja girada a «giro»);\n'
-          '   cubos = [cubo, u, v, z0, z1, du, dv] (volumen de elevadores o escalera). entrepiso = [z0, z1, contorno [u, v, …],\n'
+          '   cubos = [cubo, u, v, z0, z1, du, dv] (volumen de escalera). entrepiso = [z0, z1, contorno [u, v, …],\n'
           '   huecos…]. No incluye los indicadores «no alcanza». */\n'
           'window.ATLAMPA_ESTRUCTURA = ' + json.dumps(datos, separators=(',', ':')) + ';\n')
     with open(SALIDA, 'w', encoding='utf-8', newline='\n') as f:
