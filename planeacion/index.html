@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planeación del mercado</title>
+<style>
+  :root {
+    --fondo: #f6f5f1; --papel: #ffffff; --tinta: #1c1c1a; --tenue: #66655f; --linea: #dcdad3;
+    --verde: #2f7a4a; --ambar: #b26a00; --rojo: #b3261e; --azul: #2457a6; --chip: #eceae4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fondo: #111111; --papel: #1a1a1a; --tinta: #ecebe6; --tenue: #a19f98; --linea: #2e2e2c;
+      --verde: #8fd17a; --ambar: #f2b04e; --rojo: #ff8a80; --azul: #8ab4ff; --chip: #262624;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fondo: #111111; --papel: #1a1a1a; --tinta: #ecebe6; --tenue: #a19f98; --linea: #2e2e2c;
+    --verde: #8fd17a; --ambar: #f2b04e; --rojo: #ff8a80; --azul: #8ab4ff; --chip: #262624;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--tinta); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 2.2rem; line-height: 1.15; margin: 0 0 6px; letter-spacing: -0.015em; }
+  h2 { font-size: 1.4rem; margin: 44px 0 10px; padding-top: 14px; border-top: 1px solid var(--linea); }
+  h3 { font-size: 1rem; margin: 18px 0 6px; }
+  p, li { max-width: 78ch; }
+  .sub { color: var(--tenue); margin: 0 0 18px; }
+  .aviso { background: color-mix(in srgb, var(--ambar) 10%, var(--papel)); border: 1px solid color-mix(in srgb, var(--ambar) 35%, var(--linea)); padding: 10px 14px; border-radius: 6px; }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 6px; }
+  nav a { font-size: .85rem; text-decoration: none; color: var(--tinta); background: var(--chip); padding: 4px 10px; border-radius: 999px; }
+  nav a:hover { background: var(--linea); }
+  table { border-collapse: collapse; width: 100%; max-width: 760px; background: var(--papel); border: 1px solid var(--linea); border-radius: 6px; overflow: hidden; font-size: .92rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  th { color: var(--tenue); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .03em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .total td { font-weight: 700; }
+  figure { margin: 14px 0 6px; background: var(--papel); border: 1px solid var(--linea); border-radius: 8px; padding: 10px; }
+  figure img { width: 100%; height: auto; display: block; border-radius: 4px; background: #111; }
+  figcaption { color: var(--tenue); font-size: .88rem; margin-top: 8px; }
+  .chip { display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-right: 6px; vertical-align: 1px; }
+  .vigente { background: color-mix(in srgb, var(--verde) 18%, transparent); color: var(--verde); }
+  .parcial { background: color-mix(in srgb, var(--ambar) 18%, transparent); color: var(--ambar); }
+  .hecho { background: color-mix(in srgb, var(--azul) 18%, transparent); color: var(--azul); }
+  ol.dec li, ul.pend li { margin: 4px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } h1 { font-size: 1.75rem; } }
+  a { color: var(--azul); }
+  code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Planeación del mercado</h1>
+  <p class="sub">Atlampa · estado al 13 de octubre de 2026 · nave norte, nave sur y locales del aro · <a href="../">abrir el visor</a></p>
+  <p class="aviso"><strong>Ya está en el visor</strong> (versión 20261013f): la sur en manzanas de barrio con respiros, la ranura y la esquina a doble altura, la cubierta plegada, los jardines de las esquinas y la nave norte sobre la retícula de vivienda. Lo de «Lo que falta decidir» todavía no.</p>
+
+  <nav>
+    <a href="#decisiones">Decisiones</a><a href="#meta">Meta 7,500 m²</a><a href="#investigacion">Investigación</a>
+    <a href="#clusters">Clusters</a><a href="#zonificacion">Zonificación</a><a href="#cubierta">Cubierta sur</a>
+    <a href="#norte">Nave norte</a><a href="#estructura">Estructura</a><a href="#esquinas">Esquinas</a><a href="#pendientes">Pendientes</a>
+  </nav>
+
+  <h2 id="decisiones">1. Lo que ya decidiste</h2>
+  <ol class="dec">
+    <li><strong>Las columnas de la estructura rigen todo.</strong> En la norte manda la retícula de vivienda (11 × 8, girada −10°). En la sur mandan las líneas de columnas de la nave (≈ 9.0) y los postes (6.6).</li>
+    <li><strong>Industria:</strong> el café o terraza sobre la industria lo trabaja André; no entra en nuestros 7,500 m².</li>
+    <li><strong>Biodigestor:</strong> se quita. En su lugar van cámaras frías, residuos y bodegas junto a la descarga.</li>
+    <li><strong>Calles de 3.00</strong> donde hoy son de 2.26–2.50.</li>
+    <li><strong>P1 norte:</strong> se quitan unos pocos locales (los de 1.0 de frente) y se conservan todos los giros.</li>
+    <li><strong>Mezcla de mercancía y barra para comer</strong>, en módulos de combinación con divisiones claras: sin convivencia forzada.</li>
+    <li><strong>Sin restaurante.</strong> La comida es de mercado: fondas con barra, antojitos, jugos.</li>
+    <li><strong>El jardín inundable se divide.</strong> El del hoyo sale. Quedan 80 m² en la esquina NE «recibiendo gente» y 120 m² en las esquinas sur de los locales.</li>
+    <li><strong>Esquina NE:</strong> una parte abierta y un alero, para que el piso de +0.40 no se moje.</li>
+    <li><strong>Esquina SE:</strong> el jardín sale del predio y remata adentro.</li>
+    <li><strong>Los vacíos son respiros</strong>, con referencia japonesa: paisaje de fondo.</li>
+  </ol>
+
+  <h2 id="meta">2. Meta de 7,500 m² de comercio</h2>
+  <p>Cuenta huellas brutas (incluye plazas, baños, carga y vitrina) y no incluye arte y cultura.</p>
+  <table>
+    <tr><th>Componente</th><th>Hoy</th><th>Con lo planeado</th></tr>
+    <tr><td>Locales del aro (18 módulos × 22 m²)</td><td class="num">396</td><td class="num">396</td></tr>
+    <tr><td>Nave norte PB</td><td class="num">1,877</td><td class="num">1,877</td></tr>
+    <tr><td>Nave sur PB</td><td class="num">2,773</td><td class="num">2,773</td></tr>
+    <tr><td>Nave sur PA (−175 por los vacíos de luz)</td><td class="num">2,346</td><td class="num">≈ 2,171</td></tr>
+    <tr><td>Plataformas norte (P3 +53 al ensancharla; P2 −80 por el jardín de la esquina)</td><td class="num">1,117</td><td class="num">≈ 1,090</td></tr>
+    <tr class="total"><td>Total</td><td class="num">8,509</td><td class="num">≈ 8,307</td></tr>
+    <tr><td>Contra 7,500</td><td class="num">+1,009</td><td class="num">≈ +807</td></tr>
+  </table>
+  <p>Corrido en el modelo, con la sur en manzanas de barrio, los respiros, la ranura y la esquina a doble altura: <strong>8,244 m²</strong>, 744 por encima de la meta.</p>
+
+  <h2 id="investigacion">3. Investigación</h2>
+  <p>Se revisaron unos 30 referentes y guías. Las conclusiones que siguen pesando:</p>
+  <ul>
+    <li><strong>Lo fresco a nivel de calle; arriba, un destino</strong> (San Antón, Bolhão, Barceló, Tepoztlán). Hoy el 46 % de los locales está arriba.</li>
+    <li><strong>Calles de 3.0 m</strong> (Oztotepec de Mauricio Rocha, Sant Antoni), contra 2.26–2.50 hoy. En la CDMX la mercancía sale al pasillo.</li>
+    <li><strong>Locales que se juntan</strong> (Oztotepec: 3×3 → 3×6 / 6×6). Los nuestros son de 5 m² y no se juntan.</li>
+    <li><strong>Faltaban</strong> zonificación por giro, un ancla (tortillería) y bodegas: hoy hay 4 bodegas para 424 locales.</li>
+  </ul>
+  <p>Detalle y fuentes: <a href="investigacion-referentes.html">investigacion-referentes</a> · propuesta 1: <a href="propuesta-mercado.html">propuesta-mercado</a></p>
+
+  <h2 id="clusters">4. Módulos de combinación (clusters) y respiros</h2>
+  <p><span class="chip parcial">descartado en la sur</span>Bajaba mucho la densidad (284 locales). La sur volvió a las manzanas de barrio con respiros; ver abajo.</p>
+  <ul>
+    <li><strong>Sur, ahora:</strong> manzanas cortas en aparejo (116 locales en PB y 94 en PA; 321 en todo el mercado).</li>
+    <li><strong>Tres respiros de pasillo,</strong> elegidos donde más acercan la luz a la PB:
+      <ul>
+        <li>abajo, las dos medias filas que dan al pasillo se vuelven tsuboniwa (arriate, banca-borde y un árbol cada una);</li>
+        <li>arriba son vacío y el pasillo de la PA pasa entre las copas, como puente;</li>
+        <li>encima, un módulo alto translúcido.</li>
+      </ul>
+    </li>
+    <li><strong>El jardín entre carga y mercado sube a la PA:</strong>
+      <ul>
+        <li>una ranura de 1.40 abierta junto al muro ciego, con un árbol por crujía y tragaluz corrido encima;</li>
+        <li>la esquina del jardín, a doble altura;</li>
+        <li>un puente en el vano.</li>
+      </ul>
+    </li>
+  </ul>
+  <figure><a href="planta_mercado_plano.png"><img src="planta_mercado_plano.png" alt="Planta baja y planta alta del mercado con las manzanas de barrio, los tres respiros y los jardines de las esquinas"></a>
+    <figcaption>Planta del modelo como está hoy: 181 locales en planta baja y 140 arriba. Los respiros son los rectángulos verdes punteados. La leyenda todavía nombra los colores de los clusters.</figcaption></figure>
+  <p>Lo de abajo es la propuesta de clusters, como quedó.</p>
+  <ul>
+    <li><strong>Un cluster es una machiya en miniatura:</strong>
+      <ul>
+        <li>cabeza con barra de comida que sale del producto del cluster;</li>
+        <li>3 + 3 puestos que se juntan, con franja de exhibición;</li>
+        <li>núcleo de trastiendas (o cámara fría, en los húmedos) con las columnas adentro;</li>
+        <li>pie con zaguán de servicio.</li>
+      </ul>
+    </li>
+    <li><strong>Una familia por cluster.</strong> Los húmedos forman su propio barrio junto a la carga.</li>
+    <li><strong>Aparejo como el tatami bien puesto:</strong> nunca se cruzan cuatro esquinas.</li>
+    <li><strong>Los respiros ocupan el lugar de un cluster:</strong> tsuboniwa con borde-banca abajo y vacío en la PA; el módulo alto de la cubierta saca el humo de los comales.</li>
+  </ul>
+  <figure><a href="propuesta_clusters.png"><img src="propuesta_clusters.png" alt="Lámina del cluster: cuatro variantes, patrón en aparejo y corte por un respiro"></a>
+    <figcaption>Medidas de la sur: 6.00 × 10.00 sobre las líneas de columnas a 9.0, con calles de 3.00 que salen solas. En la norte, la figura se ajusta a la retícula de vivienda (ver Estructura). Detalle: <a href="propuesta-clusters.html">propuesta-clusters</a></figcaption></figure>
+
+  <h2 id="zonificacion">5. Zonificación por giro</h2>
+  <p><span class="chip parcial">parcial</span>Sigue valiendo el reparto por zonas. El trazo de locales lo reemplazan los clusters.</p>
+  <ul>
+    <li><strong>Planta baja:</strong> húmedos (sur, junto a la carga), frutas y verduras, semillas y secos (norte), flores, tortillería como ancla.</li>
+    <li><strong>Arriba:</strong> ropa, hogar, artesanía y servicios con taller en las puntas, más las fondas alrededor de los vacíos.</li>
+  </ul>
+  <figure><a href="propuesta_zonificacion.png"><img src="propuesta_zonificacion.png" alt="Zonificación por giro sobre la planta actual"></a>
+    <figcaption>Dibujado sobre la distribución actual, antes de los clusters y de la regla de la estructura.</figcaption></figure>
+
+  <h2 id="cubierta">6. Cubierta sur y vacíos de luz</h2>
+  <p><span class="chip vigente">vigente</span></p>
+  <ul>
+    <li>Módulos de crujía a tres alturas, estilo Rocha en Oztotepec: bajo, medio (+1.00) y alto (+2.00) sobre los vacíos.</li>
+    <li><strong>Cada módulo es un pedazo de las dos aguas originales</strong> (pendiente 1:3, +3.00 por media crujía, como en Rhino), cortado y subido su escalón.</li>
+    <li><strong>Doblez en canal</strong> (costados arriba, doblez abajo) en los módulos con un vecino más alto: la lluvia baja por en medio hasta el valle, lejos del vidrio.</li>
+    <li><strong>Doblez en lomo</strong> en los más altos de su fila: el agua se va a los techos de junto. El alto vuela lo que pide la lluvia a 20° (0.35 en escalones de 1 m) y en los valles el pie del escalón es pretil de lámina (0.30).</li>
+    <li>La silueta entera sube 1.70 (alero +7.90, cumbrera +10.90) para dejar 3.00 libres sobre la PA en el punto más bajo.</li>
+    <li>Los escalones que miran al N o al E llevan vidrio; los que miran al S o al O, persiana.</li>
+  </ul>
+  <figure><a href="propuesta_cubierta_aguas.png"><img src="propuesta_cubierta_aguas.png" alt="Cubierta sur en dos aguas plegadas: planta de módulos y dos cortes"></a>
+    <figcaption>Lámina de la versión de clusters: 28 bajos, 18 medios y 3 altos; 32 en canal y 17 en lomo. Con los respiros (lo que está en el visor) quedan 28 bajos, 16 medios y 5 altos, con los mismos 32 en canal y 17 en lomo.</figcaption></figure>
+  <figure><a href="propuesta_cubierta_sur.png"><img src="propuesta_cubierta_sur.png" alt="Cubierta sur por módulos a tres alturas, versión plana"></a>
+    <figcaption>Versión anterior, de módulos planos.</figcaption></figure>
+
+  <h2 id="norte">7. Nave norte: accesos, la P2 y el pasillo de P3</h2>
+  <p><span class="chip parcial">parcial</span>El jardín de la esquina mueve el acceso de Sabino y el zaguán bajo la P2.</p>
+  <ul>
+    <li><strong>La P2 hoy es un bloque macizo</strong> de +0.40 a +2.40. Se vacía con el piso a −0.20, para tener 2.30 libres, y caben bodegas y la carga norte.</li>
+    <li><strong>Pasillo trasero de P3:</strong> mide 1.50; con P3 de 9.5 m queda de 3.00.</li>
+    <li><strong>Accesos:</strong> Eulalia Guzmán (calle de las plantas), plazuela de Sabino y la espuela por el patio del aro. Se suman dos junto al jardín de la esquina: N1b por Eulalia Guzmán y N4 por Sabino.</li>
+  </ul>
+  <figure><a href="propuesta_norte.png"><img src="propuesta_norte.png" alt="Nave norte: accesos, bajo la P2 y pasillo de P3"></a>
+    <figcaption>Pendiente de acomodar: aquí el zaguán aparece en v 477–481, pero con el jardín de la esquina (v 473–485) se recorre al sur, junto a la carga.</figcaption></figure>
+  <figure><a href="corte_nave_norte.png"><img src="corte_nave_norte.png" alt="Corte A–A de la nave norte por la P1, la calle de las plantas, la P2 con su zaguán y el jardín NE"></a>
+    <figcaption>Corte A–A en v 480, sacado del modelo. La lluvia a 20° que entra por la parte abierta del jardín NE cae dentro del jardín. Choque a resolver: la cumbrera oeste (+9.20) entra unos 1.2 m en el primer nivel de vivienda (+7.99).</figcaption></figure>
+
+  <h2 id="estructura">8. La estructura de vivienda en la nave norte</h2>
+  <p><span class="chip vigente">vigente</span></p>
+  <ul>
+    <li><strong>17 columnas de vivienda llegan a piso.</strong> Hoy 6 caen en circulación, una en plena calle de las plantas.</li>
+    <li><strong>Un cluster girado entero no cabe</strong> en la norte.</li>
+    <li><strong>Se acomoda lo que pisa cada línea:</strong>
+      <ul>
+        <li>la fila que abre afuera y la isla bajo P1 se alinean a su línea;</li>
+        <li>la calle de las plantas gira 10° y sus columnas quedan como pórtico;</li>
+        <li>una banca-jardinera donde arranca el arco;</li>
+        <li>un núcleo de servicio junto a los baños.</li>
+      </ul>
+    </li>
+    <li><strong>Resultado:</strong> 0 columnas en circulación.</li>
+  </ul>
+  <figure><a href="propuesta_jardines_estructura.png"><img src="propuesta_jardines_estructura.png" alt="Columnas de vivienda, experimento y jardín sur"></a>
+    <figcaption>Izquierda: dónde caen hoy. Centro: el experimento. Derecha: la primera versión del jardín sur, reemplazada por la de la sección 9.</figcaption></figure>
+
+  <h2 id="esquinas">9. Las esquinas</h2>
+  <p><span class="chip vigente">vigente</span></p>
+  <div class="grid2">
+    <div>
+      <h3>NE · Eulalia Guzmán × Sabino</h3>
+      <ul>
+        <li>Jardín de 82 m², con orillas en líneas de columnas de vivienda.</li>
+        <li>Parte abierta y alero, calculado con la altura real de la cubierta (+9.2 → +6.6 hacia Sabino):
+          <ul>
+            <li>lluvia a 20°: alero 3.30 m, 31 m² abiertos;</li>
+            <li>lluvia a 30°: alero 4.70 m, 16 m² abiertos.</li>
+          </ul>
+        </li>
+        <li>Para la lluvia casi horizontal, celosía en las dos fachadas.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>SE · Sabino</h3>
+      <ul>
+        <li>123 m², sobre las líneas de la nave:
+          <ul>
+            <li>franja de 59 m² que remata adentro con árbol y agua;</li>
+            <li>esquina de 55 m² hasta la línea de postes;</li>
+            <li>jardinera de 8 m² en la banqueta.</li>
+          </ul>
+        </li>
+        <li>Separa la descarga del mercado; sólo la cruza el paso de abasto.</li>
+      </ul>
+    </div>
+  </div>
+  <figure><a href="propuesta_esquinas.png"><img src="propuesta_esquinas.png" alt="Esquinas NE y SE con alero y corte de lluvia"></a>
+    <figcaption>Detalle: <a href="planeacion-jardines-estructura.html">planeacion-jardines-estructura</a></figcaption></figure>
+
+  <h2>10. Hecho en el visor</h2>
+  <p><span class="chip hecho">hecho</span>Ya se ven las entradas vehiculares del estacionamiento, del DWG de André: carril curvo, muros y boca de la helicoidal. Una entra por Eulalia Guzmán y otra por Clavel, al oeste del predio. </p>
+
+  <h2 id="pendientes">11. Lo que falta decidir</h2>
+  <ul class="pend">
+    <li>El choque de la cumbrera oeste de la norte (+9.20) con el primer nivel de vivienda (+7.99): bajar esa agua o subir la vivienda.</li>
+    <li>La franja abierta entre los muros de la sur, que terminan en +6.20, y la cubierta subida.</li>
+    <li>Las manzanas sueltas de 1–2 locales que quedan en la sur: juntarlas o cederlas a la plazuela.</li>
+    <li>Lluvia de diseño de la esquina NE: 20° (31 m² abiertos) o 30° (16 m²).</li>
+    <li>Respiros: ¿árbol y agua, o seco con tezontle?</li>
+    <li>Vaciar la P2 para las bodegas y la carga norte, y ensanchar P3 a 9.5.</li>
+    <li>Ancho de la banqueta de Sabino: la jardinera debe dejar al menos 1.20 libres.</li>
+  </ul>
+</main>
+</body>
+</html>

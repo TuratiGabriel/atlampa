@@ -102,7 +102,7 @@
   var VEL = 40, TAU = 0.35, TAU_EL = 0.09;
   // al arrastrar, la cámara sigue a la mano: más rápida y con menos inercia
   var VEL_MANO = 900, TAU_MANO = 0.06, mano = false, rapido = false;   // rapido: un giro pedido (brújula)
-  var flujos = false, personas = false, sol = false, visible = true, corriendo = false;
+  var flujos = false, personas = false, sol = false, infra = false, visible = true, corriendo = false;
   var CURVAS = {
     suave: function (t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; },
     lenta: function (t) { return Math.sin(t * Math.PI / 2); },          // arranca y se va frenando
@@ -136,10 +136,10 @@
       cambia = true;
     }
     if (cambia) { dib.vista(x, az, el); escala(); if (ponMini) ponMini(az); }
-    if (flujos && !quieto.matches) dib.fluye(ms);
+    if ((flujos || infra) && !quieto.matches) dib.fluye(ms);
     if (personas && !quieto.matches) dib.camina(ms);
     if (sol && !quieto.matches) dib.solea(ms);
-    corriendo = visible && (!!tramo || tramos.length > 0 || az !== azMeta || el !== elMeta || ((flujos || personas || sol) && !quieto.matches));
+    corriendo = visible && (!!tramo || tramos.length > 0 || az !== azMeta || el !== elMeta || ((flujos || personas || sol || infra) && !quieto.matches));
     if (corriendo) requestAnimationFrame(cuadro);
     else msAnt = 0;
   }
@@ -191,10 +191,23 @@
       if (arriba && !antesNolli) { antesNolli = { az: azMeta, el: elMeta }; azMeta += ((NORTE_ARRIBA - azMeta) % 360 + 540) % 360 - 180; elMeta = LIM[1]; mano = false; arranca(); }
       else if (!arriba && antesNolli) { azMeta = antesNolli.az; elMeta = antesNolli.el; antesNolli = null; arranca(); }
     }
+    if (si && (nombre === 'instalacion-electrica' || nombre === 'instalacion-hidraulica')) {
+      var otra = nombre === 'instalacion-electrica' ? 'instalacion-hidraulica' : 'instalacion-electrica';
+      marca(boton(otra), false);
+      dib.capa(otra, false);
+    }
     dib.capa(nombre, si);
     if (nombre === 'flujos') { flujos = si; dib.fluye(performance.now()); arranca(); }
     if (nombre === 'personas') { personas = si; arranca(); }
     if (nombre === 'sol') { sol = si; arranca(); }
+    if (nombre === 'instalacion-electrica' || nombre === 'instalacion-hidraulica') {
+      infra = prendida('instalacion-electrica') || prendida('instalacion-hidraulica');
+      document.body.classList.toggle('con-instalacion-electrica', prendida('instalacion-electrica'));
+      document.body.classList.toggle('con-instalacion-hidraulica', prendida('instalacion-hidraulica'));
+      dib.fluye(performance.now());
+      actualizaDatos();
+      arranca();
+    }
     if (nombre === 'color') document.body.classList.toggle('con-color', si);   // la leyenda también
   }
 
@@ -358,6 +371,8 @@
     var f = doc.figuras, v = f.vivienda, social = v.tipologias.filter(function (t) { return /social/i.test(t.tipo); })
       .reduce(function (n, t) { return n + t.deptos; }, 0);
     var mercado = window.ATLAMPA_MERCADO && window.ATLAMPA_MERCADO.resumen;
+    var infraestructura = window.ATLAMPA_INFRAESTRUCTURA || null;
+    var elec = infraestructura && infraestructura.electrica, hidro = infraestructura && infraestructura.hidrosanitaria;
     var puestosNorte = mercado && Number.isFinite(mercado.puestos) ? mercado.puestos : f.comercio.puestos;
     var puestosSur = mercado && mercado.sur && Number.isFinite(mercado.sur.puestos) ? mercado.sur.puestos : 0;
     var puestosComercio = puestosNorte + puestosSur;
@@ -379,7 +394,13 @@
           ['Arte y cultura', numero(f.cultura.construido_m2) + ' m² construidos'],
           ['Aro', numero(potencial[aroK]) + ' m² de losa'],
           ['Área verde', '4,000 m² · complemento Excel']
-        ])],
+        ]), tabla('Sistemas preliminares', ['Sistema', 'Capacidad / alcance'], infraestructura ? [
+          ['Eléctrico', numero(elec.subestacion.transformador_kva) + ' kVA · ' + numero(elec.subestacion.area_m2) + ' m²'],
+          ['Emergencia', numero(elec.subestacion.planta_emergencia_kw) + ' kW'],
+          ['Agua potable', numero(hidro.cisterna_potable.volumen_m3) + ' m³'],
+          ['Tratamiento', hidro.humedales.length + ' humedales · ' + numero(hidro.humedales.length * 48) + ' m²'],
+          ['Biodigestión', '2 × ' + numero(hidro.biodigestores.capacidad_unitaria_m3) + ' m³']
+        ] : [])],
         notas: ['El total físico mostrado suma la proyección sobre piso y los sótanos del repositorio.', 'El aro puede traslapar el área de cultura.', 'El área verde programada complementa un campo que no existe con esa definición en Git.']
       },
       vivienda: {
@@ -433,10 +454,34 @@
         metricas: [metrica('Superficie estimada', f.potencial.sotanos_m2, 'm²'), metrica('Cajones', f.estacionamiento.cajones_total),
           metrica('Por sótano', f.estacionamiento.cajones_por_sotano, 'cajones'), metrica('Sótanos', f.estacionamiento.sotanos),
           metrica('Entrepiso', f.estacionamiento.entrepiso_m, 'm')]
+      },
+      electrica: {
+        titulo: 'Instalación eléctrica', subtitulo: 'Esquema técnico preliminar', fuente: 'Git · atlampa-infraestructura.js · NOM-001-SEDE-2012',
+        metricas: infraestructura ? [metrica('Subestación', elec.subestacion.area_m2, 'm²'),
+          metrica('Transformador', elec.subestacion.transformador_kva, 'kVA'), metrica('Emergencia', elec.subestacion.planta_emergencia_kw, 'kW'),
+          metrica('Núcleos atendidos', elec.nucleos_vivienda.length + elec.nucleos_comercio.length),
+          metrica('Derivaciones representadas', elec.nucleos_vivienda.reduce(function (n, x) { return n + x.niveles; }, 0) + elec.nucleos_comercio.reduce(function (n, x) { return n + x.niveles; }, 0))] : [],
+        tablas: infraestructura ? [tabla('Equipamiento conceptual', ['Elemento', 'Criterio'], elec.subestacion.equipos.map(function (x) { return [x, 'Preliminar']; }))] : [],
+        notas: ['La capacidad, los tableros y las trayectorias requieren memoria de cargas, diagrama unifilar, coordinación de protecciones y factibilidad de CFE.', 'La vista representa un alimentador por volumen, montante y una derivación conceptual por nivel; no equivale al número final de circuitos.']
+      },
+      hidrosanitaria: {
+        titulo: 'Instalación hidro-sanitaria y pluvial', subtitulo: 'Esquema técnico preliminar', fuente: 'Git · atlampa-infraestructura.js · Reglamento de Construcciones CDMX',
+        metricas: infraestructura ? [metrica('Cisterna potable', hidro.cisterna_potable.volumen_m3, 'm³'),
+          metrica('Cuarto de bombas', hidro.bombas.area_m2, 'm²'), metrica('Humedales', hidro.humedales.length),
+          metrica('Área de humedales', hidro.humedales.length * 48, 'm²'),
+          metrica('Biodigestión total', hidro.biodigestores.capacidad_unitaria_m3 * 2, 'm³'),
+          metrica('Laguna funcional', hidro.laguna.area_m2, 'm²')] : [],
+        tablas: infraestructura ? [tabla('Paquetes de humedales', ['Ubicación', 'Configuración', 'Servicio'], ['norte', 'oriente', 'central'].map(function (p) {
+          var hs = hidro.humedales.filter(function (h) { return h.paquete === p; });
+          return [p.charAt(0).toUpperCase() + p.slice(1), '1 vertical + 1 horizontal · 96 m²', hs.map(function (h) { return h.servicio; }).join(' + ')];
+        }))] : [],
+        notas: ['La red separa agua potable, tratada, pluvial, aguas grises y aguas negras.', 'Las montantes y derivaciones por nivel son conceptuales; diámetros, pendientes, ventilaciones, registros, bombeo y capacidades finales deben resolverse en el proyecto ejecutivo.', 'La laguna funciona como almacenamiento de agua tratada y como parte del paisaje.']
       }
     };
   }
   function claveDatosActual() {
+    if (prendida('instalacion-electrica') && catalogoDatos && catalogoDatos.electrica) return 'electrica';
+    if (prendida('instalacion-hidraulica') && catalogoDatos && catalogoDatos.hidrosanitaria) return 'hidrosanitaria';
     var a = aislado === 'nave-norte' ? 'comercio' : aislado;
     if (a) return a;
     // En un apartado manda el uso de esa página. El resaltado se conserva al
@@ -469,7 +514,7 @@
       '<dl class="hud-datos-metricas">' + metricas + '</dl>' + tablas + notas + '<p class="hud-datos-fuente">Fuente: ' + esc(d.fuente) + '</p>';
   }
   function actualizaDatos() {
-    var nombres = { general: 'proyecto completo', vivienda: 'vivienda', comercio: 'comercio', industria: 'industria', cultura: 'arte y cultura', aro: 'aro', paisajismo: 'paisajismo', estacionamiento: 'estacionamiento' };
+    var nombres = { general: 'proyecto completo', vivienda: 'vivienda', comercio: 'comercio', industria: 'industria', cultura: 'arte y cultura', aro: 'aro', paisajismo: 'paisajismo', estacionamiento: 'estacionamiento', electrica: 'instalación eléctrica', hidrosanitaria: 'instalación hidro-sanitaria y pluvial' };
     var nombre = nombres[claveDatosActual()] || 'proyecto completo';
     datosBoton.title = 'Ver datos de ' + nombre;
     datosBoton.setAttribute('aria-label', 'Ver datos de ' + nombre);
@@ -581,8 +626,20 @@
       fichaAntes = f.innerHTML;
       var M = window.ATLAMPA_MERCADO, r = M && M.resumen, c = M && M.cinta, datos = [];
       if ((ap === 'comercio' || ap === 'nave-norte') && r) {
-        datos = [r.puestos + ' puestos de 2.5 × 2 × 3.0 m en ' + Object.keys(r.bloques || {}).length + ' bloques', r.mesas + ' mesas en los comedores',
-          'Plataformas de +1.42 a +2.40 (suben al sur)', 'Jardín ' + Math.round(r.jardin_m2) + ' m² · hoyo ' + Math.round(r.hoyo_m2) + ' m²'];
+        var su = r.sur || {}, lo = r.locales || {};
+        var jardinNE = 'Jardín de la esquina NE ' + Math.round(r.jardin_m2) + ' m² (' + Math.round(r.jardin_abierto_m2 || 0) + ' abiertos, alero ' + (r.alero_m || 0).toFixed(2) + ')';
+        if (ap === 'nave-norte') {   // (la nave norte sola: no se cuela la sur)
+          datos = [r.puestos + ' locales', 'Sobre la retícula de vivienda: isla, portal y calle de las plantas con pórtico', jardinNE, 'Foro bajo el hoyo (con vidrio)'];
+        } else {
+          var fondas = ((lo.PB_fonda_del_jardin || 0) + (lo.P2_racimos || 0)) / 4 + (su.racimos_pa || 0) + (su.racimos_pb || 0);
+          datos = [(r.puestos + (su.puestos_pb || 0) + (su.puestos || 0)) + ' locales (norte ' + r.puestos + ' · sur PB ' + (su.puestos_pb || 0) + ' · sur PA ' + (su.puestos || 0) + ')',
+            'Sur: manzanas en aparejo · ' + (su.respiros || 0) + ' respiros (tsuboniwa abajo, puente entre copas arriba) · ' + fondas + ' fondas con barra',
+            'Jardín sur: ranura de doble altura sobre la franja (' + Math.round(su.ranura_m2 || 0) + ' m²) y esquina a doble altura (' + Math.round(su.doble_altura_m2 || 0) + ' m²)',
+            'Norte sobre la retícula de vivienda: isla, portal y calle de las plantas con pórtico',
+            jardinNE + ' · jardín sur ' + Math.round(su.jardin_sur_m2 || 0) + ' m²',
+            'Foro bajo el hoyo (con vidrio) · cubierta sur: las dos aguas en módulos a tres alturas' + (su.cubierta_dobleces ? ', ' + su.cubierta_dobleces.canal + ' en canal y ' + su.cubierta_dobleces.lomo + ' en lomo' : '')];
+          if (su.acuaponia_m2) datos.push('Acuaponia: vitrina de ' + Math.round(su.acuaponia_m2) + ' m²');
+        }
         if (c) datos.push('Cinta del aro: ' + Math.round(c.largo) + ' m al ' + Math.max.apply(null, c.pendientes).toFixed(1) + ' %');
         datos.push('Fachada al aro: vidrio (por definir)');
       }
@@ -650,7 +707,7 @@
     dib = creaDibujo();
     window.AtlampaVista = dib;   // para capturas y frames clave desde la consola
     LIM = dib.limitesElevacion;
-    x = 0; tramos = []; tramo = null; flujos = personas = sol = false;
+    x = 0; tramos = []; tramo = null; flujos = personas = sol = infra = false;
     var mini = document.querySelector('[data-minimapa]');
     ponMini = mini ? dib.minimapa(mini) : null;
     [].forEach.call(document.querySelectorAll('[data-capa]'), function (b) {
@@ -922,7 +979,7 @@
   }
   monta();
   if (h.indexOf('contexto') >= 0) ponContexto(true, true);
-  ['flujos', 'arboles', 'postes', 'personas', 'color', 'sol', 'esquema', 'corte'].forEach(function (n) { if (h.indexOf(n) >= 0) ponCapa(n, true); });
+  ['flujos', 'arboles', 'postes', 'personas', 'color', 'sol', 'esquema', 'corte', 'instalacion-electrica', 'instalacion-hidraulica'].forEach(function (n) { if (h.indexOf(n) >= 0) ponCapa(n, true); });
   if (h.indexOf('estructura') >= 0) ponOculta('estructura', false);
   if (h.indexOf('sinmodulos') >= 0) ponOculta('vivienda', true);
   var th = h.filter(function (s) { return /^resalta=/.test(s); })[0];

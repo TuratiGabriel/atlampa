@@ -1,0 +1,65 @@
+{
+ "nota": "Columnas de la vivienda que llegan al piso dentro de la nave norte (las 10 que usa prepara-mercado.py: z0 < 1 y dentro de la zanja). Respaldo de analisis/mercado/columnas_vivienda.json (que vive fuera del repo, en la carpeta del proyecto): si ese archivo existe, manda. Recuperadas el 2026-10-13 de la llave 'vivienda' de atlampa-mercado.js (cada columna es un prisma de 12 triángulos; esquinas de un cuadrado girado -10°), y comprobadas: con este archivo, prepara-mercado.py reproduce idénticos acero, vivienda, perímetro, cubierta, vidrio, cinta y resumen. Marco del visor (u, v) en m; lado en m; z0 = 0 (sólo se usa para filtrar z0 < 1).",
+ "columnas": [
+  {
+   "u": 524.83,
+   "v": 462.622,
+   "z0": 0.0,
+   "lado": 0.463
+  },
+  {
+   "u": 526.219,
+   "v": 470.501,
+   "z0": 0.0,
+   "lado": 0.463
+  },
+  {
+   "u": 527.608,
+   "v": 478.379,
+   "z0": 0.0,
+   "lado": 0.4053
+  },
+  {
+   "u": 535.663,
+   "v": 460.712,
+   "z0": 0.0,
+   "lado": 0.4053
+  },
+  {
+   "u": 537.052,
+   "v": 468.591,
+   "z0": 0.0,
+   "lado": 0.4053
+  },
+  {
+   "u": 534.094,
+   "v": 451.85,
+   "z0": 0.0,
+   "lado": 0.463
+  },
+  {
+   "u": 543.538,
+   "v": 442.062,
+   "z0": 0.0,
+   "lado": 0.4053
+  },
+  {
+   "u": 544.927,
+   "v": 449.94,
+   "z0": 0.0,
+   "lado": 0.4053
+  },
+  {
+   "u": 551.592,
+   "v": 424.394,
+   "z0": 0.0,
+   "lado": 0.4053
+  },
+  {
+   "u": 552.981,
+   "v": 432.273,
+   "z0": 0.0,
+   "lado": 0.4053
+  }
+ ]
+}

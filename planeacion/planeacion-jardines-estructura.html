@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jardines y estructura</title>
+<style>
+  :root {
+    --fondo: #f6f5f1; --papel: #ffffff; --tinta: #1c1c1a; --tenue: #66655f; --linea: #dcdad3;
+    --verde: #2f7a4a; --ambar: #b26a00; --rojo: #b3261e; --azul: #2457a6; --chip: #eceae4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fondo: #111111; --papel: #1a1a1a; --tinta: #ecebe6; --tenue: #a19f98; --linea: #2e2e2c;
+      --verde: #8fd17a; --ambar: #f2b04e; --rojo: #ff8a80; --azul: #8ab4ff; --chip: #262624;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fondo: #111111; --papel: #1a1a1a; --tinta: #ecebe6; --tenue: #a19f98; --linea: #2e2e2c;
+    --verde: #8fd17a; --ambar: #f2b04e; --rojo: #ff8a80; --azul: #8ab4ff; --chip: #262624;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--tinta); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 2.2rem; line-height: 1.15; margin: 0 0 6px; letter-spacing: -0.015em; }
+  h2 { font-size: 1.4rem; margin: 44px 0 10px; padding-top: 14px; border-top: 1px solid var(--linea); }
+  h3 { font-size: 1rem; margin: 18px 0 6px; }
+  p, li { max-width: 78ch; }
+  .sub { color: var(--tenue); margin: 0 0 18px; }
+  .aviso { background: color-mix(in srgb, var(--ambar) 10%, var(--papel)); border: 1px solid color-mix(in srgb, var(--ambar) 35%, var(--linea)); padding: 10px 14px; border-radius: 6px; }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 6px; }
+  nav a { font-size: .85rem; text-decoration: none; color: var(--tinta); background: var(--chip); padding: 4px 10px; border-radius: 999px; }
+  nav a:hover { background: var(--linea); }
+  table { border-collapse: collapse; width: 100%; max-width: 760px; background: var(--papel); border: 1px solid var(--linea); border-radius: 6px; overflow: hidden; font-size: .92rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  th { color: var(--tenue); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .03em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .total td { font-weight: 700; }
+  figure { margin: 14px 0 6px; background: var(--papel); border: 1px solid var(--linea); border-radius: 8px; padding: 10px; }
+  figure img { width: 100%; height: auto; display: block; border-radius: 4px; background: #111; }
+  figcaption { color: var(--tenue); font-size: .88rem; margin-top: 8px; }
+  .chip { display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-right: 6px; vertical-align: 1px; }
+  .vigente { background: color-mix(in srgb, var(--verde) 18%, transparent); color: var(--verde); }
+  .parcial { background: color-mix(in srgb, var(--ambar) 18%, transparent); color: var(--ambar); }
+  .hecho { background: color-mix(in srgb, var(--azul) 18%, transparent); color: var(--azul); }
+  ol.dec li, ul.pend li { margin: 4px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } h1 { font-size: 1.75rem; } }
+  a { color: var(--azul); }
+  code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+
+  h1 { font-size: 1.9rem; }
+  h2 { font-size: 1.3rem; }
+  .volver { display: inline-block; margin-bottom: 14px; font-size: .9rem; text-decoration: none; }
+  table { max-width: 100%; display: block; overflow-x: auto; }
+  hr { border: none; border-top: 1px solid var(--linea); margin: 28px 0; }
+  em { color: var(--tenue); }
+</style>
+</head>
+<body>
+<main>
+  <a class="volver" href="./">← Planeación del mercado</a>
+<h1>Planeación: jardines inundables, esquina NE y estructura de vivienda</h1>
+<p><em>2026-10-12. El mercado no se modificó. Lámina: <a href="propuesta_jardines_estructura.png">propuesta_jardines_estructura.png</a>. Boceto hecho con <code>scratchpad/propuesta_jardines.py</code>.</em></p>
+<h2>1. El jardín inundable se divide en dos</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Hoy</th>
+<th>Propuesta</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Norte</td>
+<td>122 m² bajo el hoyo, al centro</td>
+<td><strong>80 m² en la esquina Eulalia Guzmán × Sabino</strong> (8.9 × 9.0)</td>
+</tr>
+<tr>
+<td>Sur</td>
+<td>—</td>
+<td><strong>120 m²</strong> a lo largo del sur de los locales, con remate en la esquina a Sabino</td>
+</tr>
+</tbody>
+</table>
+<h3>Norte: la esquina que recibe</h3>
+<ul>
+<li><strong>Quitar la espalda a la calle.</strong> La esquina NE hoy le da la espalda a la calle: dos muros ciegos y, detrás, la P2, que es un macizo. Se abre la esquina: el jardín queda en ella, visible desde las dos calles, abierto al cielo, con un borde-banca alrededor.</li>
+<li><strong>Dos accesos pegados al jardín</strong>, que funciona como gancho:<ul>
+<li><strong>N1b</strong> por Eulalia Guzmán, al oeste del jardín.</li>
+<li><strong>N4</strong> por Sabino, al sur del jardín.</li>
+<li>La N1 de la calle de las plantas se queda.</li>
+</ul>
+</li>
+<li><strong>La P2</strong> pierde esa esquina: pasa de 389 a 309 m².</li>
+<li><strong>El hueco del jardín viejo</strong> queda como piso bajo el hoyo: un pequeño foro frente a la gradería de la P2.</li>
+<li><strong>La lluvia:</strong> hoy el jardín se inunda con lo que entra por el hoyo. En la esquina abierta llueve directo, y además pueden bajar ahí los canalones de la cubierta norte. El hoyo puede quedarse como tragaluz.</li>
+</ul>
+<h3>Sur: el jardín que une las esquinas de los locales</h3>
+<ul>
+<li><strong>Franja de 2.2 × 40.7 m (90 m²).</strong> Ocupa la banda de macetas, de la plazuela de la vitrina (SO) a Sabino (SE). Corre pegada al frente sur de los locales, la parte que sientes con poca circulación.</li>
+<li><strong>Remate de 6.0 × 5.2 m (31 m²) en la esquina a Sabino</strong>, con celosía verde: le da fachada verde a la calle.</li>
+<li><strong>Total: 121 m².</strong> Toda la franja separa la descarga (vehículo, andén y servicio) del mercado. Sólo la cruza el paso de abasto (u 534.6–537.6).</li>
+<li><strong>Interpretación:</strong> entendí «dividirá el área de descarga» como «la separa del mercado». Si querías que el jardín parta la descarga misma (por ejemplo, entre la maniobra y el andén), dime.</li>
+</ul>
+<h2>2. Entradas vehiculares del estacionamiento</h2>
+<p><strong>Por qué no se veían:</strong> las bocas de las rampas sí vienen en el DWG de André (86 trazos de muros y carriles en planta baja) y el generador las guarda. Pero el visor no las dibujaba, y fuera de la página del estacionamiento oculta todo el estacionamiento porque está bajo el piso.</p>
+<p><strong>Ya se dibujan en todas las escenas</strong> (<code>atlampa-3d.js</code>, versión 20261012j):
+- el carril curvo desde la calle;
+- sus muros a 0.90;
+- la boca de cada helicoidal.</p>
+<p>Una entra por <strong>Eulalia Guzmán</strong> y otra por <strong>Clavel</strong>, las dos al <strong>oeste del predio</strong> (u ≈ 460–489), lejos de las naves. No chocan con la descarga del mercado, que está en Sabino.</p>
+<h2>3. Experimento: la estructura de vivienda en la nave norte</h2>
+<ul>
+<li><strong>La retícula.</strong> 17 columnas de vivienda bajan a piso dentro de la nave norte (bloques B1, B3 y B4). Siguen la retícula de <strong>11 × 8 girada −10°</strong>: medí 11.0 m entre líneas y 8.0 m entre columnas.<ul>
+<li>6 caen en el patio del aro.</li>
+<li>5 caen dentro de un local o de la fonda del jardín.</li>
+<li><strong>6 caen en circulación</strong>:<ul>
+<li>una en la calle de las plantas (537.05, 468.59);</li>
+<li>una al sur de esa calle (535.66, 460.71);</li>
+<li>una en la calle de la fila que abre afuera (527.61, 478.38);</li>
+<li>una en el arranque del arco (523.26, 453.76);</li>
+<li>dos junto a los baños (551.59, 424.39) y (552.98, 432.27).</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Lo que no funciona.</strong> Usar en la norte un cluster girado entero sobre esa retícula: no cabe ninguno. Las líneas de vivienda corren justo junto al muro oeste, por la calle de las plantas, por el arco y junto a los baños.</li>
+<li><strong>Lo que sí funciona: acomodar lo que pisa cada línea.</strong><ol>
+<li><strong>Línea B1-oeste.</strong> La fila que abre afuera, su calle de 3.00 y la isla bajo P1 se alinean a la línea: las tres columnas quedan en el muro de fondo, que es la regla de siempre (la columna nunca en un pasillo).</li>
+<li><strong>Línea B1-este.</strong> La calle de las plantas gira 10° y su orilla este es la línea de columnas: un pórtico con la pérgola de plantas. El borde oeste de la P2 sigue la misma línea.</li>
+<li><strong>Arranque del arco.</strong> Una banca-jardinera rodea la columna.</li>
+<li><strong>Junto a los baños.</strong> Un núcleo de servicio (bebedero, lockers, aseo) contiene las dos columnas.</li>
+</ol>
+</li>
+<li><strong>Resultado:</strong> las 6 columnas salen de la circulación.</li>
+<li><strong>Nave sur:</strong> no le baja ninguna columna de vivienda. Su retícula para los clusters (9.0 × 6.6) se queda.</li>
+<li><strong>Siguiente paso:</strong> cuando corramos los clusters, la norte usaría la retícula de vivienda en esas cuatro franjas y la de la nave en lo demás.</li>
+</ul>
+<h2>4. Lo que necesito que decidas</h2>
+<ol>
+<li><strong>Esquina NE abierta al cielo</strong>, sin cubierta sobre el jardín: ¿sí? ¿O prefieres el jardín bajo un tragaluz?</li>
+<li><strong>Jardín sur:</strong> ¿franja de 2.2 con remate en la esquina, o un solo jardín más compacto en la esquina SE?</li>
+<li><strong>Calle de las plantas girada 10°</strong> con pórtico de columnas de vivienda: ¿te late, o mejor la dejamos recta y las dos columnas se vuelven jardineras al borde?</li>
+</ol>
+<hr />
+<h2>5. Lo que decidiste y cómo queda (lámina <a href="propuesta_esquinas.png">propuesta_esquinas.png</a>)</h2>
+<p>«Las columnas de la estructura deben regir todo» se aplica así:
+- En la norte manda la retícula de vivienda: 11 × 8, girada −10°.
+- En la sur manda la de la nave y la PA: valles, cumbres y postes cada 6.6.</p>
+<h3>Esquina NE: parte abierta y alero</h3>
+<p><strong>El jardín</strong> queda definido por la estructura: su orilla interior son dos líneas de la retícula de vivienda que pasan por columnas, la línea de B3-2 y la de la red de B1. Mide <strong>82 m²</strong>, de u 549.3–557.7 por v 473.2–484.6.</p>
+<p><strong>Parte abierta y alero.</strong>
+- Junto a las dos calles, la esquina queda abierta al cielo y a la calle, sin muros en esa parte. Hacia adentro, la cubierta se queda como alero.
+- El ancho del alero se calculó con la altura real de la cubierta: baja de +9.2 en la cumbrera a +6.6 junto a Sabino. Así, la lluvia que entra inclinada por la abertura cae dentro del jardín (a −1.30) y no en el piso de +0.40.</p>
+<table>
+<thead>
+<tr>
+<th>Lluvia (desde la vertical)</th>
+<th>Alero (con 0.50 de holgura)</th>
+<th>Abierto al cielo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>20° (el mismo supuesto con que se dimensionó el jardín del hoyo)</td>
+<td>3.30 m</td>
+<td>31 m²</td>
+</tr>
+<tr>
+<td>30° (más viento)</td>
+<td>4.70 m</td>
+<td>16 m²</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Por las fachadas abiertas.</strong>
+- La lluvia a 20° entra 3.2 m bajo la cubierta del lado norte y 2.2 m del lado este. A 30°, entra 5.0 y 3.6 m.
+- En los dos casos cae dentro del jardín, que mide 6.7–11.5 m de fondo.</p>
+<p><strong>Límite.</strong> «En ningún ángulo» no se logra sólo con geometría: la lluvia casi horizontal entra siempre. Para esos días propongo una celosía o persiana en las dos fachadas de la esquina, a partir de +2.5, que deje pasar la vista y el aire.</p>
+<p><strong>Accesos:</strong> N1b por Eulalia Guzmán y N4 por Sabino, pegados al jardín.</p>
+<h3>Esquina SE: sale del predio y remata adentro</h3>
+<ul>
+<li>Ahora se apoya en la retícula de la sur:<ul>
+<li><strong>franja</strong> de 2.2 del valle (u 522.6) a la cumbre (u 549.5): 59 m²;</li>
+<li><strong>esquina</strong> de la cumbre al muro de Sabino, hasta la línea de postes v 344.0: 55 m²;</li>
+<li><strong>jardinera en la banqueta</strong> de 1.30 frente a la esquina: 8 m².</li>
+</ul>
+</li>
+<li><strong>Total: 123 m².</strong></li>
+<li><strong>Remates:</strong><ul>
+<li>el jardín sale a la calle por la esquina, y la celosía verde queda en el muro;</li>
+<li><strong>remata adentro</strong> en el valle, con un árbol y agua;</li>
+<li>el paso de abasto lo cruza.</li>
+</ul>
+</li>
+<li><strong>Pendiente:</strong> confirmar el ancho de la banqueta de Sabino, porque la jardinera debe dejar ≥ 1.20 libres.</li>
+<li><strong>Opción:</strong> si quieres que llegue hasta la plazuela de la vitrina, la franja se alarga a la cumbre u 513.5: +20 m², 143 en total.</li>
+</ul>
+<h3>Siguiente</h3>
+<p>Cuando digas, paso todo esto al generador. Hasta entonces el mercado sigue sin cambios.</p>
+</main>
+</body>
+</html>

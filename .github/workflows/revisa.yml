@@ -1,0 +1,27 @@
+# Corre herramientas/revisa.py en cada pull request y en cada push a master.
+# Si sale en rojo, el detalle dice qué archivo arreglar (es lo mismo que correrlo en tu máquina).
+name: Revisión
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  revisa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # para comparar contra la rama base (¿subió V?)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Revisa
+        env:
+          BASE: ${{ github.base_ref }}
+        run: python herramientas/revisa.py ${BASE:+--base origin/$BASE}
