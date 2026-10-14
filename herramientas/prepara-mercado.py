@@ -1493,7 +1493,7 @@ SUR = {
     # (2026-10-12, Gabriel: «toda la potencia a los baños»): un muro ciego de lado a lado de la nave delimita la franja de
     # servicios de la PA; un solo vano: a la derecha (oeste) los baños públicos, a la izquierda (este) la circulación
     # vertical de servicio (escalera y montacargas) y los baños y vestidores de locatarios.
-    'muro_ciego': (505.2, 338.2, 558.1, 338.45), 'vano': (525.0, 527.4), 'muro_alto': 3.6, 'vano_alto': 2.7,
+    'muro_ciego': (505.2, 338.2, 558.1, 338.45), 'vano': (525.0, 527.4), 'muro_alto': 3.3, 'vano_alto': 2.7,   # (3.60 → 3.30 el 2026-10-13: la cubierta baja a +7.60)
     'vestibulo': (505.2, 335.8, 543.0, 338.2),      # pasillo detrás del muro, del vano a cada lado
     # (2026-10-12, Gabriel: «los baños están algo grandes»): una franja de 4.10 libres a lo largo del vestíbulo (el módulo de
     # baños de la nave norte) con mujeres, hombres, familiar accesible, lactario, primeros auxilios y aseo; atrás, sólo desde
@@ -3044,11 +3044,15 @@ def jardin_inundable(S, L, g, z_borde, k_pared, k_agua, k_junco, arboles, rng, n
 #   · CANAL (costados arriba, doblez abajo): la lluvia baja por en medio hasta el valle, lejos del vidrio del vecino;
 #   · LOMO (doblez arriba): sólo el que no tiene vecino más alto en su fila y sí alguno más bajo; el agua se va a los
 #     costados, a los techos de junto.
-# La silueta completa sube 1.70 (alero +7.90 en vez de +6.20) para dejar ≥ 3.00 libres sobre la PA (+4.28) en su punto
-# más bajo (el doblez de un canal en el valle). El módulo más alto vuela sobre el de junto lo que pide la lluvia a
-# LLUVIA_ANG para que no le llegue al vidrio del escalón; en los valles, donde el agua sí llega al escalón, el pie del
-# escalón es lámina (pretil) sobre el canalón.
-CUBIERTA_SUR = {'valle': 7.90, 'subida': 3.00, 'escalon': 1.00, 'doblez': 0.40, 'canto': 0.20, 'pretil': 0.30}
+# El módulo más alto vuela sobre el de junto lo que pide la lluvia a LLUVIA_ANG para que no le llegue al vidrio del
+# escalón; en los valles, donde el agua sí llega al escalón, el pie del escalón es lámina (pretil) sobre el canalón.
+# 2026-10-13 (Gabriel: «las cubiertas chocan con los primeros módulos de vivienda … hazlos más pequeños, con menor
+# altura, o menos empinado el doblez»): la vivienda (LRFD v2) tapa 716 m² de la nave por el oeste y su entrepiso empieza
+# a +10.24; abajo mandan los 3.00 libres sobre la PA (+4.28) y los amarres de la vivienda (+7.24…+7.55). Toda la cubierta
+# cabe en esa franja: lo más bajo (cara de abajo del doblez de un canal en el valle) a +7.60, lo más alto (lomo de un
+# alto en la cumbrera) a +9.90, 0.34 bajo el entrepiso. Para eso bajan las dos cosas: escalones de 0.50 (antes 1.00) y
+# las aguas a 0.80 en media crujía (≈ 9 %, antes 3.00 = 1:3); el doblez y el pretil a la mitad.
+CUBIERTA_SUR = {'valle': 7.95, 'subida': 0.80, 'escalon': 0.50, 'doblez': 0.15, 'canto': 0.20, 'pretil': 0.15}
 NIV_SUR = {'bajo': 0, 'medio': 1, 'alto': 2}
 CUB_SUR = {}   # lo llena mercado_sur: triángulos y líneas de la cubierta (opaca) y del vidrio, para main()
 

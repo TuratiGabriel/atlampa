@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261014c'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261014d'      # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',

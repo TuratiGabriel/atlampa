@@ -1470,10 +1470,19 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   // La estructura de acero de la vivienda (ponerestructura_LRFD_v2.3dm, por herramientas/prepara-estructura.py):
   // cada miembro como caja de aristas, de su eje y su sección (ancho horizontal, peralte ⟂ al eje; en las columnas el
   // ancho va en el eje u de la retícula girada). Con ella no se dibujan las columnas del PDF. Sólo en la capa Estructura.
+  // (2026-10-13, Gabriel: «hazla superficie para que no se vea lo de atrás»): miembros y losas también con caras opacas;
+  // los volúmenes de escalera siguen sólo en aristas (taparían el acero de su núcleo).
   const gEstr = pieza('estructura-acero', 'paisajismo', 0.5);
   gEstr.userData.capa = 'estructura';
   if (ESTR) {
-    const aristasCaja = (l, c0, c1) => { l.poli(c0, true); l.poli(c1, true); for (let i = 0; i < 4; i++) l.seg(c0[i], c1[i]); };
+    let caras = null;   // la malla de las caras (sólo la primera vez: va a la CACHE)
+    const carasCaja = (c0, c1) => {
+      if (!caras) return;
+      caras.quad(c0[0], c0[3], c0[2], c0[1]); caras.quad(c1[0], c1[1], c1[2], c1[3]);
+      for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; caras.quad(c0[i], c0[j], c1[j], c1[i]); }
+    };
+    // (f0, f1: las caras, si no van en las aristas)
+    const aristasCaja = (l, c0, c1, f0, f1) => { l.poli(c0, true); l.poli(c1, true); for (let i = 0; i < 4; i++) l.seg(c0[i], c1[i]); if (l !== lin.cubos) carasCaja(f0 || c0, f1 || c1); };
     const esq = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
     const miembroCaja = (l, m) => {
       let a = [m[3] - m[0], m[4] - m[1], m[5] - m[2]]; const L = Math.hypot(a[0], a[1], a[2]); if (L < 1e-6) return;
@@ -1489,8 +1498,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       aristasCaja(l, C([m[0], m[1], m[2]]), C([m[3], m[4], m[5]]));
     };
     const cajaGirada = (l, u, v, z0, z1, du, dv) => {
-      const P = z => esq.map(q => W(u + MEX[0] * q[0] * du / 2 + MEY[0] * q[1] * dv / 2, v + MEX[1] * q[0] * du / 2 + MEY[1] * q[1] * dv / 2, z));
-      aristasCaja(l, P(z0), P(z1));
+      const P = (z, e) => esq.map(q => W(u + MEX[0] * q[0] * (du / 2 - e) + MEY[0] * q[1] * (dv / 2 - e), v + MEX[1] * q[0] * (du / 2 - e) + MEY[1] * q[1] * (dv / 2 - e), z));
+      // las caras de la losa, 1 cm adentro: su cara de arriba es la del entrepiso de los módulos (no pelean)
+      aristasCaja(l, P(z0, 0), P(z1, 0), P(z0 + 0.01, 0.01), P(z1 - 0.01, 0.01));
     };
     const GRUPOS = {   // [nombre, color, tipos]
       columnas: ['estr-columnas', 0xffffff, ['columna', 'cubo_columna']],
@@ -1501,11 +1511,14 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     };
     const lin = { losas: new Lineas(), cubos: new Lineas() };
     Object.keys(GRUPOS).forEach(k => { lin[k] = new Lineas(); });
+    if (!CACHE.has('estructura-caras')) caras = new Malla();
     Object.values(ESTR.bloques).forEach(b => {
       Object.keys(GRUPOS).forEach(k => GRUPOS[k][2].forEach(t => (b.miembros[t] || []).forEach(m => miembroCaja(lin[k], m))));
       (b.losas || []).forEach(r => cajaGirada(lin.losas, r[0], r[1], r[2], r[3], r[4], r[5]));
       (b.cubos || []).forEach(r => cajaGirada(lin.cubos, r[1], r[2], r[3], r[4], r[5], r[6]));
     });
+    // las caras: opacas, del color del fondo (como todo volumen); inspeccionando la estructura se quedan (estr)
+    ponGeos(gEstr, fija('estructura-caras', () => geos(caras, 'proyecto', false)), 'proyecto', null, true);
     Object.keys(GRUPOS).forEach(k => ponLineas(gEstr, lin[k], GRUPOS[k][0], GRUPOS[k][1], null, null));
     ponLineas(gEstr, lin.losas, 'estr-losas', 0x6f7a82, null, null);
     ponLineas(gEstr, lin.cubos, 'estr-cubos', 0xffffff, null, null);
