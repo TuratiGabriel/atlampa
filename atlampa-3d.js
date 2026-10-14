@@ -1505,7 +1505,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   /* ===== 9. Estacionamiento: en rayos X (se ve a través del piso) ===== */
   const gEst = pieza('estacionamiento', 'estacionamiento', 0.05);
-  let estNivel = 0;
+  let estNivel = 0, elevTope = 0;   // elevTope: hasta dónde suben los elevadores (para el encuadre)
   const estLineas = [], estRampas = [];
   if (EST) {
     const N = EST.sotanos, e = EST.entrepiso, xray = {};
@@ -1513,7 +1513,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const l = new Lineas(), z = -k * e;
       EST.bloques.forEach(b => {
         l.poli(G.pares(b.planta).map(q => W(q[0], q[1], z)), true);
-        if (ESC === 'estacionamiento') b.cajones.forEach(c => l.poli(rect(c[0], c[1], c[2], c[3]).map(q => W(q[0], q[1], z)), true));
+        if (ESC === 'estacionamiento') b.cajones.forEach(c => l.poli((c.length === 8 ? G.pares(c) : rect(c[0], c[1], c[2], c[3])).map(q => W(q[0], q[1], z)), true));
       });
       const ob = ponLineas(gEst, l, 'est-' + k, 0xffffff, PROGRAMA.est, 'estacionamiento', xray);
       if (ob) estLineas.push(ob);
@@ -1547,6 +1547,31 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       pon(g, m, 'rampa', 'estacionamiento', false);
       ponLineas(g, lr, 'rampa-borde', 0xffffff, PROGRAMA.est, 'estacionamiento');
       estRampas.push(g);
+    }
+    /* Elevadores: el desplante del CAD (EST.elevadores) sube desde el último sótano, cruza todo el conjunto hasta el nivel
+       más alto del edificio (la azotea: la losa de entrepiso de la estructura, si está, o la tapa del último nivel de los
+       módulos) y, encima, su espacio reglamentario (EST.espacioElevador: SUPUESTO sin verificar, ver prepara-estacionamiento.py). */
+    if (EST.elevadores && EST.elevadores.length) {
+      const paso = MOD ? (MOD.paso || MOD.alto) : 3, nMax = MOD ? Math.max(...MOD.cajas.map(q => q[2])) : 7, ES = window.ATLAMPA_ESTRUCTURA;
+      const zMod = MOD ? MOD.z0 + nMax * paso + MOD.alto : 24, zLosa = ES && ES.entrepiso && ES.entrepiso.length ? Math.max(...ES.entrepiso.map(q => q[1])) : 0;
+      const zTope = Math.max(zMod, zLosa), zEsp = zTope + (EST.espacioElevador || 0), fondo = -N * e;
+      const niveles = [fondo];
+      for (let k = N - 1; k >= 1; k--) niveles.push(-k * e);
+      niveles.push(0.2);
+      if (MOD) for (let k = 0; k <= nMax; k++) niveles.push(MOD.z0 + k * paso);
+      niveles.push(zTope);
+      const ls = new Lineas(), le = new Lineas();
+      EST.elevadores.forEach(el => {
+        const pol = G.pares(el.pol);
+        niveles.forEach(z => ls.poli(pol.map(q => W(q[0], q[1], z)), true));
+        pol.forEach(q => { ls.seg(W(q[0], q[1], fondo), W(q[0], q[1], zTope)); le.seg(W(q[0], q[1], zTope), W(q[0], q[1], zEsp)); });
+        le.poli(pol.map(q => W(q[0], q[1], zEsp)), true);
+        le.seg(W(pol[0][0], pol[0][1], zEsp), W(pol[2][0], pol[2][1], zEsp)); le.seg(W(pol[1][0], pol[1][1], zEsp), W(pol[3][0], pol[3][1], zEsp));   // la tapa del espacio, en X
+        le.seg(W(pol[0][0], pol[0][1], zTope), W(pol[2][0], pol[2][1], zEsp)); le.seg(W(pol[1][0], pol[1][1], zTope), W(pol[3][0], pol[3][1], zEsp));   // y diagonales: se lee como volumen distinto del cubo
+      });
+      ponLineas(gEst, ls, 'elevador', 0xffffff, PROGRAMA.est, 'estacionamiento');
+      ponLineas(gEst, le, 'elevador-espacio', 0xf2a33a, '#f2a33a', 'estacionamiento');
+      elevTope = zEsp;
     }
   }
 
@@ -2325,7 +2350,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   function cajaAp(ap) {
     const us = [], vs = []; let z0 = 0, z1 = 10;
     const mete = q => { us.push(q[0]); vs.push(q[1]); };
-    if (ap === 'estacionamiento' && EST) { EST.bloques.forEach(b => G.pares(b.planta).forEach(mete)); z0 = -EST.sotanos * EST.entrepiso; z1 = 0; }
+    if (ap === 'estacionamiento' && EST) { EST.bloques.forEach(b => G.pares(b.planta).forEach(mete)); z0 = -EST.sotanos * EST.entrepiso; z1 = elevTope; }
     else if (ap === 'comercio') { G.NAVES.forEach(nv => { mete([nv.L.u0, nv.L.v0]); mete([nv.L.u1, nv.L.v1]); }); if (MERC) MERC.naves.forEach(h => { mete([h[0], h[1]]); mete([h[2], h[3]]); }); z1 = 9; }
     else if (ap === 'industria' && MOD && MOD.industria) { G.pares(MOD.industria.planta).forEach(mete); z1 = MOD.industria.z1; }
     else if (ap === 'cultura') { [[PLAZA_C.u0, PLAZA_C.v0], [PLAZA_C.u1, PLAZA_C.v1]].forEach(mete); mete([ANILLO.u - ANILLO.re, ANILLO.v - ANILLO.re]); z1 = ANILLO.z; }
