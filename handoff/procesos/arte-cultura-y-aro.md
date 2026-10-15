@@ -56,6 +56,8 @@
   tramo; el barandal va sobre la zanca. La losa deja 10 cm de holgura a los lados del tramo (boca de ±0.70), para que la zanca
   no quede incrustada en el canto de la losa.
 
+- Hoja (v28): la cinta se dibuja con su ancho real (de 0 a 2 m en la transición, `banda`) y su arranque va a nivel del aro (antes caía a la cota del final por un redondeo de 0.005° en el ángulo). Su barandal de afuera sigue al del aro; el de adentro y el del borde cortado del aro aparecen sólo donde la cinta ya bajó más de 0.30, como en el visor.
+
 ## Aro
 - Círculo con centro (505.75, 409.05), losa con r ≈ 39.5–46.55, piso a +10.03 (Rhino 9.92), 33 columnas.
 - **El aro y arte y cultura son uno:** el aro se ensancha sobre la azotea de cultura (`G.ponPlataforma(CD.azotea)`, tablas EXT/INT
