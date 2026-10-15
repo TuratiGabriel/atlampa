@@ -1318,6 +1318,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const R = t => [G.aroPunto(t, ANILLO.ri), G.aroPunto(t, ANILLO.re)];
     const P = (t, r) => [ANILLO.u + Math.cos(t * RAD) * r, ANILLO.v + Math.sin(t * RAD) * r];
     let antes = null;
+    const cabos = [[], []];   // por borde (adentro, afuera): cada tramo y si va abierto
     ts.forEach((t, k) => {
       const t2 = k + 1 < ts.length ? ts[k + 1] : ts[0] + 360;
       if (t2 - t < 1e-6) return;
@@ -1335,9 +1336,18 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       // sólo donde la cinta ya bajó más de 0.30 (antes es el mismo piso)
       // (2026-10-14) donde llegan las escaleras de arte y cultura (X3, X6) el barandal se abre
       const abierto = (p, q) => !!CD && !!CD.aberturas && CD.aberturas.some(P => G.dentro((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, P));
-      if (!abierto(a, b)) ln.seg(W(a[0], a[1], zb), W(b[0], b[1], zb));
-      if ((!cin || z1 - zCinta((t + t2) / 2) > 0.3) && !abierto(A, B)) ln.seg(W(A[0], A[1], zb), W(B[0], B[1], zb));
+      const oi = abierto(a, b), oe = abierto(A, B);
+      if (!oi) ln.seg(W(a[0], a[1], zb), W(b[0], b[1], zb));
+      if ((!cin || z1 - zCinta((t + t2) / 2) > 0.3) && !oe) ln.seg(W(A[0], A[1], zb), W(B[0], B[1], zb));
+      cabos[0].push({ p: a, o: oi }); cabos[1].push({ p: A, o: oe });
     });
+    // (2026-10-14, v26) donde el barandal del aro se abre para una escalera, su cabo se une con el final del barandal
+    // de la escalera (CD.bocas), el más cercano y a menos de 0.6 m: así no queda cortado y nunca cruza la escalera
+    if (CD && CD.bocas) for (const S of cabos) for (let i = 0; i < S.length; i++) {
+      const s = S[i], prev = S[(i - 1 + S.length) % S.length]; if (s.o === prev.o) continue;
+      let b = null, bd = 0.6; for (const q of CD.bocas) { const dd = Math.hypot(q[0] - s.p[0], q[1] - s.p[1]); if (dd < bd) { bd = dd; b = q; } }
+      if (b && bd > 0.03) ln.seg(W(s.p[0], s.p[1], zb), W(b[0], b[1], z1 + 0.95));
+    }
     // balaustres cada 2.4 m a lo largo de cada borde
     [r => R(r)[0], r => R(r)[1]].forEach((borde, lado) => {
       let d = 0, q = null;

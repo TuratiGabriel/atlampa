@@ -39,6 +39,16 @@
 - Cinta: nace a nivel como la franja de afuera del aro (mismo borde y mismo barandal) y en 18 m se ensancha y se separa antes de bajar;
   ya no tiene tapa al arrancar.
 
+## v26 (2026-10-14): bocas de escalera limpias
+- Algunas uniones tomaban el barandal del otro lado y cruzaban la escalera: la losa no quedaba de frente a la boca (la cortaba en
+  diagonal). Ahora, con geometría exacta (GEOS de QGIS, `bocas.py` en el flujo de la hoja), cada losa recibe un descanso de 1.5 m
+  frente a cada boca (y frente al primer escalón donde sale una escalera) y se le resta el tramo que llega: su orilla es justo el
+  último escalón. X6 sale de N2 casi en el aire: ahí la losa se recorta a lo largo del carril y su orilla queda al lado del tramo.
+- El barandal de la losa se abre sólo en la boca (dentro del ancho del carril, `xStairGap`); las orillas a los lados del tramo lo
+  conservan. Las uniones (`xStairJoins`) van sólo al barandal del mismo lado del carril y a menos de 0.8 m; nunca cruzan.
+- Aro del visor: la abertura de X3/X6 es más justa (−0.15 a 3 m, ±0.61) y cada cabo del barandal del aro se une con el final del
+  barandal de la escalera (`CD.bocas`, en `atlampa-3d.js`).
+
 ## Aro
 - Círculo con centro (505.75, 409.05), losa con r ≈ 39.5–46.55, piso a +10.03 (Rhino 9.92), 33 columnas.
 - **El aro y arte y cultura son uno:** el aro se ensancha sobre la azotea de cultura (`G.ponPlataforma(CD.azotea)`, tablas EXT/INT
