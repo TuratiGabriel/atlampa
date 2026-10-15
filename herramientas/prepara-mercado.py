@@ -2045,6 +2045,9 @@ def cinta_aro():
     ri0, re0 = ARO_RE - CINTA['ancho'], ARO_RE
     rc = (ri0 + re0) / 2
     perfil, s, z = [(0.0, ARO_Z)], 0.0, ARO_Z
+    T = CINTA['transicion']
+    # (2026-10-14) transición a nivel: la franja de afuera del aro se va separando sin bajar; ahí no hay escalón ni barandal entre los dos
+    s += T; perfil.append((s, z))
     pendientes = []
 
     def baja(dz):
@@ -2075,17 +2078,17 @@ def cinta_aro():
     th = lambda s: th0 + math.degrees(s / rc)
     th_fin = th(Ltot)
     sm = lambda x: 0.0 if x <= 0 else 1.0 if x >= 1 else x * x * (3 - 2 * x)
-    T = CINTA['transicion']
 
-    # la cinta: a un lado del aro al arrancar, y se mete bajo el corte conforme baja; se hace a un lado de las columnas de la vivienda
+    # la cinta nace como la franja de afuera del aro (mismo borde de afuera, mismo barandal) y se ensancha hasta 2 m en la transición;
+    # se hace a un lado de las columnas de la vivienda
     def esquiva(t):
         return sum(dr * math.cos(math.pi / 2 * (t - tc) / w) ** 2 for tc, dr, w in CINTA['esquiva'] if abs(t - tc) < w)
 
-    def ri(x):
-        return ri0 + CINTA['ancho'] * (1 - sm(x / T)) + esquiva(th(x))
-
     def re(x):
-        return ri(x) + CINTA['ancho']
+        return re0 + esquiva(th(x))
+
+    def ri(x):
+        return re(x) - CINTA['ancho'] * sm(x / T)
 
     # cuánto se corta el aro en el ángulo t (0 donde la cinta se une al aro, 2 m en el tramo, y se cierra al final)
     T_deg = math.degrees(T / rc)
@@ -2116,7 +2119,7 @@ def cinta_aro():
             A, B, C, D = P(t0, r0_, z0 - ARO_CANTO), P(t1, r1_, z1 - ARO_CANTO), P(t1, r1_, z1), P(t0, r0_, z0)
             tris += [(A, B, C), (A, C, D)]
             lins += [(P(t0, r0_, z0), P(t1, r1_, z1)), (P(t0, r0_, z0 - ARO_CANTO), P(t1, r1_, z1 - ARO_CANTO))]
-    for s0 in (0.0, Ltot):   # tapas
+    for s0 in (Ltot,):   # tapa del final (al arrancar la cinta mide cero: no lleva)
         t, zz = th(s0), z_en(s0)
         A, B, C, D = P(t, ri(s0), zz - ARO_CANTO), P(t, re(s0), zz - ARO_CANTO), P(t, re(s0), zz), P(t, ri(s0), zz)
         tris += [(A, B, C), (A, C, D)]

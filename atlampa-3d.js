@@ -1333,8 +1333,10 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       antes = cin;
       // barandal (pasamanos) por los dos bordes; en el tramo angosto, en el borde nuevo
       // sólo donde la cinta ya bajó más de 0.30 (antes es el mismo piso)
-      ln.seg(W(a[0], a[1], zb), W(b[0], b[1], zb));
-      if (!cin || z1 - zCinta((t + t2) / 2) > 0.3) ln.seg(W(A[0], A[1], zb), W(B[0], B[1], zb));
+      // (2026-10-14) donde llegan las escaleras de arte y cultura (X3, X6) el barandal se abre
+      const abierto = (p, q) => !!CD && !!CD.aberturas && CD.aberturas.some(P => G.dentro((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, P));
+      if (!abierto(a, b)) ln.seg(W(a[0], a[1], zb), W(b[0], b[1], zb));
+      if ((!cin || z1 - zCinta((t + t2) / 2) > 0.3) && !abierto(A, B)) ln.seg(W(A[0], A[1], zb), W(B[0], B[1], zb));
     });
     // balaustres cada 2.4 m a lo largo de cada borde
     [r => R(r)[0], r => R(r)[1]].forEach((borde, lado) => {
@@ -1342,7 +1344,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       for (let i = 0; i <= 1440; i++) {
         const t = i / 4, b0 = borde(t), cin = lado === 1 && enCinta(t), c = lado === 1 ? corteEn(t) : 0, p = c > 1e-3 && Math.hypot(b0[0] - ANILLO.u, b0[1] - ANILLO.v) <= ANILLO.re + 0.01 ? P(t, ANILLO.re - c) : b0;
         if (q) d -= Math.hypot(p[0] - q[0], p[1] - q[1]);
-        if (d <= 0 && (!cin || z1 - zCinta(t) > 0.3)) { ln.seg(W(p[0], p[1], z1), W(p[0], p[1], zb)); d += 2.4; }
+        if (d <= 0 && (!cin || z1 - zCinta(t) > 0.3) && !(CD && CD.aberturas && CD.aberturas.some(P => G.dentro(p[0], p[1], P)))) { ln.seg(W(p[0], p[1], z1), W(p[0], p[1], zb)); d += 2.4; }
         q = p;
       }
     });

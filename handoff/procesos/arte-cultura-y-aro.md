@@ -32,6 +32,13 @@
 - Azotea: el café pasó a (−8,15), fuera de la pista; se quitó la isla de estar de ahí y los árboles de las islas.
 - La vivienda de la hoja ya sale de `atlampa-modulos.js` (+10.84 en el visor, 2.70 cada 3.30).
 
+## v25 (2026-10-14): escaleras y barandales sin cruces
+- Las losas ya no se montan sobre los últimos escalones: los descansos crecen sólo desde el extremo de la escalera hacia afuera.
+- El barandal de cada plataforma (y el del aro en X3 y X6) se abre justo en el ancho del carril que llega o sale (xStairGap) y un tramo
+  corto lo une con el barandal de la escalera. Las zancas de adentro van dentro de su carril (no invaden el tramo vecino).
+- Cinta: nace a nivel como la franja de afuera del aro (mismo borde y mismo barandal) y en 18 m se ensancha y se separa antes de bajar;
+  ya no tiene tapa al arrancar.
+
 ## Aro
 - Círculo con centro (505.75, 409.05), losa con r ≈ 39.5–46.55, piso a +10.03 (Rhino 9.92), 33 columnas.
 - **El aro y arte y cultura son uno:** el aro se ensancha sobre la azotea de cultura (`G.ponPlataforma(CD.azotea)`, tablas EXT/INT

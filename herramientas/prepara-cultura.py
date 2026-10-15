@@ -105,9 +105,21 @@ function xStair(st, laneFn, Rc) {
     for (let i = 0; i + 1 < s.length; i++) for (let j = 0; j < 4; j++) quad(P(s[i], prof[j]), P(s[i], prof[(j + 1) % 4]), P(s[i + 1], prof[(j + 1) % 4]), P(s[i + 1], prof[j]));
     for (const q of [s[0], s[s.length - 1]]) quad(P(q, prof[0]), P(q, prof[1]), P(q, prof[2]), P(q, prof[3]));
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g; };
-  for (const s of out.rails) out.strings.push(zanca(s));
-  out.strings.push(zanca(path(0, st.a0, la, .63 * sg)), zanca(path(0, lb, st.a1, .63 * sg)));
+  // zancas: las de afuera en la orilla; las de adentro, cada una dentro de su carril (no invaden el tramo vecino)
+  out.strings.push(zanca(path(0, st.a0, st.a1, -.6 * sg)), zanca(path(1, st.a0, st.a1, .6 * sg)), zanca(path(1, st.a0, la, -.57 * sg)), zanca(path(1, lb, st.a1, -.57 * sg)), zanca(path(0, st.a0, la, .57 * sg)), zanca(path(0, lb, st.a1, .57 * sg)));
   return out;
+}
+
+// dónde se abre el barandal de una plataforma a la altura z: en el ancho del carril que llega o sale ahí (carril 1 arriba, carril 0 abajo),
+// desde 0.3 m antes del extremo hasta 3 m tramo adentro
+function xStairGap(st, Rc, C) {
+  const am = (st.a0 + st.a1) / 2;
+  const loc = (x, y) => { if (st.ring) { const r = Math.hypot(x - C[0], y - C[1]), t = (Math.atan2(y - C[1], x - C[0]) / deg + 360) % 360; return [t, r - Rc(t)]; }
+    const r = Math.hypot(x - st.c[0], y - st.c[1]), b = (Math.atan2(y - st.c[1], x - st.c[0]) / deg + 360) % 360; return [b, r]; };
+  const rr = k => st.ring ? Rc(am) + st.lanes[k] : st.lanes[k];
+  return (x, y, z) => { const k = Math.abs(z - st.z1) < .05 ? 1 : Math.abs(z - st.z0) < .05 ? 0 : -1; if (k < 0) return false;
+    const [t, o] = loc(x, y); if (Math.abs(o - st.lanes[k]) > .62) return false;
+    return [st.a0, st.a1].some(e => { const into = (t - e) * Math.sign(am - e) * rr(k) * deg; return into > -.3 && into < 3; }); };
 }
 export function construye() {
   const P = { losa: [], modulo: [], nucleo: [], acero: [], aro: [], escalera: [], auditorio: [], muro: [], mueble: [] }, L = { parteluz: [], huella: [], borde: [], vidrio: [] };
@@ -128,7 +140,21 @@ export function construye() {
     const b = beamsUnder(Q, top - LV.slab); if (b) P.acero.push(b);
   }
   for (const [E, z0, z1] of [[D.E1, LV.N1, LV.N2 - LV.slab], [D.E2, LV.N2, LV.RF - LV.slab]]) L.parteluz.push(mullions(E, z0, z1, 2.75));
-  for (const [Q, z] of [[D.N1, LV.N1], [D.N2, LV.N2]]) L.borde.push(new THREE.BufferGeometry().setFromPoints(Q.concat([Q[0]]).flatMap((p, i, a) => i ? [new THREE.Vector3(a[i - 1][0], z + 1, -a[i - 1][1]), new THREE.Vector3(p[0], z + 1, -p[1])] : [])));
+  // barandal de las plataformas (línea a +1.00): se abre justo en el ancho de cada carril que llega o sale
+  const GAPS = D.stairs.map(st => xStairGap(st, AC.Rc, C));
+  const FIN = {};
+  const bordeCon = (Q, z) => { const pos = [], P = Q.concat([Q[0]]);
+    for (let i = 0; i + 1 < P.length; i++) { const a = P[i], b = P[i + 1], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / .15));
+      for (let k = 0; k < n; k++) { const p = [a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n], q = [a[0] + (b[0] - a[0]) * (k + 1) / n, a[1] + (b[1] - a[1]) * (k + 1) / n];
+        if (GAPS.some(f => f((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, z))) continue; pos.push(p[0], z + 1, -p[1], q[0], z + 1, -q[1]); (FIN[z] = FIN[z] || []).push(p, q); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); return g; };
+  for (const [Q, z] of [[D.N1, LV.N1], [D.N2, LV.N2]]) L.borde.push(bordeCon(Q, z));
+  // uniones con los barandales de las escaleras: del final de cada uno (en su llegada) al extremo más cercano del de la plataforma
+  for (const st of D.stairs) { if (Math.abs(st.z1 - LV.RF) < .05) continue; const E = FIN[st.z1] || [], pos = [];
+    for (const r of xStair(st, AC.laneFn, AC.Rc).rails) for (const q of [r[0], r[r.length - 1]]) { if (Math.abs(q.z - st.z1) > .05) continue; let b = null, bd = 1.6;
+      for (const p of E) { const dd = Math.hypot(p[0] - q.p[0], p[1] - q.p[1]); if (dd < bd) { bd = dd; b = p; } }
+      if (b && bd > .03) pos.push(q.p[0], st.z1 + 1, -q.p[1], b[0], st.z1 + 1, -b[1]); }
+    if (pos.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); L.borde.push(g); } }
   // módulos como cajas (vista general); en el apartado de arte y cultura se ven por dentro (muros, vidrios y mobiliario de D.int)
   const zOf = { PIT: LV.PIT, PB: 0, N1: LV.N1, N2: LV.N2, RF: LV.RF };
   for (const m of D.mods) { const z0 = zOf[m.lv], h = m.u === 'ban0' ? .45 : LV.mod; (m.u === 'core' ? P.nucleo : P.modulo).push(boxFrom(m.P, z0, z0 + h)); }
@@ -157,7 +183,13 @@ export function construye() {
   const pisa = [enDiagrama(D.BOWL)].concat(D.mods.filter(m => m.lv === 'PB' || m.lv === 'PIT').map(m => enDiagrama(m.P)));
   // columnas de la retícula, para el mapa Nolli
   const cols = D.cols.map(c => [c.x + DX, c.y + DY]);
-  return { mallas, lineas, pisa, losa1: enDiagrama(D.N1), azotea: enDiagrama(D.RFg || D.RF), cols };
+  const aberturas = [];
+  for (const st of D.stairs.filter(st => Math.abs(st.z1 - LV.RF) < .05)) { const am = (st.a0 + st.a1) / 2, l = st.lanes[1], rr = st.ring ? AC.Rc(am) + l : l;
+    const pt = (t, o) => st.ring ? AC.ringP(t, o) : [st.c[0] + o * Math.cos(t * deg), st.c[1] + o * Math.sin(t * deg)];
+    for (const e of [st.a0, st.a1]) { const d = Math.sign(am - e), t0 = e - d * .3 / rr / deg, t1 = e + d * 3 / rr / deg, A = [], B = [];
+      for (let k = 0; k <= 8; k++) { const t = t0 + (t1 - t0) * k / 8; A.push(pt(t, l + .62)); B.push(pt(t, l - .62)); }
+      aberturas.push(enDiagrama(A.concat(B.reverse()))); } }
+  return { mallas, lineas, pisa, losa1: enDiagrama(D.N1), azotea: enDiagrama(D.RFg || D.RF), cols, aberturas };
 }
 '''
 
