@@ -49,6 +49,13 @@
 - Aro del visor: la abertura de X3/X6 es más justa (−0.15 a 3 m, ±0.61) y cada cabo del barandal del aro se une con el final del
   barandal de la escalera (`CD.bocas`, en `atlampa-3d.js`).
 
+## v27 (2026-10-14): bocas orgánicas y zancas a la vista
+- Los descansos frente a cada boca (ahora de 1.8 m) ya no hacen cortes a 90°: `bocas.py` cierra (radio 1.8) y abre (radio 0.7)
+  la losa sólo alrededor de ellos, así sus orillas son curvas que siguen las de la plataforma. La boca sigue recta, del ancho del tramo.
+- Escalones de 1.10 m; las seis zancas de cada escalera van a ±0.575 (5 cm, de −0.52 a +0.10) y se ven a los dos lados de cada
+  tramo; el barandal va sobre la zanca. La losa deja 10 cm de holgura a los lados del tramo (boca de ±0.70), para que la zanca
+  no quede incrustada en el canto de la losa.
+
 ## Aro
 - Círculo con centro (505.75, 409.05), losa con r ≈ 39.5–46.55, piso a +10.03 (Rhino 9.92), 33 columnas.
 - **El aro y arte y cultura son uno:** el aro se ensancha sobre la azotea de cultura (`G.ponPlataforma(CD.azotea)`, tablas EXT/INT

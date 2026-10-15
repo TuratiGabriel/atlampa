@@ -73,7 +73,7 @@ function marco(a, b, z0, z1) {
   for (let i = 0; i <= n; i++) { const x = a[0] + (b[0] - a[0]) * i / n, y = a[1] + (b[1] - a[1]) * i / n; pos.push(x, z0, -y, x, z1, -y); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); return g;
 }
-// escalera en X (v24): dos tramos bajos (carril 0) llegan al descanso central y dos altos (carril 1) salen de él.
+// escalera en X (v24, v27: escalón de 1.10 y zancas a la vista): dos tramos bajos (carril 0) llegan al descanso central y dos altos (carril 1) salen de él.
 // Los tramos terminan en el borde del descanso; el barandal de cada orilla es continuo de punta a punta (el de adentro
 // del carril alto se interrumpe sólo en el descanso); zancas de acero cerradas a los dos lados de cada carril.
 function xStair(st, laneFn, Rc) {
@@ -89,7 +89,7 @@ function xStair(st, laneFn, Rc) {
   // escalones de 17 cm; cada pieza baja 45 cm para que el intradós se lea dentado
   const flight = (k, aA, zA, aB, zB) => { const fn = k ? L1 : L0, ns = Math.max(4, Math.round(Math.abs(zB - zA) / .17));
     for (let j = 0; j < ns; j++) { const qa = fn(aA + (aB - aA) * j / ns), qb = fn(aA + (aB - aA) * (j + 1) / ns), zt = zA + (zB - zA) * (j + 1) / ns;
-      const g = new THREE.BoxGeometry(Math.hypot(qb.p[0] - qa.p[0], qb.p[1] - qa.p[1]) + .03, .45, 1.2);
+      const g = new THREE.BoxGeometry(Math.hypot(qb.p[0] - qa.p[0], qb.p[1] - qa.p[1]) + .03, .45, 1.1);
       g.rotateY(Math.atan2(qb.p[1] - qa.p[1], qb.p[0] - qa.p[0])); g.translate((qa.p[0] + qb.p[0]) / 2, zt - .225, -(qa.p[1] + qb.p[1]) / 2); out.steps.push(g); } };
   flight(0, st.a0, st.z0, la, zm); flight(0, st.a1, st.z0, lb, zm); flight(1, la, zm, st.a0, st.z1); flight(1, lb, zm, st.a1, st.z1);
   // descanso central (abarca los dos carriles) y sus dos apoyos
@@ -98,15 +98,15 @@ function xStair(st, laneFn, Rc) {
   out.landing = ribbon(s2, hw, .3);
   { const q = mid(am); for (const o of [hw - .35, -(hw - .35)]) { const h = zm - .3 - st.z0, g = new THREE.CylinderGeometry(.09, .09, h, 10); g.translate(q.p[0] + q.n[0] * o, st.z0 + h / 2, -(q.p[1] + q.n[1] * o)); out.posts.push(g); } }
   // barandales: orilla de afuera de cada carril de punta a punta; orilla de adentro del carril alto, salvo el descanso
-  out.rails.push(path(0, st.a0, st.a1, -.6 * sg), path(1, st.a0, st.a1, .6 * sg), path(1, st.a0, la, -.6 * sg), path(1, lb, st.a1, -.6 * sg));
+  out.rails.push(path(0, st.a0, st.a1, -.575 * sg), path(1, st.a0, st.a1, .575 * sg), path(1, st.a0, la, -.575 * sg), path(1, lb, st.a1, -.575 * sg));
   // zancas: las mismas orillas y la de adentro del carril bajo (bajo el borde del carril alto)
-  const zanca = s => { const pos = [], prof = [[-.03, -.42], [.03, -.42], [.03, .08], [-.03, .08]], P = (q, [o, dz]) => [q.p[0] + q.n[0] * o, q.z + dz, -(q.p[1] + q.n[1] * o)];
+  const zanca = s => { const pos = [], prof = [[-.025, -.52], [.025, -.52], [.025, .1], [-.025, .1]], P = (q, [o, dz]) => [q.p[0] + q.n[0] * o, q.z + dz, -(q.p[1] + q.n[1] * o)];
     const quad = (A, B, C, D) => { pos.push(...A, ...B, ...C, ...A, ...C, ...D, ...A, ...C, ...B, ...A, ...D, ...C); };   // las dos caras: se ve de cualquier lado
     for (let i = 0; i + 1 < s.length; i++) for (let j = 0; j < 4; j++) quad(P(s[i], prof[j]), P(s[i], prof[(j + 1) % 4]), P(s[i + 1], prof[(j + 1) % 4]), P(s[i + 1], prof[j]));
     for (const q of [s[0], s[s.length - 1]]) quad(P(q, prof[0]), P(q, prof[1]), P(q, prof[2]), P(q, prof[3]));
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g; };
-  // zancas: las de afuera en la orilla; las de adentro, cada una dentro de su carril (no invaden el tramo vecino)
-  out.strings.push(zanca(path(0, st.a0, st.a1, -.6 * sg)), zanca(path(1, st.a0, st.a1, .6 * sg)), zanca(path(1, st.a0, la, -.57 * sg)), zanca(path(1, lb, st.a1, -.57 * sg)), zanca(path(0, st.a0, la, .57 * sg)), zanca(path(0, lb, st.a1, .57 * sg)));
+  // zancas (v27): todas a ±0.575, por fuera del escalón (1.10) y dentro del carril (1.20): se ven de los dos lados y no invaden el tramo vecino
+  out.strings.push(zanca(path(0, st.a0, st.a1, -.575 * sg)), zanca(path(1, st.a0, st.a1, .575 * sg)), zanca(path(1, st.a0, la, -.575 * sg)), zanca(path(1, lb, st.a1, -.575 * sg)), zanca(path(0, st.a0, la, .575 * sg)), zanca(path(0, lb, st.a1, .575 * sg)));
   return out;
 }
 
@@ -137,7 +137,7 @@ function xStairJoins(st, rails, ends, Rc, C) {
     const oq = loc(q.p[0], q.p[1])[1] - st.lanes[k]; let b = null, bd = .8;
     for (const p of E) { const ob = loc(p[0], p[1])[1] - st.lanes[k]; if (Math.sign(ob) !== Math.sign(oq) || Math.abs(ob) < .55) continue;
       const dd = Math.hypot(p[0] - q.p[0], p[1] - q.p[1]); if (dd < bd) { bd = dd; b = p; } }
-    if (b && bd > .03) out.push([q.p, b, q.z]); }
+    if (b && bd > .05) out.push([q.p, b, q.z]); }
   return out;
 }
 export function construye() {
