@@ -2032,12 +2032,18 @@ def mercado_sur():
 # norte, cruzando Heliotropo (2026-10-12: a +4.28, la de la P3 norte: sigue plana). Va en sentido antihorario. El aro, donde se
 # desprendió, queda 2 m más angosto (eso lo dibuja el visor con th0…th1).
 ARO_Z, ARO_CANTO, ARO_RE = 10.03, 0.35, 46.55
-CINTA = {'plano': 27.6, 'ancho': 2.0, 'pa': 4.28, 'fin': 4.28, 'th_fin': 18.0, 'pendiente': 0.08, 'tramo': 6.0, 'descanso': 1.2, 'desc_pa': 3.0, 'desc_fin': 1.6}
+CINTA = {'plano': 27.6, 'ancho': 2.0, 'pa': 4.28, 'fin': 4.28, 'th_fin': 18.0, 'pendiente': 0.08, 'tramo': 6.0, 'descanso': 1.2, 'desc_pa': 3.0, 'desc_fin': 1.6,
+         # (2026-10-14, Diego) de la P3 sigue bajando al suelo; transición suave del corte; se hace a un lado de la columna B2 (r 46.32, 80.67°)
+         'suelo': 0.0, 'desc_suelo': 1.5, 'transicion': 18.0, 'esquiva': [(80.67, -0.5, 5.0)]}
 
 
 def cinta_aro():
-    ri, re = ARO_RE - CINTA['ancho'], ARO_RE
-    rc = (ri + re) / 2
+    # (2026-10-14, Diego) la cinta sigue bajando desde la P3 de la nave norte (+4.28, se conserva la entrada) hasta ±0.00,
+    # por el borde del aro, cerca del acceso norte; y el corte del aro ya no es de golpe: crece suave desde donde la cinta
+    # se une al aro (la cinta arranca a un lado del aro y se mete bajo el corte conforme baja) y se cierra suave después
+    # de que la cinta llega al piso, para que la pista corra por el borde del aro sin escalones.
+    ri0, re0 = ARO_RE - CINTA['ancho'], ARO_RE
+    rc = (ri0 + re0) / 2
     perfil, s, z = [(0.0, ARO_Z)], 0.0, ARO_Z
     pendientes = []
 
@@ -2059,10 +2065,37 @@ def cinta_aro():
         s += CINTA['plano']; perfil.append((s, z))
     s_fin0 = s
     s += CINTA['desc_fin']; perfil.append((s, z))
-    Ltot = s
+    L_p3 = s                          # fin del descanso de la entrada a la P3 de la nave norte (en th_fin)
     th1 = CINTA['th_fin']
-    th0 = th1 - math.degrees(Ltot / rc)
+    th0 = th1 - math.degrees(L_p3 / rc)
+    if z - CINTA['suelo'] > 1e-6:     # de la P3 al suelo, siguiendo el aro
+        baja(z - CINTA['suelo'])
+        s += CINTA['desc_suelo']; perfil.append((s, z))
+    Ltot = s
     th = lambda s: th0 + math.degrees(s / rc)
+    th_fin = th(Ltot)
+    sm = lambda x: 0.0 if x <= 0 else 1.0 if x >= 1 else x * x * (3 - 2 * x)
+    T = CINTA['transicion']
+
+    # la cinta: a un lado del aro al arrancar, y se mete bajo el corte conforme baja; se hace a un lado de las columnas de la vivienda
+    def esquiva(t):
+        return sum(dr * math.cos(math.pi / 2 * (t - tc) / w) ** 2 for tc, dr, w in CINTA['esquiva'] if abs(t - tc) < w)
+
+    def ri(x):
+        return ri0 + CINTA['ancho'] * (1 - sm(x / T)) + esquiva(th(x))
+
+    def re(x):
+        return ri(x) + CINTA['ancho']
+
+    # cuánto se corta el aro en el ángulo t (0 donde la cinta se une al aro, 2 m en el tramo, y se cierra al final)
+    T_deg = math.degrees(T / rc)
+
+    def corte(t):
+        if t < th0 or t > th_fin + T_deg:
+            return 0.0
+        if t <= th_fin:
+            return CINTA['ancho'] * sm((t - th0) / T_deg)
+        return CINTA['ancho'] * (1 - sm((t - th_fin) / T_deg))
 
     def z_en(x):
         for (s0, z0), (s1, z1) in zip(perfil, perfil[1:]):
@@ -2071,52 +2104,62 @@ def cinta_aro():
         return perfil[-1][1]
     P = lambda t, r, zz: (ARO[0] + math.cos(math.radians(t)) * r, ARO[1] + math.sin(math.radians(t)) * r, zz)
     # muestras a lo largo (cada ~0.6 m y en cada quiebre del perfil)
-    ss = sorted(set([round(x, 4) for x, _ in perfil] + [i * 0.6 for i in range(int(Ltot / 0.6) + 1)]))
+    ss = sorted(set([round(x, 4) for x, _ in perfil] + [i * 0.6 for i in range(int(Ltot / 0.6) + 1)] + [Ltot]))
     tris, lins = [], []
     for s0, s1 in zip(ss, ss[1:]):
         t0, t1, z0, z1 = th(s0), th(s1), z_en(s0), z_en(s1)
-        for (ra, za0, za1), (rb, zb0, zb1) in (((ri, z0, z1), (re, z0, z1)), ((ri, z0 - ARO_CANTO, z1 - ARO_CANTO), (re, z0 - ARO_CANTO, z1 - ARO_CANTO))):
-            A, B, C, D = P(t0, ra, za0), P(t1, ra, za1), P(t1, rb, zb1), P(t0, rb, zb0)
+        a0, a1, b0, b1 = ri(s0), ri(s1), re(s0), re(s1)
+        for dz in (0.0, -ARO_CANTO):   # piso y lecho
+            A, B, C, D = P(t0, a0, z0 + dz), P(t1, a1, z1 + dz), P(t1, b1, z1 + dz), P(t0, b0, z0 + dz)
             tris += [(A, B, C), (A, C, D)]
-        for r in (ri, re):   # cantos
-            A, B, C, D = P(t0, r, z0 - ARO_CANTO), P(t1, r, z1 - ARO_CANTO), P(t1, r, z1), P(t0, r, z0)
+        for r0_, r1_ in ((a0, a1), (b0, b1)):   # cantos
+            A, B, C, D = P(t0, r0_, z0 - ARO_CANTO), P(t1, r1_, z1 - ARO_CANTO), P(t1, r1_, z1), P(t0, r0_, z0)
             tris += [(A, B, C), (A, C, D)]
-            lins += [(P(t0, r, z0), P(t1, r, z1)), (P(t0, r, z0 - ARO_CANTO), P(t1, r, z1 - ARO_CANTO))]
+            lins += [(P(t0, r0_, z0), P(t1, r1_, z1)), (P(t0, r0_, z0 - ARO_CANTO), P(t1, r1_, z1 - ARO_CANTO))]
     for s0 in (0.0, Ltot):   # tapas
         t, zz = th(s0), z_en(s0)
-        A, B, C, D = P(t, ri, zz - ARO_CANTO), P(t, re, zz - ARO_CANTO), P(t, re, zz), P(t, ri, zz)
+        A, B, C, D = P(t, ri(s0), zz - ARO_CANTO), P(t, re(s0), zz - ARO_CANTO), P(t, re(s0), zz), P(t, ri(s0), zz)
         tris += [(A, B, C), (A, C, D)]
         lins += [(A, B), (B, C), (C, D), (D, A)]
     # cada quiebre (arranque y fin de los descansos): una raya de lado a lado
     for x, zz in perfil[1:-1]:
-        lins.append((P(th(x), ri, zz), P(th(x), re, zz)))
+        lins.append((P(th(x), ri(x), zz), P(th(x), re(x), zz)))
     # barandal (como el del aro: pasamanos a +0.90 y balaustres a cada 2.40; aquí también zoclo y travesaño)
     # El de adentro empieza donde la cinta ya bajó más de 0.30 respecto al aro.
-    for r, desde in ((re, 0.0), (ri, next((x for x in ss if ARO_Z - z_en(x) > VACIO), 0.0))):
+    for rf, desde in ((re, 0.0), (ri, next((x for x in ss if ARO_Z - z_en(x) > VACIO), 0.0))):
         prev = None
         for x in [v for v in ss if v >= desde]:
-            q = P(th(x), r, z_en(x))
+            q = P(th(x), rf(x), z_en(x))
             if prev:
                 for h in (0.1, BARANDAL):
                     lins.append(((prev[0], prev[1], prev[2] + h), (q[0], q[1], q[2] + h)))
             prev = q
         x = desde
         while x <= Ltot:
-            q = P(th(x), r, z_en(x)); lins.append((q, (q[0], q[1], q[2] + BARANDAL)))
+            q = P(th(x), rf(x), z_en(x)); lins.append((q, (q[0], q[1], q[2] + BARANDAL)))
             x += 2.4
-    # llegadas: a la planta alta de la nave sur (por el descanso) y a la plataforma +2.40 de la nave norte
-    for (sa, sb), r1 in (((s_pa0, s_pa0 + CINTA['desc_pa']), CORTE + 0.6), ((s_fin0, Ltot), CORTE + 0.9)):
+    # llegadas: a la planta alta de la nave sur (por el descanso) y a la P3 de la nave norte (+4.28)
+    for (sa, sb), r1 in (((s_pa0, s_pa0 + CINTA['desc_pa']), CORTE + 0.6), ((s_fin0, L_p3), CORTE + 0.9)):
         za = z_en(sa)
         VIDRIO_VANOS.append((math.radians(th(sa)), math.radians(th(sb)), za - ARO_CANTO, za + 2.5))   # se cruza el vidrio
         n = 6
-        borde = [P(th(sa + (sb - sa) * i / n), re, za) for i in range(n + 1)] + [P(th(sb - (sb - sa) * i / n), r1, za) for i in range(n + 1)]
+        borde = [P(th(sa + (sb - sa) * i / n), re(sa + (sb - sa) * i / n), za) for i in range(n + 1)] + [P(th(sb - (sb - sa) * i / n), r1, za) for i in range(n + 1)]
         g = Polygon([(q[0], q[1]) for q in borde])
         losa(tris, lins, g, za - ARO_CANTO, za)
     cruce = [round(z_en((math.radians(t - th0)) * rc), 2) for t in (math.degrees(math.asin((HE_LIM[1] - ARO[1]) / rc)), math.degrees(math.asin((HE_LIM[0] - ARO[1]) / rc)))]
-    datos = {'ri': ri, 're': re, 'th0': round(th0, 3), 'th1': round(th1, 3), 'canto': ARO_CANTO,
+    # para el visor: el corte del aro y la franja de la cinta, cada medio grado
+    pasos = int((th_fin + T_deg - th0) * 2) + 1
+    tt = [th0 + i / 2 for i in range(pasos)]
+    banda = []
+    for t in tt:
+        if t <= th_fin:
+            x = math.radians(t - th0) * rc
+            banda.append([round(t, 2), round(ri(x), 3), round(re(x), 3)])
+    datos = {'ri': ri0, 're': re0, 'th0': round(th0, 3), 'th1': round(th_fin, 3), 'canto': ARO_CANTO,
              'perfil': [[round(th(x), 3), round(zz, 3)] for x, zz in perfil], 'largo': round(Ltot, 2), 'pendientes': pendientes,
-             'pa': [round(th(s_pa0), 3), round(th(s_pa0 + CINTA['desc_pa']), 3)], 'heliotropo_z': cruce}
-    print('cinta del aro', json.dumps(datos))
+             'pa': [round(th(s_pa0), 3), round(th(s_pa0 + CINTA['desc_pa']), 3)], 'p3': [round(th(s_fin0), 3), round(th(L_p3), 3)], 'heliotropo_z': cruce,
+             'corte': [[round(t, 2), round(corte(t), 3)] for t in tt], 'banda': banda}
+    print('cinta del aro', json.dumps({k: v for k, v in datos.items() if k not in ('corte', 'banda')}))
     return tris, lins, datos
 
 

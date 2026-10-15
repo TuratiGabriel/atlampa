@@ -1301,6 +1301,12 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     for (let i = 1; i < P.length; i++) if (d <= P[i][0]) { const a = P[i - 1], b = P[i]; return b[0] > a[0] ? a[1] + (b[1] - a[1]) * (d - a[0]) / (b[0] - a[0]) : b[1]; }
     return P[P.length - 1][1];
   };
+  // (2026-10-14) el corte del aro ya no es de golpe: crece suave desde donde se une la cinta y se cierra suave
+  // después de que la cinta llega al piso (CINTA.corte: [t, metros]); CINTA.banda: [t, ri, re] de la cinta
+  const tabla = (T, t) => { const d = ((t - T[0][0]) % 360 + 360) % 360 + T[0][0]; if (d > T[T.length - 1][0]) return null;
+    for (let i = 1; i < T.length; i++) if (d <= T[i][0]) { const a = T[i - 1], b = T[i], f = b[0] > a[0] ? (d - a[0]) / (b[0] - a[0]) : 1; return a.map((v, k) => v + (b[k] - v) * f); } return null; };
+  const corteEn = t => { if (!CINTA) return 0; if (!CINTA.corte) return enCinta(t) ? CINTA.re - CINTA.ri : 0; const q = tabla(CINTA.corte, t); return q ? q[1] : 0; };
+  const bandaEn = t => { if (!CINTA) return null; if (!CINTA.banda) return enCinta(t) ? [CINTA.ri, CINTA.re] : null; const q = tabla(CINTA.banda, t); return q ? [q[1], q[2]] : null; };
   {
     const g = pieza('aro', 'aro', 0.6), n = 720, z1 = ANILLO.z, z0 = z1 - ANILLO.canto;
     ponGeos(g, fija('aro', () => {
@@ -1315,18 +1321,15 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     ts.forEach((t, k) => {
       const t2 = k + 1 < ts.length ? ts[k + 1] : ts[0] + 360;
       if (t2 - t < 1e-6) return;
-      const cin = enCinta((t + t2) / 2);   // este tramo, ¿angosto?
-      const [a, A0] = R(t), [b, B0] = R(t2), A = cin ? P(t, CINTA.ri) : A0, B = cin ? P(t2, CINTA.ri) : B0;
+      const cin = enCinta((t + t2) / 2);   // este tramo, ¿junto a la cinta?
+      // el borde de afuera, recortado lo que diga corteEn (donde el aro se ensancha sobre arte y cultura manda la plataforma)
+      const corta = (q, tt) => { const c = corteEn(tt); return c > 1e-3 && Math.hypot(q[0] - ANILLO.u, q[1] - ANILLO.v) <= ANILLO.re + 0.01 ? P(tt, ANILLO.re - c) : q; };
+      const [a, A0] = R(t), [b, B0] = R(t2), A = corta(A0, t), B = corta(B0, t2);
       m.quad(W(a[0], a[1], z1), W(b[0], b[1], z1), W(B[0], B[1], z1), W(A[0], A[1], z1));
       m.quad(W(a[0], a[1], z0), W(A[0], A[1], z0), W(B[0], B[1], z0), W(b[0], b[1], z0));
       m.quad(W(A[0], A[1], z0), W(A[0], A[1], z1), W(B[0], B[1], z1), W(B[0], B[1], z0));
       m.quad(W(a[0], a[1], z0), W(b[0], b[1], z0), W(b[0], b[1], z1), W(a[0], a[1], z1));
-      // donde cambia el ancho: la cara de la orilla (de un radio al otro), con su barandal
-      if (antes !== null && antes !== cin) {
-        const q0 = P(t, CINTA.ri), q1 = A0;
-        m.quad(W(q0[0], q0[1], z0), W(q1[0], q1[1], z0), W(q1[0], q1[1], z1), W(q0[0], q0[1], z1));
-        if (Math.abs(zCinta(t) - z1) > 0.3) ln.seg(W(q0[0], q0[1], zb), W(q1[0], q1[1], zb));
-      }
+      // (el ancho cambia suave: ya no hay cara de orilla de un radio al otro)
       antes = cin;
       // barandal (pasamanos) por los dos bordes; en el tramo angosto, en el borde nuevo
       // sólo donde la cinta ya bajó más de 0.30 (antes es el mismo piso)
@@ -1337,7 +1340,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     [r => R(r)[0], r => R(r)[1]].forEach((borde, lado) => {
       let d = 0, q = null;
       for (let i = 0; i <= 1440; i++) {
-        const t = i / 4, cin = lado === 1 && enCinta(t), p = cin ? P(t, CINTA.ri) : borde(t);
+        const t = i / 4, b0 = borde(t), cin = lado === 1 && enCinta(t), c = lado === 1 ? corteEn(t) : 0, p = c > 1e-3 && Math.hypot(b0[0] - ANILLO.u, b0[1] - ANILLO.v) <= ANILLO.re + 0.01 ? P(t, ANILLO.re - c) : b0;
         if (q) d -= Math.hypot(p[0] - q[0], p[1] - q[1]);
         if (d <= 0 && (!cin || z1 - zCinta(t) > 0.3)) { ln.seg(W(p[0], p[1], z1), W(p[0], p[1], zb)); d += 2.4; }
         q = p;
@@ -1352,7 +1355,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const im = new THREE.InstancedMesh(col, mcol, cs.length), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Vector3(), V = new THREE.Vector3();
     cs.forEach((c, i) => {
       const t = Math.atan2(c[1] - ANILLO.v, c[0] - ANILLO.u) / RAD, r = Math.hypot(c[0] - ANILLO.u, c[1] - ANILLO.v);
-      const h = CINTA && r > CINTA.ri && enCinta(t) ? zCinta(t) - CINTA.canto : z0, p = W(c[0], c[1], 0);
+      // bajo el aro (con su corte) llega al aro; si no, y queda bajo la cinta, la carga; si no carga nada, no va
+      const bd = bandaEn(t), bajoAro = r - 0.4 <= ANILLO.re - corteEn(t) + 0.01, bajoCinta = !!bd && r + 0.4 > bd[0] && r - 0.4 < bd[1];
+      const h = bajoAro ? z0 : bajoCinta ? zCinta(t) - CINTA.canto : 0.001, p = W(c[0], c[1], 0);
       M.compose(V.set(p[0], p[1], p[2]), Q, E.set(1, h, 1)); im.setMatrixAt(i, M);
     });
     im.userData.ap = 'aro'; im.userData.estr = true; g.add(im); picables.push(im);

@@ -73,6 +73,42 @@ function marco(a, b, z0, z1) {
   for (let i = 0; i <= n; i++) { const x = a[0] + (b[0] - a[0]) * i / n, y = a[1] + (b[1] - a[1]) * i / n; pos.push(x, z0, -y, x, z1, -y); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); return g;
 }
+// escalera en X (v24): dos tramos bajos (carril 0) llegan al descanso central y dos altos (carril 1) salen de él.
+// Los tramos terminan en el borde del descanso; el barandal de cada orilla es continuo de punta a punta (el de adentro
+// del carril alto se interrumpe sólo en el descanso); zancas de acero cerradas a los dos lados de cada carril.
+function xStair(st, laneFn, Rc) {
+  const am = (st.a0 + st.a1) / 2, zm = (st.z0 + st.z1) / 2, r0 = st.lanes[0], r1 = st.lanes[1];
+  const rr = st.ring ? Rc(am) + (r0 + r1) / 2 : (r0 + r1) / 2, da = 1.3 / rr / deg;   // medio descanso: 1.3 m
+  const L0 = laneFn(st, 0), L1 = laneFn(st, 1), sg = Math.sign(r1 - r0) || 1, d = Math.sign(st.a1 - st.a0) || 1;
+  const la = am - d * da, lb = am + d * da;   // bordes del descanso
+  const zLane = (k, a) => { const za = k ? st.z1 : st.z0, u = (a - st.a0) / (st.a1 - st.a0), ua = (la - st.a0) / (st.a1 - st.a0), ub = (lb - st.a0) / (st.a1 - st.a0);
+    return u <= ua ? za + (zm - za) * u / ua : u >= ub ? za + (zm - za) * (1 - u) / (1 - ub) : zm; };
+  const path = (k, from, to, o) => { const fn = k ? L1 : L0, n = Math.max(8, Math.ceil(Math.abs(to - from) * rr * deg / 0.4)), s = [];
+    for (let i = 0; i <= n; i++) { const a = from + (to - from) * i / n, q = fn(a); s.push({ p: [q.p[0] + q.n[0] * o, q.p[1] + q.n[1] * o], n: q.n, z: zLane(k, a) }); } return s; };
+  const out = { steps: [], landing: null, posts: [], rails: [], strings: [] };
+  // escalones de 17 cm; cada pieza baja 45 cm para que el intradós se lea dentado
+  const flight = (k, aA, zA, aB, zB) => { const fn = k ? L1 : L0, ns = Math.max(4, Math.round(Math.abs(zB - zA) / .17));
+    for (let j = 0; j < ns; j++) { const qa = fn(aA + (aB - aA) * j / ns), qb = fn(aA + (aB - aA) * (j + 1) / ns), zt = zA + (zB - zA) * (j + 1) / ns;
+      const g = new THREE.BoxGeometry(Math.hypot(qb.p[0] - qa.p[0], qb.p[1] - qa.p[1]) + .03, .45, 1.2);
+      g.rotateY(Math.atan2(qb.p[1] - qa.p[1], qb.p[0] - qa.p[0])); g.translate((qa.p[0] + qb.p[0]) / 2, zt - .225, -(qa.p[1] + qb.p[1]) / 2); out.steps.push(g); } };
+  flight(0, st.a0, st.z0, la, zm); flight(0, st.a1, st.z0, lb, zm); flight(1, la, zm, st.a0, st.z1); flight(1, lb, zm, st.a1, st.z1);
+  // descanso central (abarca los dos carriles) y sus dos apoyos
+  const mid = a => { const p = L0(a), q = L1(a); return { p: [(p.p[0] + q.p[0]) / 2, (p.p[1] + q.p[1]) / 2], n: p.n }; }, hw = Math.abs(r1 - r0) / 2 + .6, s2 = [];
+  for (let i = 0; i <= 8; i++) { const q = mid(Math.min(la, lb) + Math.abs(lb - la) * i / 8); s2.push({ p: q.p, n: q.n, z: zm }); }
+  out.landing = ribbon(s2, hw, .3);
+  { const q = mid(am); for (const o of [hw - .35, -(hw - .35)]) { const h = zm - .3 - st.z0, g = new THREE.CylinderGeometry(.09, .09, h, 10); g.translate(q.p[0] + q.n[0] * o, st.z0 + h / 2, -(q.p[1] + q.n[1] * o)); out.posts.push(g); } }
+  // barandales: orilla de afuera de cada carril de punta a punta; orilla de adentro del carril alto, salvo el descanso
+  out.rails.push(path(0, st.a0, st.a1, -.6 * sg), path(1, st.a0, st.a1, .6 * sg), path(1, st.a0, la, -.6 * sg), path(1, lb, st.a1, -.6 * sg));
+  // zancas: las mismas orillas y la de adentro del carril bajo (bajo el borde del carril alto)
+  const zanca = s => { const pos = [], prof = [[-.03, -.42], [.03, -.42], [.03, .08], [-.03, .08]], P = (q, [o, dz]) => [q.p[0] + q.n[0] * o, q.z + dz, -(q.p[1] + q.n[1] * o)];
+    const quad = (A, B, C, D) => { pos.push(...A, ...B, ...C, ...A, ...C, ...D, ...A, ...C, ...B, ...A, ...D, ...C); };   // las dos caras: se ve de cualquier lado
+    for (let i = 0; i + 1 < s.length; i++) for (let j = 0; j < 4; j++) quad(P(s[i], prof[j]), P(s[i], prof[(j + 1) % 4]), P(s[i + 1], prof[(j + 1) % 4]), P(s[i + 1], prof[j]));
+    for (const q of [s[0], s[s.length - 1]]) quad(P(q, prof[0]), P(q, prof[1]), P(q, prof[2]), P(q, prof[3]));
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g; };
+  for (const s of out.rails) out.strings.push(zanca(s));
+  out.strings.push(zanca(path(0, st.a0, la, .63 * sg)), zanca(path(0, lb, st.a1, .63 * sg)));
+  return out;
+}
 export function construye() {
   const P = { losa: [], modulo: [], nucleo: [], acero: [], aro: [], escalera: [], auditorio: [], muro: [], mueble: [] }, L = { parteluz: [], huella: [], borde: [], vidrio: [] };
   P.auditorio.push(walls(D.BOWL, F.zPit, 0), flat(D.BOWL, F.zPit));
@@ -82,7 +118,8 @@ export function construye() {
   // (2026-10-13, hoja de plantas v22) solo columnas, sin estructura en X; las que llevan sombrilla siguen a +15.00 y abren una losa de un módulo
   const conUmb = new Set((D.umb || []).filter(p => !p.ring).map(p => p.i + ',' + p.j));
   for (const p of (D.umb || []).filter(p => p.ring)) { const g = new THREE.CylinderGeometry(.27, .22, LV.PAD - p.base, 12); g.translate(p.x, (p.base + LV.PAD) / 2, -p.y); P.acero.push(g); }
-  for (const c of D.cols) for (const [a, b] of [[0, LV.N1 - LV.slab], [LV.N1, LV.N2 - LV.slab], [LV.N2, LV.RF - LV.slab]].concat(conUmb.has(c.i + ',' + c.j) ? [[LV.RF, LV.PAD]] : [])) { const g = new THREE.CylinderGeometry(.3, .3, b - a, 10); g.translate(c.x, (a + b) / 2, -c.y); P.acero.push(g); }
+  // columnas de una pieza: del piso a la última losa que cargan, o hasta la sombrilla
+  for (const c of D.cols) { const top = conUmb.has(c.i + ',' + c.j) ? LV.PAD : AC.inPoly(c.x, c.y, D.RF) ? LV.RF - LV.slab : AC.inPoly(c.x, c.y, D.N2) ? LV.N2 - LV.slab : LV.N1 - LV.slab; const g = new THREE.CylinderGeometry(.3, .3, top, 10); g.translate(c.x, top / 2, -c.y); P.acero.push(g); }
   // (su aro y sus columnas no van: en el diagrama manda el aro de siempre, más grande)
   for (const p of (D.umb || [])) P.aro.push(boxFrom(p.P, LV.PAD, LV.PAD + .4));
   // (la azotea no es losa suya: es el aro, que se ensancha sobre ella; sus vigas sí)
@@ -96,26 +133,8 @@ export function construye() {
   const zOf = { PIT: LV.PIT, PB: 0, N1: LV.N1, N2: LV.N2, RF: LV.RF };
   for (const m of D.mods) { const z0 = zOf[m.lv], h = m.u === 'ban0' ? .45 : LV.mod; (m.u === 'core' ? P.nucleo : P.modulo).push(boxFrom(m.P, z0, z0 + h)); }
   // escaleras en X: X1–X3 al frente y X4–X6 atrás (las traseras siguen el eje del aro de proyecto); X3 y X6 llegan al aro
-  for (const st of D.stairs) {
-    for (const f of AC.flights(st)) {
-      const n = Math.max(10, Math.ceil(Math.abs(f.a1 - f.a0) / 1)), s = [];
-      for (let i = 0; i <= n; i++) { const a = f.a0 + (f.a1 - f.a0) * i / n; const q = f.fn(a); s.push({ p: q.p, n: q.n, z: f.z0 + (f.z1 - f.z0) * i / n }); }
-      // escalones de 17 cm, cada uno con 28 cm de peralte abajo (el intradós se lee dentado)
-      const ns = Math.max(4, Math.round(Math.abs(f.z1 - f.z0) / .17));
-      for (let k = 0; k < ns; k++) {
-        const qa = f.fn(f.a0 + (f.a1 - f.a0) * k / ns), qb = f.fn(f.a0 + (f.a1 - f.a0) * (k + 1) / ns), zt = f.z0 + (f.z1 - f.z0) * (k + 1) / ns;
-        P.escalera.push(caja([(qa.p[0] + qb.p[0]) / 2, (qa.p[1] + qb.p[1]) / 2], Math.atan2(qb.p[1] - qa.p[1], qb.p[0] - qa.p[0]), Math.hypot(qb.p[0] - qa.p[0], qb.p[1] - qa.p[1]) + .03, 1.2, zt - .45, zt));
-      }
-      // zancas de acero a los lados y barandal (pasamanos y postes)
-      for (const o of [.63, -.63]) { P.acero.push(banda(s, [[o - .03, -.42], [o + .03, -.42], [o + .03, .08], [o - .03, .08]])); L.huella.push(baranda(s, o, .95)); }
-    }
-    const am = (st.a0 + st.a1) / 2, zm = (st.z0 + st.z1) / 2, q0 = AC.laneFn(st, 0), q1 = AC.laneFn(st, 1), da = 1.3 / (st.ring ? AC.Rc(am) + st.lanes[0] : st.lanes[0]) / deg;
-    const mid = a => { const p = q0(a), q = q1(a); return { p: [(p.p[0] + q.p[0]) / 2, (p.p[1] + q.p[1]) / 2], n: p.n }; }, hw = Math.abs(st.lanes[1] - st.lanes[0]) / 2 + .6, s2 = [];
-    for (let i = 0; i <= 6; i++) { const a = am - da + 2 * da * i / 6; const q = mid(a); s2.push({ p: q.p, n: q.n, z: zm }); }
-    P.escalera.push(ribbon(s2, hw, .3, 0));
-    // el descanso central se apoya en dos columnas delgadas
-    { const q = mid(am); for (const o of [hw - .35, -(hw - .35)]) { const x = q.p[0] + q.n[0] * o, y = q.p[1] + q.n[1] * o, h = zm - .3 - st.z0; const g = new THREE.CylinderGeometry(.09, .09, h, 8); g.translate(x, st.z0 + h / 2, -y); P.acero.push(g); } }
-  }
+  // escaleras en X (v24): X1–X3 al frente y X4–X6 atrás (las traseras siguen el eje del aro de proyecto); X3 y X6 llegan al aro
+  for (const st of D.stairs) { const X = xStair(st, AC.laneFn, AC.Rc); P.escalera.push(...X.steps, X.landing); P.acero.push(...X.posts, ...X.strings); for (const r of X.rails) L.huella.push(baranda(r, 0, .95)); }
   // interior (hoja de plantas): muros y mamparas, techos de los módulos de la azotea, vidrios como marcos y mobiliario
   const I = D.int || { muros: [], vidrios: [], techos: [], muebles: [] };
   for (const [ax, ay, bx, by, z0, z1, t] of I.muros) P.muro.push(muroEntre([ax, ay], [bx, by], z0, z1, t));

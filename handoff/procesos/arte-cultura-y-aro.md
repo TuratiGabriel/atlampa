@@ -24,6 +24,14 @@
 - Decidido (Diego): el aro se queda a +10.03 aunque quede 0.51 m arriba del +9.00 del concepto; X3 y X6 suben 3.51 m.
 - Pendiente: el comercio de +7.47 y +10.47 contra el aro.
 
+## v24 (2026-10-14): listo para pasar a Rhino
+- Escaleras en X: los tramos terminan en el borde del descanso central; barandal continuo por la orilla de afuera de cada
+  carril (el de adentro del carril alto sólo se corta en el descanso); zancas cerradas en todas; dos apoyos bajo el descanso.
+- X6 ya no arranca en el aire: N2 crece un descanso de arranque atrás (como los de llegada).
+- Columnas de una pieza (sin cortes en losas que no tocan); las de sombrilla, del piso a +15.00.
+- Azotea: el café pasó a (−8,15), fuera de la pista; se quitó la isla de estar de ahí y los árboles de las islas.
+- La vivienda de la hoja ya sale de `atlampa-modulos.js` (+10.84 en el visor, 2.70 cada 3.30).
+
 ## Aro
 - Círculo con centro (505.75, 409.05), losa con r ≈ 39.5–46.55, piso a +10.03 (Rhino 9.92), 33 columnas.
 - **El aro y arte y cultura son uno:** el aro se ensancha sobre la azotea de cultura (`G.ponPlataforma(CD.azotea)`, tablas EXT/INT
@@ -31,3 +39,9 @@
 - Color propio `#f2c14e`. Nunca se apaga al inspeccionar o resaltar.
 - Corta las naves en r 47. Dentro van los patios del aro: área abierta permeable de tezontle con arriates y bancas «onda» (Gabriel, 2026-10-12; ver `mercado.md`).
 - En `Diag::ring` hay una curva 3D de Gabriel sin usar.
+- **Cinta (2026-10-14, Diego):** sigue bajando de la P3 de la nave norte (+4.28, se conserva la entrada) hasta ±0.00 cerca del
+  acceso norte, por el borde del aro (`th1` ≈ 100°, 182.5 m en total, ≤ 8 % con descansos). El corte del aro ya no es de golpe:
+  crece suave desde donde se une la cinta (la cinta arranca a un lado y se mete bajo el corte) y se cierra suave después de que
+  la cinta llega al piso (`cinta.corte`, `cinta.banda` en `atlampa-mercado.js`). Se recorre 0.5 m para librar la columna de
+  vivienda B2 (r 46.32, 80.67°). En la hoja de arte y cultura la pista corre por el borde de afuera del aro.
+  OJO: `atlampa-mercado.js` se regeneró sólo en la cinta (aquí no hay rhino3dm); conviene correr `prepara-mercado.py` completo.
