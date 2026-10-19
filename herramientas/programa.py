@@ -199,6 +199,7 @@ def potencial(m, ind_poly, F, P):
     from shapely.geometry import Point, Polygon
     from shapely.ops import unary_union
     predio = Polygon(P).area
+    predio_norma = round(predio)  # misma superficie de predio que publica el programa
 
     # Vivienda: proyección de las mallas de los 917 módulos
     tris = []
@@ -247,16 +248,16 @@ def potencial(m, ind_poly, F, P):
         'construido_m2': construido,
         'sobre_piso_m2': round(sobre_piso),
         'sotanos_m2': sotanos_m2,
-        'desplante_max_m2': round(COS_MAX * predio),
-        'maximo_construible_m2': round(CUS_MAX * COS_MAX * predio),   # CUS × desplante máximo (COS_max × predio), no × predio
+        'desplante_max_m2': round(COS_MAX * predio_norma),
+        'maximo_construible_m2': round(CUS_MAX * COS_MAX * predio_norma, 1),   # CUS × desplante máximo (COS_max × predio), no × predio
         'CUS_max_sobre_predio': round(CUS_MAX * COS_MAX, 2),
         'desplante_pb_m2': round(desplante_pb),
         'desplante_proy_m2': round(desplante_proy),
-        'COS_pb': round(cos_pb, 3), 'COS_proy': round(cos_proy, 3),
-        'CAS_proy': round(1 - cos_proy, 3), 'CAS_pb': round(1 - cos_pb, 3),
+        'COS_pb': round(cos_pb, 5), 'COS_proy': round(cos_proy, 5),
+        'CAS_proy': round(1 - cos_proy, 5), 'CAS_pb': round(1 - cos_pb, 5),
         'CUS_sobre_piso': round(cus_sobre, 2), 'CUS_con_sotanos': round(cus_total, 2),
         'cumple_CAS': (1 - cos_proy) >= CAS_MIN, 'cumple_COS': cos_proy <= COS_MAX,
-        'cumple_CUS': sobre_piso <= CUS_MAX * COS_MAX * predio,
+        'cumple_CUS': sobre_piso <= CUS_MAX * COS_MAX * predio_norma,
         'nota': ('La proyección de vivienda y el aro son elevados: si la norma sólo cuenta lo que toca el piso, '
                  'usa COS_pb y CAS_pb. Los sótanos no cuentan para COS. El CUS máximo se aplica sobre el desplante máximo (COS_max × predio), no sobre el predio. Predio de geometría 18,305 m² (el dato del equipo, 18,200, difiere 0.6 %).'),
     }
