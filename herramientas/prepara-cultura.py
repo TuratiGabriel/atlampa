@@ -158,7 +158,8 @@ export function construye() {
     if (Q !== D.RF) P.losa.push(extr(Q, top - LV.slab, top));
     const b = beamsUnder(Q, top - LV.slab); if (b) P.acero.push(b);
   }
-  for (const [E, z0, z1] of [[D.E1, LV.N1, LV.N2 - LV.slab], [D.E2, LV.N2, LV.RF - LV.slab]]) L.parteluz.push(mullions(E, z0, z1, 2.75));
+  // (v29) la planta baja también se cierra con vidrio (E0): Péndulo y Gandhi
+  for (const [E, z0, z1] of [[D.E0, 0, LV.N1 - LV.slab], [D.E1, LV.N1, LV.N2 - LV.slab], [D.E2, LV.N2, LV.RF - LV.slab]]) if (E) L.parteluz.push(mullions(E, z0, z1, 2.75));
   // barandal de las plataformas (línea a +1.00): se abre justo en el ancho de cada carril que llega o sale
   const GAPS = D.stairs.map(st => xStairGap(st, AC.Rc, C));
   const FIN = {};
@@ -317,7 +318,7 @@ def datos_del_edificio():
                 q['i'], q['j'] = c['i'], c['j']
         umb.append(q)
     return {'C': v['C'], 'R0': v['R0'], 'RW': v['RW'], 'BULGE': v['BULGE'], 'S': v['S'], 'FAN': v['FAN'], 'lat': v['lat'], 'lv': v['lv'],
-            'N1': v['N1'], 'N2': v['N2'], 'RF': v['RF'], 'RFg': v['RFg'], 'E1': v['E1'], 'E2': v['E2'], 'BOWL': v['BOWL'],
+            'N1': v['N1'], 'N2': v['N2'], 'RF': v['RF'], 'RFg': v['RFg'], 'E0': v.get('E0'), 'E1': v['E1'], 'E2': v['E2'], 'BOWL': v['BOWL'],
             'mods': mods, 'cols': [{'x': c['x'], 'y': c['y'], 'i': c['i'], 'j': c['j']} for c in v['cols']], 'par': [], 'umb': umb,
             'stairs': v['stairs'], 'grid': {'planes': []}, 'int': interior(ly, v['lv'])}
 

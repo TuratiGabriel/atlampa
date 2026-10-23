@@ -58,6 +58,23 @@
 
 - Hoja (v28): la cinta se dibuja con su ancho real (de 0 a 2 m en la transición, `banda`) y su arranque va a nivel del aro (antes caía a la cota del final por un redondeo de 0.005° en el ángulo). Su barandal de afuera sigue al del aro; el de adentro y el del borde cortado del aro aparecen sólo donde la cinta ya bajó más de 0.30, como en el visor.
 
+## v29 (2026-10-22): programa nuevo por el análisis financiero
+- **PB:** se cierra con vidrio (`E0`: losa del N1 completa menos X1, X4 y el foso del auditorio, 905 m²) y se reparte entre dos comercios separados por un muro corrido.
+  - Un café-librería tipo Péndulo, al norte y al oriente, junto al elevador y al patio: 374 m².
+  - Una librería tipo Gandhi, al sur y al poniente, con acceso por el lado del auditorio y por la plaza trasera: 374 m².
+  - Salen los talleres de PB, el camerino, la oficina y la recepción.
+  - Al centro quedan los servicios: bodega del Péndulo (recibe el montacargas), bodega del Gandhi, pasillo de servicio, núcleo y baños.
+  - El cuarto de máquinas se queda en PB, pero escondido: su puerta ahora da sólo al pasillo de servicio.
+- **N1:** todo es del Péndulo (545 m²: lectura, libreros y café); salen las salas, las salas oscuras y los talleres.
+- **N2:** sigue de exposición (salas A y B, 212 m²) y la antigua sala C se vuelve dos talleres en renta de 59 y 57 m². Cada uno abre a la sala B y la llegada de X2 ya entra a la sala B.
+- **Azotea:** sin cambios de geometría; la terraza ahora también es exposición al aire libre y conserva el café de 22 m².
+- **Para el análisis financiero (m² cerrados):**
+  - Comercio: 1,381. Son el Péndulo, 963 (374 + bodega 22 + N1 545 + baños del N1 22); el Gandhi, 396 (374 + bodega 22); y el café de la azotea, 22.
+  - Talleres en renta: 116.
+  - Cultura sin ingreso: 491.
+  - Edificio cerrado: 1,988.
+- **Visor:** `prepara-cultura.py` pasa también `E0` y dibuja los parteluces de la fachada de PB. El auditorio queda sin camerino.
+
 ## Aro
 - Círculo con centro (505.75, 409.05), losa con r ≈ 39.5–46.55, piso a +10.03 (Rhino 9.92), 33 columnas.
 - **El aro y arte y cultura son uno:** el aro se ensancha sobre la azotea de cultura (`G.ponPlataforma(CD.azotea)`, tablas EXT/INT
