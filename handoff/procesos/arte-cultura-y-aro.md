@@ -75,6 +75,24 @@
   - Edificio cerrado: 1,988.
 - **Visor:** `prepara-cultura.py` pasa también `E0` y dibuja los parteluces de la fachada de PB. El auditorio queda sin camerino.
 
+## v30 (2026-10-23): PB y N1 a la mitad entre los dos comercios, núcleo compartido
+- **Reparto (PB y N1):** el Péndulo ocupa la mitad norte (hacia el patio) y el Gandhi la mitad sur. Péndulo 652 m², Gandhi 627 m² y café de la azotea 22.
+- **Núcleo en todos los niveles:**
+  - Un solo elevador-montacargas en (−8,16): cubo de 3 m, cabina ≈2.5 × 3.2, abre al norte.
+  - Baños en el resto de ese módulo y en (−7,16): accesible, mujeres y hombres.
+  - El ducto va pegado al cubo. En N2 no hay baños, sólo pasa el ducto. Se quitó el núcleo anterior de (−7,18).
+- **Vestíbulo común (PB y N1):** junta el elevador, los baños y la escalera.
+  - Encima de la escalera hay una doble altura de 12 m² (`H1`, hueco en la losa del N1) con barandal (`H1R`).
+  - Cada comercio entra con puerta de vidrio. En PB el vestíbulo tiene entrada propia por el poniente para subir a la exposición.
+- **Fachadas oeste y sur sólidas** (en PB y N1). Ahí se recarga la operación:
+  - Péndulo, al noroeste: cocina 27, bodega 13 y caja 12.
+  - Gandhi, al sur: bodega 51 y caja 27.
+  - Cuarto de máquinas, entre ellas: 25; sólo abre afuera.
+  - Datos: `F0s/F0g` y `F1s/F1g` son las líneas sólidas y las de vidrio. Las sólidas también van en `walls3`.
+- **N2:** el montaje pasa a (−7,17) junto a la llegada. Salas A 166 y B 65 m².
+- **Edificio cerrado:** 1,976 m². Comercio 1,301, talleres en renta 116, cultura y áreas comunes 559.
+- **Visor:** `prepara-cultura.py` pasa F0g/F1g (parteluces sólo en el vidrio), el hueco H1 de la losa del N1 y su barandal.
+
 ## Aro
 - Círculo con centro (505.75, 409.05), losa con r ≈ 39.5–46.55, piso a +10.03 (Rhino 9.92), 33 columnas.
 - **El aro y arte y cultura son uno:** el aro se ensancha sobre la azotea de cultura (`G.ponPlataforma(CD.azotea)`, tablas EXT/INT

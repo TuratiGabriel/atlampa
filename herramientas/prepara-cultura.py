@@ -155,11 +155,15 @@ export function construye() {
   for (const p of (D.umb || [])) P.aro.push(boxFrom(p.P, LV.PAD, LV.PAD + .4));
   // (la azotea no es losa suya: es el aro, que se ensancha sobre ella; sus vigas sí)
   for (const [Q, top] of [[D.N1, LV.N1], [D.N2, LV.N2], [D.RF, LV.RF]]) {
-    if (Q !== D.RF) P.losa.push(extr(Q, top - LV.slab, top));
+    if (Q !== D.RF) P.losa.push(extr(Q, top - LV.slab, top, Q === D.N1 && D.H1 ? [D.H1] : undefined));   // (v30) doble altura del vestíbulo
     const b = beamsUnder(Q, top - LV.slab); if (b) P.acero.push(b);
   }
-  // (v29) la planta baja también se cierra con vidrio (E0): Péndulo y Gandhi
-  for (const [E, z0, z1] of [[D.E0, 0, LV.N1 - LV.slab], [D.E1, LV.N1, LV.N2 - LV.slab], [D.E2, LV.N2, LV.RF - LV.slab]]) if (E) L.parteluz.push(mullions(E, z0, z1, 2.75));
+  // (v29) la planta baja también se cierra (E0); (v30) en PB y N1 sólo llevan vidrio y parteluces las fachadas oriente y norte
+  // (F0g, F1g: líneas abiertas); las oeste y sur son muros sólidos y llegan como muros del interior (walls3)
+  for (const [E, Fg, z0, z1] of [[D.E0, D.F0g, 0, LV.N1 - LV.slab], [D.E1, D.F1g, LV.N1, LV.N2 - LV.slab], [D.E2, null, LV.N2, LV.RF - LV.slab]]) {
+    if (!E) continue;
+    for (const Pm of (Fg || [E])) L.parteluz.push(mullions(Fg ? Pm.concat(Pm.slice(0, -1).reverse()) : Pm, z0, z1, 2.75));
+  }
   // barandal de las plataformas (línea a +1.00): se abre justo en el ancho de cada carril que llega o sale
   const GAPS = D.stairs.map(st => xStairGap(st, AC.Rc, C));
   const FIN = {};
@@ -174,6 +178,7 @@ export function construye() {
     for (const s of segs) { for (let i = 0; i + 1 < s.length; i++) pos.push(s[i][0], z + 1, -s[i][1], s[i + 1][0], z + 1, -s[i + 1][1]); (FIN[z] = FIN[z] || []).push(s[0], s[s.length - 1]); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); return g; };
   for (const [Q, z] of [[D.N1, LV.N1], [D.N2, LV.N2]]) L.borde.push(bordeCon(Q, z));
+  if (D.H1R) { const pos = []; for (let i = 0; i + 1 < D.H1R.length; i++) pos.push(D.H1R[i][0], LV.N1 + 1, -D.H1R[i][1], D.H1R[i + 1][0], LV.N1 + 1, -D.H1R[i + 1][1]); const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); L.borde.push(g); }   // barandal de la doble altura
   // uniones (v26): del final de cada barandal de escalera al de la losa del mismo lado del carril (ninguna cruza la escalera)
   { const pos = [], ends = z => FIN[Object.keys(FIN).find(k => Math.abs(+k - z) < .05)];
     for (const st of D.stairs) for (const [p, b, z] of xStairJoins(st, xStair(st, AC.laneFn, AC.Rc).rails, ends, AC.Rc, C)) pos.push(p[0], z + 1, -p[1], b[0], z + 1, -b[1]);
@@ -318,7 +323,7 @@ def datos_del_edificio():
                 q['i'], q['j'] = c['i'], c['j']
         umb.append(q)
     return {'C': v['C'], 'R0': v['R0'], 'RW': v['RW'], 'BULGE': v['BULGE'], 'S': v['S'], 'FAN': v['FAN'], 'lat': v['lat'], 'lv': v['lv'],
-            'N1': v['N1'], 'N2': v['N2'], 'RF': v['RF'], 'RFg': v['RFg'], 'E0': v.get('E0'), 'E1': v['E1'], 'E2': v['E2'], 'BOWL': v['BOWL'],
+            'N1': v['N1'], 'N2': v['N2'], 'RF': v['RF'], 'RFg': v['RFg'], 'E0': v.get('E0'), 'F0g': v.get('F0g'), 'F1g': v.get('F1g'), 'H1': v.get('H1'), 'H1R': v.get('H1R'), 'E1': v['E1'], 'E2': v['E2'], 'BOWL': v['BOWL'],
             'mods': mods, 'cols': [{'x': c['x'], 'y': c['y'], 'i': c['i'], 'j': c['j']} for c in v['cols']], 'par': [], 'umb': umb,
             'stairs': v['stairs'], 'grid': {'planes': []}, 'int': interior(ly, v['lv'])}
 
