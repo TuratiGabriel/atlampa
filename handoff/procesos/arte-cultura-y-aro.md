@@ -93,6 +93,10 @@
 - **Edificio cerrado:** 1,976 m². Comercio 1,301, talleres en renta 116, cultura y áreas comunes 559.
 - **Visor:** `prepara-cultura.py` pasa F0g/F1g (parteluces sólo en el vidrio), el hueco H1 de la losa del N1 y su barandal.
 
+## v31 (2026-10-23): muros sólidos sólo en PB y operación del Péndulo al oriente
+- En PB sólo son sólidos el oriente del Péndulo (hacia el aro), con su caja, cocina y bodega, y el sur del Gandhi (bodega, caja y cuarto de máquinas, que envuelve la esquina suroeste). La fachada poniente es de vidrio y el N1 es todo de vidrio, como antes (`F1g` = null en V3).
+- Se quitó el mobiliario de los comercios (no se propone): quedan sólo los espacios, la escalera del vestíbulo y los rótulos. Áreas sin cambio: Péndulo 652, Gandhi 627.
+
 ## Aro
 - Círculo con centro (505.75, 409.05), losa con r ≈ 39.5–46.55, piso a +10.03 (Rhino 9.92), 33 columnas.
 - **El aro y arte y cultura son uno:** el aro se ensancha sobre la azotea de cultura (`G.ponPlataforma(CD.azotea)`, tablas EXT/INT
