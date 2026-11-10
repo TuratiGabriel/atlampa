@@ -70,7 +70,7 @@
   zona.tabIndex = 0;
   // El dibujo: atlampa-3d.js (Three.js); los datos del sitio, atlampa-geo.js.
   var VER = (document.currentScript && document.currentScript.src.split('?')[1]) || '';
-  var estiloAct = 'clay', perspAct = false;
+  var estiloAct = 'plano', perspAct = false;
   var antesNolli = null, NORTE_ARRIBA = -9.96;   // azimut con el norte arriba (el modelo está girado 9.96°)
   function creaDibujo() {
     var d = window.Atlampa3D.crea(svg, { escena: ESCENA, az: azMeta, el: elMeta });
@@ -642,7 +642,6 @@
     var trazos = {
       color: '<path d="M12 3a9 9 0 1 0 0 18c1.7 0 2.2-1.4 1.2-2.5-.8-.9-.1-2.5 1.2-2.5H17a4 4 0 0 0 4-4c0-5-4-9-9-9Z"/>',
       perspectiva: '<path d="m12 2 9 5v10l-9 5-9-5V7l9-5Z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
-      clay: '<circle cx="12" cy="12" r="8"/><path d="M8 16c2-4 4-6 8-8"/>',
       rayado: '<path d="M4 8h16M4 12h16M4 16h16"/><rect x="3" y="3" width="18" height="18" rx="2"/>',
       plano: '<rect x="4" y="4" width="16" height="16"/>',
       despiece: '<path d="m12 3 8 4-8 4-8-4 8-4Z"/><path d="m4 13 8 4 8-4M12 11v6"/>',
@@ -658,7 +657,7 @@
     var vista = '<button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="' + prendida('color') + '">' + iconoOpcion('color') + '<span>Color</span></button>' +
       '<button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="' + perspAct + '">' + iconoOpcion('perspectiva') + '<span>Perspectiva</span></button>' +
       '<p class="hud-panel__t">Estilo</p>' +
-      ['clay', 'rayado', 'plano'].map(function (e) { var n = e === 'clay' ? 'Clay' : e === 'rayado' ? 'Rayado' : 'Plano'; return '<button class="hud-op hud-op--radio" type="button" data-estilo="' + e + '" aria-pressed="' + (estiloAct === e) + '">' + iconoOpcion(e) + '<span>' + n + '</span></button>'; }).join('');
+      ['rayado', 'plano'].map(function (e) { var n = e === 'rayado' ? 'Rayado' : 'Plano'; return '<button class="hud-op hud-op--radio" type="button" data-estilo="' + e + '" aria-pressed="' + (estiloAct === e) + '">' + iconoOpcion(e) + '<span>' + n + '</span></button>'; }).join('');
     nav.innerHTML = (partes.length ? '<details class="hud-menu" name="hud"><summary class="hud-menu__t">' + iconoMenu('partes') + '<span>Partes</span></summary><div class="hud-panel hud-panel--partes">' + filasPartes(partes) + '</div></details>' : '') +
       '<details class="hud-menu" name="hud"><summary class="hud-menu__t">' + iconoMenu('vista') + '<span>Vista</span></summary><div class="hud-panel">' + vista + '</div></details>' +
       '<button class="hud-salir" type="button" data-aisla-sale>Salir <span aria-hidden="true">✕</span></button>';

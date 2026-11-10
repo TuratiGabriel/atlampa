@@ -527,7 +527,7 @@ function crea(svg, op) {
   trabajo.insertBefore(lienzoEsq, svg);
 
   const escena = new THREE.Scene();
-  let estilo = ESTILOS.clay;
+  let estilo = ESTILOS.plano;
   escena.background = new THREE.Color(estilo.cielo || estilo.fondo);
 
   const camO = new THREE.OrthographicCamera(-1, 1, 1, -1, -2000, 4000);
@@ -538,7 +538,7 @@ function crea(svg, op) {
   const MATS = {};      // clave → ShaderMaterial
   const ARISTAS = {};   // clave → LineBasicMaterial
   const LINEAS = {};    // nombre → LineBasicMaterial (plantas, columnas…)
-  let conColor = false, resalta = null, espacioAct = null, conEsquema = false, infraAct = null, matPersEsq = null;
+  let conColor = true, resalta = null, espacioAct = null, conEsquema = false, infraAct = null, matPersEsq = null;
   // con el esquema compositivo, el modelo entero queda muy tenue (pero se lee: no se va a negro)
   const TENUE_ESQ = 0.32;
   // Inspeccionando la estructura (no sólo mostrándola): de lo demás sólo
