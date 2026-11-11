@@ -150,6 +150,9 @@ const CORTE_ALTO = 1.75;
 const CORTE_POS = { value: new THREE.Vector3(1e5, 1e5, 1e5) };
 const CORTE_ACT = { value: new THREE.Vector3(0, 0, 0) };
 const CORTE_DIR = { value: new THREE.Vector3(1, 1, 1) };
+const ELEV_ACT = { value: 0 };
+const ELEV_ORIG = { value: new THREE.Vector3() };
+const ELEV_DIR = { value: new THREE.Vector3(0, 0, 1) };
 
 /* Dibujar como a mano (las transiciones): cada arista se traza desde una de
    sus puntas, en un orden que mezcla un barrido (desde un punto, radial, o en
@@ -184,9 +187,12 @@ const DIB_LINEA = /* glsl */`
   }`;
 function dibujable(mat, U) {   // un LineBasicMaterial que se dibuja con el canal U
   mat.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, U);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aOtro; attribute float aLado;' + DIB_GLSL)
-      .replace('#include <begin_vertex>', DIB_LINEA);
+    Object.assign(sh.uniforms, U, { uElevacion: ELEV_ACT, uElevOrigen: ELEV_ORIG, uElevDir: ELEV_DIR });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aOtro; attribute float aLado; varying float vElevDist; uniform vec3 uElevOrigen, uElevDir;' + DIB_GLSL)
+      .replace('#include <begin_vertex>', DIB_LINEA)
+      .replace('#include <project_vertex>', 'vElevDist = dot((modelMatrix * vec4(transformed, 1.0)).xyz - uElevOrigen, uElevDir);\n#include <project_vertex>');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vElevDist; uniform float uElevacion;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\nif (uElevacion > 0.5) { diffuseColor.rgb = vec3(0.08); diffuseColor.a *= mix(0.95, 0.5, smoothstep(9.0, 11.0, vElevDist)); }');
   };
   mat.customProgramCacheKey = () => 'dib';
   return mat;
@@ -230,7 +236,7 @@ const VERT = /* glsl */`
   }`;
 const FRAG = /* glsl */`
   uniform vec3 uFondo; uniform vec3 uTinta; uniform float uModo; uniform float uTono; uniform float uPaso; uniform float uMundo;
-  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform vec3 uCortePos; uniform vec3 uCorteAct; uniform vec3 uCorteDir;
+  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform vec3 uCortePos; uniform vec3 uCorteAct; uniform vec3 uCorteDir; uniform float uElevacion; uniform vec3 uElevOrigen; uniform vec3 uElevDir;
   varying vec3 vN; varying vec3 vW;` + DIB_GLSL + `
   // una raya cada periodo de c (antialias con fwidth; si es muy denso, el promedio)
   float raya(float c, float grueso) {
@@ -251,6 +257,10 @@ const FRAG = /* glsl */`
         if (raya((gl_FragCoord.x - gl_FragCoord.y) / (4.5 * uPx), 0.3) < 0.4) discard;
         gl_FragColor = vec4(mix(uFondo, uTinta, 0.42 * uBrillo), uOpacidad); return;
       }
+    }
+    if (uElevacion > 0.5) {
+      float lejos = smoothstep(9.0, 11.0, dot(vW - uElevOrigen, uElevDir));
+      gl_FragColor = vec4(mix(vec3(0.70), vec3(0.84), lejos), uOpacidad); return;
     }
     // lo cortado: el interior del sólido, liso (poché)
     if (dot(uCorteAct, vec3(1.0)) > 0.5 && !gl_FrontFacing) { gl_FragColor = vec4(uTinta * 0.2 * uBrillo, uOpacidad); return; }
@@ -482,10 +492,14 @@ function crea(svg, op) {
   }
   const lienzo = LIENZO, renderer = RENDERER;
   if (lienzo.parentNode !== trabajo) trabajo.insertBefore(lienzo, svg);
+  const lienzoSeccion = document.createElement('canvas');
+  lienzoSeccion.className = 'ad-3d-seccion';
+  trabajo.insertBefore(lienzoSeccion, svg);
   renderer.clippingPlanes = [];
   CORTE_POS.value.set(1e5, 1e5, 1e5);
   CORTE_ACT.value.set(0, 0, 0);
   CORTE_DIR.value.set(1, 1, 1);
+  ELEV_ACT.value = 0;
   const CORTE_LIM = {
     x: [S.u0 - CEN[0], S.u1 - CEN[0]],
     y: [-14, Math.max(14, MOD ? MOD.z0 + 8 * MOD.alto : 14)],
@@ -494,6 +508,15 @@ function crea(svg, op) {
   const cortes = { x: 1, y: 1, z: 1 };
   const cortesInvertidos = { x: false, z: false };
   let corteFijo = false;
+  let elevacionAct = false, fachadaAct = 'norte', seccionPendiente = true;
+  function actualizaElevacion() {
+    const norte = fachadaAct === 'norte', sur = fachadaAct === 'sur', este = fachadaAct === 'este';
+    ELEV_DIR.value.set(fachadaAct === 'oeste' ? 1 : este ? -1 : 0, 0, norte ? 1 : sur ? -1 : 0);
+    const eje = norte || sur ? 'z' : 'x', lado = norte || fachadaAct === 'oeste' ? 0 : 1;
+    ELEV_ORIG.value.set(0, 0, 0);
+    ELEV_ORIG.value[eje] = CORTE_ACT.value[eje] ? CORTE_POS.value[eje] : CORTE_LIM[eje][lado];
+    seccionPendiente = true;
+  }
   function actualizaCortes() {
     const ax = cortes.x < 0.999, ay = corteFijo || cortes.y < 0.999, az = cortes.z < 0.999;
     const valor = (eje, t) => cortesInvertidos[eje]
@@ -508,6 +531,7 @@ function crea(svg, op) {
     if (ax) renderer.clippingPlanes.push(new THREE.Plane(new THREE.Vector3(-dx, 0, 0), dx * px));
     if (ay) renderer.clippingPlanes.push(new THREE.Plane(new THREE.Vector3(0, -1, 0), py));
     if (az) renderer.clippingPlanes.push(new THREE.Plane(new THREE.Vector3(0, 0, -dz), dz * pz));
+    if (elevacionAct) actualizaElevacion();
     pide();
   }
   function corta(eje, t, invertido) {
@@ -557,7 +581,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
       uniforms: Object.assign({ uFondo: { value: new THREE.Color(0, 0, 0) }, uTinta: { value: new THREE.Color(1, 1, 1) }, uModo: { value: 0 }, uTono: { value: 0.5 },
         uPaso: { value: 3 }, uMundo: { value: 0 }, uGris: { value: 0.1 }, uGrano: { value: 0 }, uOpacidad: { value: 1 }, uLuz: { value: luz }, uPx: { value: renderer.getPixelRatio() },
-        uBrillo: { value: 1 }, uGrueso: { value: 0.22 }, uCortePos: CORTE_POS, uCorteAct: CORTE_ACT, uCorteDir: CORTE_DIR }, canalDe(papel))
+        uBrillo: { value: 1 }, uGrueso: { value: 0.22 }, uCortePos: CORTE_POS, uCorteAct: CORTE_ACT, uCorteDir: CORTE_DIR,
+        uElevacion: ELEV_ACT, uElevOrigen: ELEV_ORIG, uElevDir: ELEV_DIR }, canalDe(papel))
     });
     m.userData.papel = papel;
     return (MATS[papel] = m);
@@ -618,7 +643,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     return 1;
   }
   function aplicaEstilo() {
-    escena.background = new THREE.Color(estilo.cielo || estilo.fondo);
+    escena.background = new THREE.Color(elevacionAct ? '#f2ffff' : estilo.cielo || estilo.fondo);
     const nada = !resalta && !espacioAct;
     Object.keys(MATS).forEach(k => {
       const m = MATS[k], e = estilo.papel[m.userData.papel] || estilo.papel.proyecto, u = m.uniforms;
@@ -642,14 +667,14 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     Object.keys(ARISTAS).forEach(k => {
       const m = ARISTAS[k], e = estilo.papel[m.userData.papel] || estilo.papel.proyecto;
       m.color.copy(tinta(m.userData.papel));
-      m.opacity = Math.min(1, (e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
+      m.opacity = Math.min(1, (elevacionAct ? Math.max(0.55, e.arista || 0) : e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
       if (enEstr && m.userData.papel !== 'aro' && m.opacity > 0.001) m.opacity = 0.42;
       m.visible = m.opacity > 0.001;
     });
     Object.keys(LINEAS).forEach(k => {
       const m = LINEAS[k], base = m.userData.nombre.split('-')[0];
       const pb = nada && ['pasto', 'flor', 'junco', 'tronco', 'sendero', 'rayo'].indexOf(base) >= 0 ? 1.3 : 1;
-      m.opacity = Math.min(1, (estilo.lineas[base] !== undefined ? estilo.lineas[base] : 0.4) * (m.userData.ref ? REF : pb)) * (apagadaLinea(base) ? TENUE : 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
+      m.opacity = Math.min(1, (elevacionAct ? 0.42 : estilo.lineas[base] !== undefined ? estilo.lineas[base] : 0.4) * (m.userData.ref ? REF : pb)) * (apagadaLinea(base) ? TENUE : 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
       if (enEstr) { const est = m.userData.nombre === 'columna'; m.opacity = est ? 1 : m.opacity * 0.6; m.depthTest = !est; m.renderOrder = est ? 5 : 0; }
       else { m.depthTest = true; m.renderOrder = 0; }
       if (espacioAct && LINEAS_PAISAJE.indexOf(base) >= 0) m.color.set(ESPACIO_COLOR.publico);
@@ -667,6 +692,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     }
     matArbol.uniforms.uOpacidad.value = (apArb ? TENUE : 1) * (infraAct ? 0.09 : 1); matArbol.transparent = apArb || !!infraAct; matArbol.depthWrite = !apArb && !infraAct;
     if (enEstr) { matArbol.uniforms.uOpacidad.value = 0.35; matArbol.transparent = true; matArbol.depthWrite = false; }
+    suelos.forEach(o => { o.visible = !elevacionAct; });
+    escena.traverse(o => { if (o.userData.exceso) o.visible = !elevacionAct; });
     pide();
   }
 
@@ -744,7 +771,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     [c.eg, c.ex].forEach(eg => {
       if (!eg) return;
       const am = arista(clave); am.userData.papel = papel; am.userData.ref = ref;
-      grupo.add(new THREE.LineSegments(eg, am));
+      const ar = new THREE.LineSegments(eg, am);
+      ar.userData.exceso = eg === c.ex;
+      grupo.add(ar);
     });
     return me;
   }
@@ -2414,6 +2443,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const capas = { modulos: !!MOD, paisaje: !!PAI, estructura: false, sol: false, flujos: false, arboles: false, postes: false, personas: false, accesos: false,
     nolli: false, planta: false, corte: false, esquema: false, 'instalacion-electrica': false, 'instalacion-hidraulica': false };
   function visibles() {
+    seccionPendiente = true;
     // Nolli: sólo la figura y fondo (más los accesos y las personas, si están)
     const n = capas.nolli;
     piezas.forEach(p => { p.g.visible = !n && !p.g.userData.oculto; });
@@ -2421,7 +2451,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     gMods.forEach(g => { g.visible = !n && GENERAL && capas.modulos && !ocultos.has('vivienda'); });
     gPai.visible = gPlantas.visible = !n && capas.paisaje && !gPai.userData.oculto;
     gCol.visible = gEstr.visible = !n && capas.estructura;
-    gEst.visible = !n && ESC === 'estacionamiento';
+    gEst.visible = !n && (ESC === 'estacionamiento' || elevacionAct) && !ocultos.has('estacionamiento');
     gEstEntradas.visible = !n && GENERAL && !ocultos.has('estacionamiento');
     gSol.visible = !n && capas.sol;
     gPers.visible = capas.personas;
@@ -2468,7 +2498,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (aisl) return aisl.caja;
     if (capas.nolli) return [S.u0 - 110, S.u1 + 110, S.v0 - 90, S.v1 + 90, 0, 1];
     if (capas.sol) return [CEN[0] - R_SOL, CEN[0] + R_SOL, CEN[1] - R_SOL, CEN[1] + R_SOL, 0, R_SOL];
-    if (GENERAL) return [S.u0, S.u1, S.v0, S.v1, 0, MOD ? MOD.z0 + 7 * (MOD.paso || MOD.alto) + MOD.alto : 14];
+    if (GENERAL) return [S.u0, S.u1, S.v0, S.v1, elevacionAct ? -14 : 0, MOD ? MOD.z0 + 7 * (MOD.paso || MOD.alto) + MOD.alto : 14];
     return cajaAp(ESC);
   }
   function cajaAp(ap) {
@@ -2530,10 +2560,82 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   let pedido = false, muerto = false;
   function pide() { if (!pedido && !muerto) { pedido = true; requestAnimationFrame(pinta); } }
   const tmp = new THREE.Vector3();
+  let secciones = [];
+  function armaSeccion() {
+    seccionPendiente = false; secciones = [];
+    if (!elevacionAct) return;
+    const eje = fachadaAct === 'norte' || fachadaAct === 'sur' ? 'z' : 'x';
+    if (!CORTE_ACT.value[eje]) return;
+    const h = CORTE_POS.value[eje], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), mat = new THREE.Matrix4();
+    const clave = p => Math.round(p.x * 50) + ',' + Math.round(p.y * 50) + ',' + Math.round(p.z * 50);
+    escena.updateMatrixWorld(true);
+    escena.traverse(o => {
+      if (!o.isMesh || !o.material.uniforms || !o.material.uniforms.uCortePos || suelos.includes(o)) return;
+      for (let p = o; p; p = p.parent) if (!p.visible || p === gCorte || p === gNolli) return;
+      const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count;
+      const enlaces = [], vecinos = new Map();
+      const cuenta = o.isInstancedMesh ? o.count : 1;
+      for (let k = 0; k < cuenta; k++) {
+        if (o.isInstancedMesh) { o.getMatrixAt(k, mat); mat.premultiply(o.matrixWorld); } else mat.copy(o.matrixWorld);
+        for (let i = 0; i < n; i += 3) {
+          a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(mat);
+          b.fromBufferAttribute(pos, idx ? idx.getX(i + 1) : i + 1).applyMatrix4(mat);
+          c.fromBufferAttribute(pos, idx ? idx.getX(i + 2) : i + 2).applyMatrix4(mat);
+          const vs = [a, b, c], pts = [];
+          for (let j = 0; j < 3; j++) {
+            const p = vs[j], q = vs[(j + 1) % 3], d = p[eje] - h, e = q[eje] - h;
+            if (d * e < 0) pts.push(p.clone().lerp(q, -d / (e - d)));
+          }
+          if (pts.length !== 2) continue;
+          const id = enlaces.length, ka = clave(pts[0]), kb = clave(pts[1]);
+          enlaces.push({ pts, ka, kb });
+          for (const kk of [ka, kb]) { if (!vecinos.has(kk)) vecinos.set(kk, []); vecinos.get(kk).push(id); }
+        }
+      }
+      const usados = new Set(), curvas = [];
+      enlaces.forEach((seg, inicio) => {
+        if (usados.has(inicio)) return;
+        usados.add(inicio);
+        const puntos = [seg.pts[0], seg.pts[1]], origen = seg.ka;
+        let fin = seg.kb;
+        while (fin !== origen && puntos.length < enlaces.length + 1) {
+          const siguiente = (vecinos.get(fin) || []).find(id => !usados.has(id));
+          if (siguiente === undefined) break;
+          usados.add(siguiente);
+          const s = enlaces[siguiente], cambia = s.ka === fin;
+          puntos.push(s.pts[cambia ? 1 : 0]); fin = cambia ? s.kb : s.ka;
+        }
+        if (fin === origen && puntos.length >= 4) curvas.push(puntos);
+      });
+      if (curvas.length) secciones.push(curvas);
+    });
+  }
+  function dibujaSeccion() {
+    const ctx = lienzoSeccion.getContext('2d'), dpr = renderer.getPixelRatio();
+    const w = lienzoSeccion.width / dpr, h = lienzoSeccion.height / dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    if (!elevacionAct) return;
+    if (seccionPendiente) armaSeccion();
+    const suelo = new THREE.Vector3(0, 0, 0).project(cam), ySuelo = (1 - suelo.y) * h / 2;
+    ctx.fillStyle = 'rgba(45,48,49,.035)'; ctx.fillRect(0, ySuelo, w, h - ySuelo);
+    const proy = p => { const q = p.clone().project(cam); return [(q.x + 1) * w / 2, (1 - q.y) * h / 2]; };
+    secciones.forEach(curvas => {
+      const path = new Path2D();
+      curvas.forEach(puntos => { puntos.forEach((p, i) => { const q = proy(p); if (i) path.lineTo(q[0], q[1]); else path.moveTo(q[0], q[1]); }); path.closePath(); });
+      ctx.fillStyle = '#54585a'; ctx.fill(path, 'evenodd');
+      ctx.save(); ctx.clip(path, 'evenodd'); ctx.strokeStyle = '#3c4042'; ctx.lineWidth = 1;
+      for (let x = -h; x < w + h; x += 8) { ctx.beginPath(); ctx.moveTo(x, h); ctx.lineTo(x + h, 0); ctx.stroke(); }
+      ctx.restore();
+      ctx.strokeStyle = '#141617'; ctx.lineWidth = 2; ctx.stroke(path);
+    });
+    ctx.strokeStyle = '#141617'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(0, ySuelo); ctx.lineTo(w, ySuelo); ctx.stroke();
+  }
   function pinta() {
     pedido = false;
     if (muerto) return;
     renderer.render(escena, cam);
+    dibujaSeccion();
     if (ext.pinta) ext.pinta(cam);
     if (conEsquema || !esqLimpio) dibujaEsquema();
     if (capas.sol) {
@@ -2548,6 +2650,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const w = trabajo.clientWidth, h = trabajo.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false);
+    const dpr = renderer.getPixelRatio();
+    lienzoSeccion.width = Math.round(w * dpr); lienzoSeccion.height = Math.round(h * dpr);
     Object.keys(MATS).forEach(k => { MATS[k].uniforms.uPx.value = renderer.getPixelRatio(); });
     ASP = w / h;
   }
@@ -2558,8 +2662,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const EL_DENTRO = [-60, 85];
   function vista(x, az, el) {
     const fija = dentro() ? camP.position.clone() : null;
-    if (az !== undefined) AZ = ((az % 360) + 360) % 360;
-    if (el !== undefined) EL = fija ? Math.max(EL_DENTRO[0], Math.min(EL_DENTRO[1], el)) : Math.max(EL_MIN, Math.min(EL_MAX, el));
+    if (az !== undefined) AZ = elevacionAct ? { norte: 180, sur: 0, este: 270, oeste: 90 }[fachadaAct] : ((az % 360) + 360) % 360;
+    if (el !== undefined) EL = elevacionAct ? 0 : fija ? Math.max(EL_DENTRO[0], Math.min(EL_DENTRO[1], el)) : Math.max(EL_MIN, Math.min(EL_MAX, el));
     if (fija) base.c.copy(fija).addScaledVector(direccion(), base.h / Math.tan(camP.fov / 2 * RAD));
     const nx = GENERAL ? Math.max(0, Math.min(1, x || 0)) : 0;
     if (nx !== X) { X = nx; encuadra(); if (ext.vista) ext.vista(X); }   // al abrir (y con el contexto)
@@ -2928,7 +3032,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     });
     Object.values(MATS).forEach(m => m.dispose()); Object.values(ARISTAS).forEach(m => m.dispose()); Object.values(LINEAS).forEach(m => m.dispose());
     renderer.renderLists.dispose();
-    capaRot.remove(); lienzoEsq.remove();
+    capaRot.remove(); lienzoEsq.remove(); lienzoSeccion.remove();
   }
   function cambiaEstilo(n) {
     if (!ESTILOS[n]) return;
@@ -2937,8 +3041,15 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   }
   let persp = true;
   // en planta y en el Nolli, siempre ortográfica
-  function camaraSegun() { cam = capas.nolli || capas.planta || capas.corte ? camO : persp ? camP : camO; }
+  function camaraSegun() { cam = elevacionAct || capas.nolli || capas.planta || capas.corte ? camO : persp ? camP : camO; }
   function perspectiva(si) { persp = !!si; camaraSegun(); ponCamara(); }
+  function elevacionModo(si, lado) {
+    elevacionAct = !!si;
+    if (['norte', 'sur', 'este', 'oeste'].includes(lado)) fachadaAct = lado;
+    ELEV_ACT.value = elevacionAct ? 1 : 0;
+    lienzoSeccion.style.display = elevacionAct ? '' : 'none';
+    actualizaElevacion(); camaraSegun(); visibles(); aplicaEstilo(); encuadra(); ponCamara();
+  }
 
   /* ----- extras (atlampa-3d-ctx.js) -----
      ext = EXTRAS.crea(api): lo que el motor les presta (herramientas de
@@ -2962,10 +3073,10 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   vista(0, AZ, EL);
 
   return {
-    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura,
+    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura, elevacionModo,
     aisla, partes, ponParte, despiece, aislado: () => aisl ? aisl.ap : null, camara, corta,
     naveNorteEn,
-    depura: () => ({ escena, capas }),   // para revisar desde la consola
+    depura: () => ({ escena, capas, elevacion: elevacionAct, fachada: fachadaAct, camaraOrtogonal: cam === camO }),
     preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); },
     contextoListo: () => !ext.listo || ext.listo(), separa,
     fluye(ms) { mueveInfra(ms); if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
