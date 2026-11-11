@@ -263,6 +263,19 @@ body.sin-sol [data-l="sol"], body.sin-arboles [data-l="arboles"], body.sin-perso
   background:rgba(0,0,0,.82); border:1px solid var(--trazo); border-radius:50%;
   cursor:pointer; transition:border-color .2s var(--ease-ui);
 }
+.ad-mini-fachadas{ position:relative; width:108px; height:108px; display:grid; place-items:center; flex:none; }
+.ad-mini-fachada{
+  position:absolute; z-index:2; width:24px; height:24px; padding:0; border:1px solid rgba(255,255,255,.42);
+  border-radius:50%; background:#111315; color:#fff; font:11px var(--font-display); cursor:pointer;
+  box-shadow:0 2px 9px rgba(0,0,0,.24);
+}
+.ad-mini-fachada--n{ top:0; left:42px; }
+.ad-mini-fachada--s{ bottom:0; left:42px; }
+.ad-mini-fachada--e{ right:0; top:42px; }
+.ad-mini-fachada--o{ left:0; top:42px; }
+.ad-mini-fachada[aria-pressed="true"]{ background:#fff; color:#111; border-color:#111; }
+.ad-mini-fachada:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+.ad-3d-seccion{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; }
 /* brújula: un clic nortea la vista */
 @media (hover:hover){ .ad-mini:hover{ border-color:rgba(255,255,255,.5); } }
 .ad-mini:focus-visible{ outline:1px solid var(--fg); outline-offset:3px; }
