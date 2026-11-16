@@ -97,6 +97,22 @@
 - En PB sólo son sólidos el oriente del Péndulo (hacia el aro), con su caja, cocina y bodega, y el sur del Gandhi (bodega, caja y cuarto de máquinas, que envuelve la esquina suroeste). La fachada poniente es de vidrio y el N1 es todo de vidrio, como antes (`F1g` = null en V3).
 - Se quitó el mobiliario de los comercios (no se propone): quedan sólo los espacios, la escalera del vestíbulo y los rótulos. Áreas sin cambio: Péndulo 652, Gandhi 627.
 
+## v32 y v33 (2026-11-04/05): cocina del Péndulo y arranques de X1 y X4
+- **Péndulo:** cocina de 44 m² en (−7..−6,19) y bodega de 22.3 m² en (−5,19), contra el muro oriente, con equipo indicativo y puerta de servicio. Barra y caja de 22 m² en (−6,18).
+- **X1 y X4 son escaleras Vessel:** cada una tiene dos arranques a ±0.00 y dos llegadas a +3.00. En cada arranque, la fachada de PB sigue la curva de la escalera (a 0.55 m) y remata recto, sin meterse más al edificio. Es regla de Diego: la menor cantidad de curvas.
+- **Puertas:** el Gandhi abre frente al arranque poniente de X1, el Péndulo junto al oriente y el vestíbulo común frente al norte de X4. En N1, X4 llega a dos puertas nuevas del Gandhi. Las puertas de vidrio abren un hueco de 1.8 m en `F0g`/`F1g`.
+- **Edificio cerrado:** 1,953 m². Comercio 1,277.9 (Péndulo 649.9, Gandhi 606.0 y café 22), talleres 115.8, cultura y áreas comunes 559.3.
+
+## v34 (2026-11-16): baño de hombres de la azotea
+- X3 llegaba a la azotea contra el muro oriente del baño de hombres. Ese baño pasó a (−7,17), junto al de mujeres, con su puerta al norte, y el de mujeres abre ahora al oriente, hacia la llegada de X3. Los baños siguen sumando 32 m².
+
+## v35 (2026-11-16): sin auditorio
+- Se quitó el auditorio por completo (el foso a −3.00 con gradas y escenario: `BOWL` y `FAN`) porque chocaba con el estacionamiento subterráneo. Su lugar queda como patio a ±0.00, y las terrazas de N1 y N2 ya no se cuentan como gradas. Las áreas cerradas no cambian.
+- **Visor:**
+  - `prepara-cultura.py` ya no genera la malla `auditorio` ni pone el foso en `pisa`.
+  - En `atlampa-3d.js` (bloque de cultura), el suelo y el predio ya no abren el hueco del foso (antes `CD.pisa[0]`), el Nolli dibuja `pisa` parejo y se quitó la parte «Auditorio» del menú.
+- **Rhino:** Diego ya no lo usa para arte y cultura (2026-11-16). La fuente es la hoja `modelo/arte_y_cultura_plantas.html`.
+
 ## Aro
 - Círculo con centro (505.75, 409.05), losa con r ≈ 39.5–46.55, piso a +10.03 (Rhino 9.92), 33 columnas.
 - **El aro y arte y cultura son uno:** el aro se ensancha sobre la azotea de cultura (`G.ponPlataforma(CD.azotea)`, tablas EXT/INT

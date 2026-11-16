@@ -792,7 +792,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   const matArbol = matAtlas(ARBOLES_TEX.tex, ARBOLES_TEX.N, 1, DIB.base);
   // Arte y cultura detallado: el paisaje sólo se quita donde estorba de verdad
-  // (el foso del auditorio, los módulos de planta baja); los árboles, además,
+  // (los módulos de planta baja; el foso del auditorio se quitó en la v35); los árboles, además,
   // bajo la losa del nivel 1. Lo demás del suelo sigue debajo del edificio.
   // (se arma una vez: ya trasladado al diagrama y con sus aristas)
   const CD = CULTURA_DET ? fija('cultura', () => {
@@ -812,10 +812,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const CAJA_N = MERCADO && MERCADO.paso3 ? MERCADO.cajaN : null;
   function conHuecoN(c, z, m, recorte) {
     menosCaja(c, CAJA_N).forEach(q => {
-      const r = recorte ? G.recortaConvexo(q, recorte) : rect(q[0], q[1], q[2], q[3]), F = CD && CD.pisa[0];
+      const r = recorte ? G.recortaConvexo(q, recorte) : rect(q[0], q[1], q[2], q[3]);
       if (!r) return;
-      if (F && F.every(p => p[0] > q[0] && p[0] < q[2] && p[1] > q[1] && p[1] < q[3])) tapaHueco(m, r, F, z);
-      else tapa(m, r, z);
+      tapa(m, r, z);   // (sin el hueco del foso de arte y cultura: el auditorio se quitó en la v35)
     });
   }
 
@@ -833,7 +832,6 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const m = new Malla();
     if (ESC === 'estacionamiento') tapaHueco(m, rect(S.u0, S.v0, S.u1, S.v1), PRED, 0);
     else if (CAJA_N) conHuecoN([S.u0, S.v0, S.u1, S.v1], 0, m);   // Comercio: sin suelo bajo la nave norte (zanja y jardín hundidos)
-    else if (CD) tapaHueco(m, rect(S.u0, S.v0, S.u1, S.v1), CD.pisa[0], 0);   // con el foso del auditorio abierto
     else tapa(m, rect(S.u0, S.v0, S.u1, S.v1), 0);
     suelos.push(pon(gSitio, m, 'suelo', null));
     const [SW, SE, NE, NW] = GUP;
@@ -862,7 +860,6 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   {
     const m = new Malla();
     if (CAJA_N) conHuecoN([PB.u0, PB.v0, PB.u1, PB.v1], 0.2, m, PRED);   // Comercio: la nave norte trae su propio piso
-    else if (CD) tapaHueco(m, PRED, CD.pisa[0], 0.2);   // con el hueco del foso del auditorio
     else tapa(m, PRED, 0.2);
     // el área verde es del paisaje (se queda en su apartado) pero no se pica: picar el piso no abre nada
     const verde = pon(gPredio, m, PAI ? 'verde' : 'predio', PAI ? 'paisajismo' : null, 1);
@@ -1419,7 +1416,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   /* ===== 6b. Arte y cultura (el concepto detallado) =====
      Reemplaza a los pabellones simples en todas las escenas: un edificio de
-     tres niveles con auditorio hundido, escaleras en X, fachada de diagonales
+     tres niveles (sin auditorio desde la v35), escaleras en X, fachada de diagonales
      y parasoles a +12, bajo el aro de siempre (el suyo, más chico, no va).
      Viene en el sistema de Rhino: se traslada como los módulos. Los vidrios
      no se dibujan (nada transparente): la fachada se lee por sus parteluces. */
@@ -1429,7 +1426,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const g = pieza('cultura-detalle', 'cultura', 0.45);
     // en su apartado se ve por dentro (muros, vidrios como marcos y mobiliario); en las demás escenas, módulos y núcleos como cajas
     const PARTES_CD = [['losa', 'Losas', ['m-losa', 'l-borde']], ['acero', 'Estructura de acero', ['m-acero']],
-      ['escalera', 'Escaleras', ['m-escalera', 'l-huella']], ['auditorio', 'Auditorio', ['m-auditorio']], ['aro', 'Sombrillas', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]]
+      ['escalera', 'Escaleras', ['m-escalera', 'l-huella']], ['aro', 'Sombrillas', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]]
       .concat(ESC === 'cultura' ? [['interior', 'Muros interiores', ['m-muro']], ['vidrio', 'Vidrios (marcos)', ['l-vidrio']], ['mobiliario', 'Mobiliario', ['m-mueble']]]
         : [['modulos', 'Módulos', ['m-modulo']], ['nucleo', 'Núcleos', ['m-nucleo']]]);
     PARTES_CD.forEach(([id, nombre, ks]) => {
@@ -2294,8 +2291,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     }
     // naves: su planta (recortada a las fachadas y por el círculo del aro)
     G.NAVES.forEach(nv => { const pol = G.menosCirculo(rect(nv.L.u0, nv.L.v0, nv.L.u1, nv.L.v1), [ANILLO.u, ANILLO.v], CORTE); if (pol) muro(pol, MURO); });
-    // arte y cultura: los módulos de planta baja (núcleos, oficinas…) y el foso del auditorio
-    if (CD) CD.pisa.forEach((pol, k) => muro(pol, k ? MURO : MURO * 0.7));
+    // arte y cultura: los módulos de planta baja (núcleos, oficinas…); desde la v35 ya no hay foso del auditorio
+    if (CD) CD.pisa.forEach(pol => muro(pol, MURO));
     // estructura: columnas del aro (Ø 0.8), de arte y cultura (Ø 0.6) y las que bajan de los módulos (□ 0.5, exageradas un poco)
     const punto = (u, v, r) => { const c = circ([u, v], r, 12); for (let k = 0; k < 12; k++) ed.tri(W(u, v, z), W(c[k][0], c[k][1], z), W(c[(k + 1) % 12][0], c[(k + 1) % 12][1], z)); };
     COLUMNAS.forEach(c => punto(c[0], c[1], 0.45));

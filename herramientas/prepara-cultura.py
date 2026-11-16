@@ -4,7 +4,7 @@
 
 Lee dos hojas de Diego SIN modificarlas:
   · modelo/arte_y_cultura_plantas.html: el edificio vigente (hoja de plantas v22):
-    placas N1, N2 y azotea, salas, auditorio, columnas, escaleras X1–X6, módulos de
+    placas N1, N2 y azotea, salas, columnas, escaleras X1–X6, módulos de
     cada nivel, sombrillas (las del edificio y las del tramo este del aro) y la
     azotea con los descansos de X3 y X6 (RFg), donde se ensancha el aro.
   · modelo/arte_y_cultura_concepto.html: las funciones de geometría de su visor
@@ -12,11 +12,12 @@ Lee dos hojas de Diego SIN modificarlas:
     (Rc, ringP, laneFn, flights). laneFn se ajusta para que las escaleras traseras
     (X4–X6) sigan el eje del aro de proyecto (C, R0, BULGE).
 Encima va construye(): las mallas y líneas del edificio por papel (losa, módulos, núcleo,
-estructura, sombrillas, escaleras con escalones y zancas, auditorio) y el interior de la hoja
+estructura, sombrillas, escaleras con escalones y zancas) y el interior de la hoja
 (muros y mamparas, vidrios como marcos, mobiliario: DATA.int) en su sistema local (x, z arriba, −y).
 El visor muestra los módulos como cajas en la vista general y el interior en el apartado de arte y cultura.
 Sin la azotea (es el aro del conjunto, que se ensancha sobre `azotea`), sin la
-estructura en X (solo columnas) y sin rampas.
+estructura en X (solo columnas) y sin rampas. Sin auditorio desde la hoja v35
+(2026-11-16): el foso a −3.00 chocaba con el estacionamiento subterráneo.
 Su sistema es el de Rhino: al diagrama se pasa con la misma traslación que los
 módulos (campo 'lat'): +497.9986, +392.0954 y +0.52 m.
 
@@ -141,11 +142,8 @@ function xStairJoins(st, rails, ends, Rc, C) {
   return out;
 }
 export function construye() {
-  const P = { losa: [], modulo: [], nucleo: [], acero: [], aro: [], escalera: [], auditorio: [], muro: [], mueble: [] }, L = { parteluz: [], huella: [], borde: [], vidrio: [] };
-  P.auditorio.push(walls(D.BOWL, F.zPit, 0), flat(D.BOWL, F.zPit));
-  const rowD = (F.rout - F.rin) / F.rows;
-  for (let k = 0; k < F.rows; k++) P.auditorio.push(extr(sector(S, F.rin + rowD * k, F.rin + rowD * (k + 1), F.b0, F.b1), F.zPit, F.zPit + F.rise * (k + 1)));
-  P.auditorio.push(extr(sector(S, F.st0, F.st1, F.sb0, F.sb1), F.zPit, F.zStage));
+  const P = { losa: [], modulo: [], nucleo: [], acero: [], aro: [], escalera: [], muro: [], mueble: [] }, L = { parteluz: [], huella: [], borde: [], vidrio: [] };
+  // (v35, 2026-11-16) sin auditorio: el foso, sus gradas y el escenario chocaban con el estacionamiento subterráneo
   // (2026-10-13, hoja de plantas v22) solo columnas, sin estructura en X; las que llevan sombrilla siguen a +15.00 y abren una losa de un módulo
   const conUmb = new Set((D.umb || []).filter(p => !p.ring).map(p => p.i + ',' + p.j));
   for (const p of (D.umb || []).filter(p => p.ring)) { const g = new THREE.CylinderGeometry(.27, .22, LV.PAD - p.base, 12); g.translate(p.x, (p.base + LV.PAD) / 2, -p.y); P.acero.push(g); }
@@ -204,11 +202,11 @@ export function construye() {
   const mallas = {}, lineas = {};
   for (const k in P) if (P[k].length) mallas[k] = mergeGeometries(P[k].map(g => g.index ? g.toNonIndexed() : g).map(g => { for (const a of Object.keys(g.attributes)) if (a !== 'position' && a !== 'normal') g.deleteAttribute(a); if (!g.attributes.normal) g.computeVertexNormals(); return g; }));
   for (const k in L) if (L[k].length) lineas[k] = mergeGeometries(L[k]);
-  // lo que pisa en planta baja (para no poner paisaje ahí): el foso del
-  // auditorio y los módulos de planta baja; y la huella del nivel 1 (los
-  // árboles no caben bajo la losa)
+  // lo que pisa en planta baja (para no poner paisaje ahí): los módulos de
+  // planta baja (desde la v35 ya no hay foso del auditorio); y la huella del
+  // nivel 1 (los árboles no caben bajo la losa)
   const enDiagrama = Q => Q.map(p => [p[0] + DX, p[1] + DY]);
-  const pisa = [enDiagrama(D.BOWL)].concat(D.mods.filter(m => m.lv === 'PB' || m.lv === 'PIT').map(m => enDiagrama(m.P)));
+  const pisa = D.mods.filter(m => m.lv === 'PB' || m.lv === 'PIT').map(m => enDiagrama(m.P));
   // columnas de la retícula, para el mapa Nolli
   const cols = D.cols.map(c => [c.x + DX, c.y + DY]);
   const aberturas = [];
@@ -322,8 +320,8 @@ def datos_del_edificio():
             if math.hypot(c['x'] - p['x'], c['y'] - p['y']) < 0.05:
                 q['i'], q['j'] = c['i'], c['j']
         umb.append(q)
-    return {'C': v['C'], 'R0': v['R0'], 'RW': v['RW'], 'BULGE': v['BULGE'], 'S': v['S'], 'FAN': v['FAN'], 'lat': v['lat'], 'lv': v['lv'],
-            'N1': v['N1'], 'N2': v['N2'], 'RF': v['RF'], 'RFg': v['RFg'], 'E0': v.get('E0'), 'F0g': v.get('F0g'), 'F1g': v.get('F1g'), 'H1': v.get('H1'), 'H1R': v.get('H1R'), 'E1': v['E1'], 'E2': v['E2'], 'BOWL': v['BOWL'],
+    return {'C': v['C'], 'R0': v['R0'], 'RW': v['RW'], 'BULGE': v['BULGE'], 'S': v['S'], 'lat': v['lat'], 'lv': v['lv'],
+            'N1': v['N1'], 'N2': v['N2'], 'RF': v['RF'], 'RFg': v['RFg'], 'E0': v.get('E0'), 'F0g': v.get('F0g'), 'F1g': v.get('F1g'), 'H1': v.get('H1'), 'H1R': v.get('H1R'), 'E1': v['E1'], 'E2': v['E2'],
             'mods': mods, 'cols': [{'x': c['x'], 'y': c['y'], 'i': c['i'], 'j': c['j']} for c in v['cols']], 'par': [], 'umb': umb,
             'stairs': v['stairs'], 'grid': {'planes': []}, 'int': interior(ly, v['lv'])}
 
