@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261014e'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261111a'      # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -45,6 +45,7 @@ ICONOS = {
     'color': '<path d="M12 3a9 9 0 1 0 0 18c1.7 0 2.2-1.4 1.2-2.5-.8-.9-.1-2.5 1.2-2.5H17a4 4 0 0 0 4-4c0-5-4-9-9-9Z"/><circle cx="7.5" cy="10" r=".8"/><circle cx="10" cy="6.5" r=".8"/><circle cx="15" cy="7.5" r=".8"/>',
     'perspectiva': '<path d="m12 2 9 5v10l-9 5-9-5V7l9-5Z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
     'planta': '<rect x="3" y="3" width="18" height="18"/><path d="M8 3v8h8V3M8 21v-6h5"/>',
+    'elevacion': '<path d="M3 20h18M5 20V5h14v15M9 9h2M14 9h2M9 14h2M14 14h2"/>',
     'nolli': '<path d="M3 3h7v7H3zM14 3h7v4h-7zM14 11h7v10h-7zM3 14h7v7H3z"/>',
     'instalacion-electrica': '<path d="m13 2-7 11h5l-1 9 8-12h-5l0-8Z"/><path d="M4 4h3M17 20h3"/>',
     'instalacion-hidraulica': '<path d="M12 2C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-13Z"/><path d="M9 16c.5 1.5 1.5 2 3 2"/>',
@@ -261,6 +262,7 @@ PLANTILLA = '''<!doctype html>
         <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">{icon_color}<span>Color</span></button>
         <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="false">{icon_perspectiva}<span>Perspectiva</span></button>
         <button class="hud-op" type="button" data-capa="planta" aria-pressed="false">{icon_planta}<span>Planta</span></button>
+        <button class="hud-op" type="button" data-capa="elevacion" aria-pressed="false">{icon_elevacion}<span>Elevación</span></button>
         <button class="hud-op" type="button" data-capa="nolli" aria-pressed="false">{icon_nolli}<span>Mapa Nolli</span></button>
         <p class="hud-panel__t">Instalaciones</p>
         <button class="hud-op hud-op--radio" type="button" data-capa="instalacion-electrica" aria-pressed="false">{icon_instalacion_electrica}<span>Instalación eléctrica</span></button>
@@ -296,7 +298,13 @@ PLANTILLA = '''<!doctype html>
   </aside>
 
   <div class="hud-camara">
-    <svg class="ad-mini" data-minimapa role="button" tabindex="0" aria-label="Brújula: nortear la vista"></svg>
+    <div class="ad-mini-fachadas" data-fachadas>
+      <svg class="ad-mini" data-minimapa role="button" tabindex="0" aria-label="Brújula: nortear la vista"></svg>
+      <button type="button" class="ad-mini-fachada ad-mini-fachada--n" data-fachada="norte" title="Fachada norte" aria-label="Ver elevación norte">N</button>
+      <button type="button" class="ad-mini-fachada ad-mini-fachada--s" data-fachada="sur" title="Fachada sur" aria-label="Ver elevación sur">S</button>
+      <button type="button" class="ad-mini-fachada ad-mini-fachada--e" data-fachada="este" title="Fachada este" aria-label="Ver elevación este">E</button>
+      <button type="button" class="ad-mini-fachada ad-mini-fachada--o" data-fachada="oeste" title="Fachada oeste" aria-label="Ver elevación oeste">O</button>
+    </div>
     <div class="ad-zoom" role="group" aria-label="Zoom">
       <button class="ad-zoom__b" type="button" data-zoom="mas" aria-label="Acercar">+</button>
       <button class="ad-zoom__b" type="button" data-zoom="0" aria-label="Regresar al encuadre">⟲</button>
@@ -366,7 +374,7 @@ def main():
             icon_propuesto=icono('propuesto'), icon_capas=icono('capas'), icon_diagramas=icono('diagramas'),
             icon_vista=icono('vista'), icon_leyenda=icono('leyenda'), icon_predio=opcion_icono('predio'),
             icon_color=opcion_icono('color'), icon_perspectiva=opcion_icono('perspectiva'),
-            icon_planta=opcion_icono('planta'), icon_nolli=opcion_icono('nolli'), icon_clay=opcion_icono('clay'),
+            icon_planta=opcion_icono('planta'), icon_elevacion=opcion_icono('elevacion'), icon_nolli=opcion_icono('nolli'), icon_clay=opcion_icono('clay'),
             icon_instalacion_electrica=opcion_icono('instalacion-electrica'),
             icon_instalacion_hidraulica=opcion_icono('instalacion-hidraulica'),
             icon_rayado=opcion_icono('rayado'), icon_plano=opcion_icono('plano'))

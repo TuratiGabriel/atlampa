@@ -71,6 +71,8 @@
   // El dibujo: atlampa-3d.js (Three.js); los datos del sitio, atlampa-geo.js.
   var VER = (document.currentScript && document.currentScript.src.split('?')[1]) || '';
   var estiloAct = 'clay', perspAct = false;
+  var fachadaAct = 'norte', antesElevacion = null;
+  var AZ_FACHADA = { norte: 180, sur: 0, este: 270, oeste: 90 };
   var antesNolli = null, NORTE_ARRIBA = -9.96;   // azimut con el norte arriba (el modelo está girado 9.96°)
   function creaDibujo() {
     var d = window.Atlampa3D.crea(svg, { escena: ESCENA, az: azMeta, el: elMeta });
@@ -226,7 +228,27 @@
   }
   function ponCapa(nombre, si) {
     marca(boton(nombre), si);
+    if (si && (nombre === 'planta' || nombre === 'nolli' || nombre === 'corte') && prendida('elevacion')) ponCapa('elevacion', false);
     if (nombre === 'separa') { dib.separa(si); escala(); return; }
+    if (nombre === 'elevacion') {
+      if (si && !antesElevacion) antesElevacion = { az: azMeta, el: elMeta };
+      if (si) ['planta', 'nolli', 'corte'].forEach(function (n) {
+        if (prendida(n)) { marca(boton(n), false); dib.capa(n, false); }
+      });
+      if (dib.elevacionModo) dib.elevacionModo(si, fachadaAct);
+      document.body.classList.toggle('en-elevacion', si);
+      [].forEach.call(document.querySelectorAll('[data-fachada]'), function (b) {
+        b.setAttribute('aria-pressed', String(si && b.getAttribute('data-fachada') === fachadaAct));
+      });
+      if (si) {
+        az = azMeta = AZ_FACHADA[fachadaAct]; el = elMeta = 0;
+      } else if (antesElevacion) {
+        az = azMeta = antesElevacion.az; el = elMeta = antesElevacion.el; antesElevacion = null;
+      }
+      dib.vista(x, az, el); dib.reencuadra(); escala();
+      if (ponMini) ponMini(az);
+      return;
+    }
     if (nombre === 'perspectiva') { perspAct = si; if (dib.perspectiva) dib.perspectiva(si); return; }
     // Planta y Mapa Nolli: la cámara se va arriba (cenital) con el norte arriba, y al apagar ambos regresa
     if (nombre === 'nolli' || nombre === 'planta' || nombre === 'corte') {
@@ -259,9 +281,23 @@
      arriba, por el camino más corto; la altura no cambia. */
   function nortea() {
     if (yendo || !dib) return;
+    if (prendida('elevacion')) { seleccionaFachada('norte'); return; }
     azMeta += ((NORTE_ARRIBA - azMeta) % 360 + 540) % 360 - 180;
     rapido = true;
     arranca();
+  }
+  function seleccionaFachada(lado) {
+    if (!Object.prototype.hasOwnProperty.call(AZ_FACHADA, lado) || !dib || yendo) return;
+    fachadaAct = lado;
+    if (lado === 'norte' || lado === 'sur') {
+      cortes.iz = lado === 'norte';
+      reflejaCorte('z'); dib.corta('z', cortes.z, cortes.iz);
+    } else {
+      cortes.ix = lado === 'oeste';
+      reflejaCorte('x'); dib.corta('x', cortes.x, cortes.ix);
+    }
+    guarda('atlampa-cortes', cortes);
+    ponCapa('elevacion', true);
   }
   var brujula = document.querySelector('[data-minimapa]');
   if (brujula) {
@@ -713,8 +749,9 @@
     else if (aislado && !yendo) saleAislado();
   });
   document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-capa], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte]');
+    var b = ev.target.closest('[data-capa], [data-fachada], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte]');
     if (!b || !dib) return;
+    if (b.hasAttribute('data-fachada')) { seleccionaFachada(b.getAttribute('data-fachada')); return; }
     if (b.hasAttribute('data-corte-reset')) { restableceCortes(); return; }
     if (b.hasAttribute('data-corte-invierte')) { invierteCorte(b.getAttribute('data-corte-invierte')); return; }
     if (b.hasAttribute('data-ir')) { ev.preventDefault(); cierraMenus(); if (aislado) saleAislado(); ir(b.getAttribute('data-ir')); return; }
@@ -898,6 +935,7 @@
   }
   function acerca(f, fx, fy) { dib.acerca(f, fx, fy); escala(); zona.classList.toggle('con-zoom', dib.aumento() > 1); }
   function orbita(dAz, dEl) {
+    if (prendida('elevacion')) return;
     azMeta += dAz;
     var lim = dib && dib.dentro && dib.dentro() ? dib.limitesDentro : LIM;   // dentro de la nave se puede mirar hacia arriba
     elMeta = Math.max(lim[0], Math.min(lim[1], elMeta + dEl));
@@ -1029,6 +1067,12 @@
     if (tab.ocultos) ocultos = tab.ocultos;
   }
   monta();
+  var vistaElevacion = h.filter(function (s) { return /^elevacion=(norte|sur|este|oeste)$/.test(s); })[0];
+  if (vistaElevacion) seleccionaFachada(vistaElevacion.slice(10));
+  h.forEach(function (s) {
+    var q = /^corte-([xyz])=(0(?:\.\d+)?|1(?:\.0+)?)$/.exec(s);
+    if (q) ponCorte(q[1], Number(q[2]));
+  });
   if (h.indexOf('contexto') >= 0) ponContexto(true, true);
   ['flujos', 'arboles', 'postes', 'personas', 'color', 'sol', 'esquema', 'corte', 'instalacion-electrica', 'instalacion-hidraulica'].forEach(function (n) { if (h.indexOf(n) >= 0) ponCapa(n, true); });
   if (h.indexOf('estructura') >= 0) ponOculta('estructura', false);
