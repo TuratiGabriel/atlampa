@@ -81,6 +81,24 @@
 
   function guarda(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
   function lee(k, borra) { try { var v = sessionStorage.getItem(k); if (borra) sessionStorage.removeItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  var modoPresentacion = lee('atlampa-modo-presentacion') === true;
+  document.body.classList.toggle('modo-presentacion', modoPresentacion);
+  function ponModoPresentacion(si) {
+    if (urbanRotationActive) stopUrbanRotation();
+    modoPresentacion = !!si;
+    if (modoPresentacion) { cierraMenus(); cierraDatos(true); tooltip(null); }
+    document.body.classList.toggle('modo-presentacion', modoPresentacion);
+    [].forEach.call(document.querySelectorAll('[data-modo-presentacion]'), function (b) {
+      b.setAttribute('aria-pressed', String(modoPresentacion));
+    });
+    guarda('atlampa-modo-presentacion', modoPresentacion);
+  }
+  window.AtlampaPresentacion = {
+    activar: function () { ponModoPresentacion(true); },
+    desactivar: function () { ponModoPresentacion(false); },
+    alternar: function () { ponModoPresentacion(!modoPresentacion); },
+    activo: function () { return modoPresentacion; }
+  };
   var cortes = lee('atlampa-cortes') || { x: 1, y: 1, z: 1, ix: false, iz: false };
   ['x', 'y', 'z'].forEach(function (eje) { if (typeof cortes[eje] !== 'number') cortes[eje] = 1; });
   cortes.ix = !!cortes.ix; cortes.iz = !!cortes.iz;
@@ -146,6 +164,13 @@
   // al arrastrar, la cámara sigue a la mano: más rápida y con menos inercia
   var VEL_MANO = 900, TAU_MANO = 0.06, mano = false, rapido = false;   // rapido: un giro pedido (brújula)
   var flujos = false, personas = false, sol = false, infra = false, visible = true, corriendo = false;
+  // 6°/s: una vuelta por minuto, sin aceleración ni salto al reabrir la pestaña.
+  var urbanRotationActive = false, URBAN_ROTATION_DEG_PER_SECOND = 6;
+  function stopUrbanRotation() {
+    var wasActive = urbanRotationActive;
+    urbanRotationActive = false;
+    return { ok: true, active: false, wasActive: wasActive };
+  }
   var CURVAS = {
     suave: function (t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; },
     lenta: function (t) { return Math.sin(t * Math.PI / 2); },          // arranca y se va frenando
@@ -156,6 +181,11 @@
     var cambia = false, dt = msAnt ? Math.min(0.1, (ms - msAnt) / 1000) : 1 / 60;
     msAnt = ms;
     if (yendo) { corriendo = false; msAnt = 0; return; }   // la animación entre apartados manda
+    if (urbanRotationActive) {
+      az += URBAN_ROTATION_DEG_PER_SECOND * dt;
+      azMeta = az;
+      cambia = true;
+    }
     if (!tramo && tramos.length) { var t = tramos.shift(); tramo = { de: x, a: t[0], dur: t[1], f: CURVAS[t[2]], t0: ms, espera: t[3] }; }
     if (tramo) {
       if (tramo.espera && !tramo.espera()) tramo.t0 = ms;            // espera a que algo esté listo
@@ -182,7 +212,7 @@
     if ((flujos || infra) && !quieto.matches) dib.fluye(ms);
     if (personas && !quieto.matches) dib.camina(ms);
     if (sol && !quieto.matches) dib.solea(ms);
-    corriendo = visible && (!!tramo || tramos.length > 0 || az !== azMeta || el !== elMeta || ((flujos || personas || sol || infra) && !quieto.matches));
+    corriendo = visible && (urbanRotationActive || !!tramo || tramos.length > 0 || az !== azMeta || el !== elMeta || ((flujos || personas || sol || infra) && !quieto.matches));
     if (corriendo) requestAnimationFrame(cuadro);
     else msAnt = 0;
   }
@@ -259,6 +289,7 @@
      arriba, por el camino más corto; la altura no cambia. */
   function nortea() {
     if (yendo || !dib) return;
+    if (urbanRotationActive) stopUrbanRotation();
     azMeta += ((NORTE_ARRIBA - azMeta) % 360 + 540) % 360 - 180;
     rapido = true;
     arranca();
@@ -331,6 +362,9 @@
      aísla en la general; lo demás, en su apartado (si no se está ahí, se va y
      se aísla al llegar). */
   var aislado = null, antesAislar = null, porAislar = null, fichaAntes = null;
+  var detalleV4 = { etapa: 'predio', departamento: null, muro: null, apartamentos: [], muros: [] };
+  var detalleUso = { etapa: 'predio', piso: null, zona: null, separacion: 0 };
+  var leyendaV4 = null, azAntesMuro = null;
   var NOMBRE_USO = { vivienda: 'Vivienda', comercio: 'Mercado', 'nave-norte': 'Nave norte', industria: 'Industria', cultura: 'Arte y cultura', aro: 'Aro', paisajismo: 'Paisajismo', estacionamiento: 'Estacionamiento' };
   function escenaDe(ap) { return ap === 'vivienda' ? 'general' : ap === 'nave-norte' ? 'comercio' : PAGINAS[ap] ? ap : null; }
   function aislar(ap) {
@@ -351,17 +385,25 @@
     var partes = dib.aisla(ap);
     if (!partes) { ponCapa('perspectiva', antesAislar.persp); if (antesAislar.resalta) ponResalta(antesAislar.resalta); antesAislar = null; return; }
     aislado = ap;
+    if (ap === 'vivienda') detalleV4 = { etapa: 'vivienda', departamento: null, muro: null, apartamentos: [], muros: [] };
+    if (['comercio', 'cultura', 'industria'].includes(ap)) detalleUso = { etapa: 'uso', piso: null, zona: null, separacion: 0 };
     document.body.classList.add('aislado');
     // la nave norte se abre de una vez (cubierta arriba, muros abajo)
     if (ap === 'nave-norte') partes = dib.despiece(true);
     barraAislado(ap, partes);
+    if (ap === 'vivienda') actualizaMenuV4();
+    else actualizaMenuUso();
     actualizaDatos();
   }
   function saleAislado() {
     if (!aislado) return;
     cierraMenus();
     dib.aisla(null);
+    if (azAntesMuro !== null) { azMeta = azAntesMuro; azAntesMuro = null; dib.vista(0, azMeta, elMeta); dib.reencuadra(); }
     aislado = null;
+    detalleV4 = { etapa: 'predio', departamento: null, muro: null, apartamentos: [], muros: [] };
+    detalleUso = { etapa: 'predio', piso: null, zona: null, separacion: 0 };
+    if (leyendaV4) { leyendaV4.remove(); leyendaV4 = null; }
     document.body.classList.remove('aislado');
     var a = antesAislar || {}; antesAislar = null;
     var b = document.querySelector('.hud-barra--aislado');
@@ -372,6 +414,116 @@
     if (f && fichaAntes !== null) f.innerHTML = fichaAntes;
     fichaAntes = null;
     actualizaDatos();
+  }
+  function actualizaMenuV4() {
+    var panel = document.querySelector('[data-v4-opciones]');
+    if (!panel) return;
+    var d = detalleV4, h = '<p class="hud-panel__t">Nivel 4 · volumen sur</p>';
+    if (d.etapa === 'vivienda') h += '<button class="hud-op" type="button" data-v4-separa>Explotar verticalmente</button>' +
+      '<button class="hud-op" type="button" data-v4-piso>Aislar piso 4 · sur</button>';
+    if (d.etapa === 'piso') h += '<p class="hud-v4-ayuda">Selecciona un departamento en el modelo o aquí:</p>' +
+      d.apartamentos.map(function (id, i) { var f = vivienda4.featuredApartments.find(function (x) { return x.id === id; });
+        return '<button class="hud-op" type="button" data-v4-depto="' + esc(id) + '">' +
+          esc((i+1) + ' · Departamento ' + f.areaM2 + ' m²') + '</button>'; }).join('');
+    if (d.etapa === 'departamento') h += '<p class="hud-v4-ayuda">Selecciona un muro exterior en el modelo o aquí:</p>' +
+      d.muros.map(function (id) { return '<button class="hud-op" type="button" data-v4-muro="' + esc(id) + '">Muro ' + esc(id) + '</button>'; }).join('');
+    if (d.etapa === 'muro') h += '<button class="hud-op" type="button" data-v4-explota>Explotar muro por capas</button>';
+    if (d.etapa !== 'vivienda') h += '<button class="hud-op hud-v4-reinicio" type="button" data-v4-reinicia>Reiniciar al predio</button>';
+    panel.innerHTML = h;
+    var ficha = document.querySelector('[data-ficha] .hud-ficha__sub');
+    if (ficha) ficha.textContent = d.etapa === 'vivienda' ? 'aislado' :
+      d.etapa === 'piso' ? 'piso 4 sur' : d.etapa === 'departamento' ? d.departamento :
+      d.etapa === 'muro' ? 'muro ' + d.muro : 'capas del muro';
+  }
+  function actualizaMenuUso() {
+    var panel = document.querySelector('[data-uso-opciones]');
+    if (!panel || !dib || !aislado) return;
+    var d = detalleUso, h = '';
+    if (d.etapa === 'uso') {
+      var pisos = dib.pisosUso(aislado);
+      h = pisos.length ? '<button class="hud-op" type="button" data-uso-separa>' +
+        (d.separacion ? 'Unir pisos' : 'Explotar verticalmente') + '</button><p class="hud-panel__t">Seleccionar piso</p>' + pisos.map(function (p) {
+        return '<button class="hud-op" type="button" data-uso-piso="' + p.id + '">Piso ' + p.id + ' · ' + p.z0 + ' a ' + p.z1 + ' m</button>';
+      }).join('') : '<p class="hud-v4-ayuda">Sin pisos BIM identificados.</p>';
+    }
+    if (d.etapa === 'piso' && (aislado === 'comercio' || aislado === 'cultura')) {
+      h = '<p class="hud-panel__t">' + (aislado === 'comercio' ? 'Seleccionar módulo' : 'Seleccionar local') + '</p>' +
+        dib.zonasProvisionales(aislado, d.piso).map(function (z) {
+          return '<button class="hud-op" type="button" data-uso-zona="' + esc(z.id) + '">' + esc(z.label) + '</button>';
+        }).join('');
+    }
+    if (d.etapa !== 'uso') h += '<button class="hud-op hud-v4-reinicio" type="button" data-v4-reinicia>Reiniciar al predio</button>';
+    panel.innerHTML = h;
+    var ficha = document.querySelector('[data-ficha] .hud-ficha__sub');
+    if (ficha) ficha.textContent = d.etapa === 'uso' ? 'aislado' : d.etapa === 'piso' ? 'piso ' + d.piso : d.zona;
+    var datos = document.querySelector('[data-ficha] .ad-datos');
+    if (datos) datos.hidden = d.etapa !== 'uso';
+  }
+  function seleccionaPisoUso(numero) {
+    if (!controlListo() || !['comercio', 'cultura', 'industria'].includes(aislado) || detalleUso.etapa !== 'uso')
+      return { ok: false, reason: 'use_not_isolated' };
+    var r = dib.aislaPisoUso(aislado, Number(numero));
+    if (r.ok) { detalleUso = { etapa: 'piso', piso: r.floor, zona: null, separacion: 0 }; actualizaMenuUso(); }
+    return r;
+  }
+  function separaPisosUso(progreso) {
+    if (!controlListo() || !['comercio', 'cultura', 'industria'].includes(aislado) || detalleUso.etapa !== 'uso')
+      return { ok: false, reason: 'use_not_isolated' };
+    var r = dib.separaPisosUso(aislado, progreso);
+    if (r.ok) { detalleUso.separacion = progreso; actualizaMenuUso(); }
+    return r;
+  }
+  function seleccionaZonaUso(id) {
+    if (!controlListo() || !['comercio', 'cultura'].includes(aislado) || detalleUso.etapa !== 'piso')
+      return { ok: false, reason: 'floor_not_isolated' };
+    var r = dib.aislaZonaProvisional(aislado, detalleUso.piso, String(id));
+    if (r.ok) { detalleUso.etapa = 'zona'; detalleUso.zona = r.label; actualizaMenuUso(); }
+    return r;
+  }
+  function reiniciaArbol() {
+    if (!controlListo()) return { ok: false, reason: 'not_ready' };
+    if (aislado) saleAislado();
+    if (prendida('contexto')) ponContexto(false, true);
+    var cambiaEscena = ESCENA !== 'general';
+    if (cambiaEscena) ir('general');
+    return { ok: true, stage: 'predio', pending: cambiaEscena };
+  }
+  function seleccionaPisoV4() {
+    if (!controlListo() || aislado !== 'vivienda' || detalleV4.etapa !== 'vivienda')
+      return { ok: false, reason: 'vivienda_no_aislada' };
+    var r = dib.aislaPiso4Sur();
+    if (r.ok) { detalleV4.etapa = 'piso'; detalleV4.apartamentos = r.apartments; marcaPartesAislado(dib.partes()); actualizaMenuV4(); }
+    else console.warn('No se pudo aislar el piso 4 sur:', r);
+    return r;
+  }
+  function seleccionaDepartamentoV4(id) {
+    if (!controlListo() || detalleV4.etapa !== 'piso') return { ok: false, reason: 'piso_no_aislado' };
+    var r = dib.aislaDepartamento(id);
+    if (r.ok) { detalleV4.etapa = 'departamento'; detalleV4.departamento = id; detalleV4.muros = r.wallIds; actualizaMenuV4(); }
+    return r;
+  }
+  function seleccionaMuroV4(id) {
+    if (!controlListo() || detalleV4.etapa !== 'departamento') return { ok: false, reason: 'departamento_no_aislado' };
+    var r = dib.aislaMuro(String(id));
+    if (r.ok) {
+      detalleV4.etapa = 'muro'; detalleV4.muro = String(id); actualizaMenuV4();
+      if (azAntesMuro === null) azAntesMuro = azMeta;
+      azMeta = 45; // oblicuo: se ven el frente y la separación de las capas
+      dib.vista(0, azMeta, elMeta);
+      dib.reencuadra();
+    }
+    return r;
+  }
+  function explotaMuroV4() {
+    if (!controlListo() || detalleV4.etapa !== 'muro') return { ok: false, reason: 'muro_no_aislado' };
+    var r = dib.explotaMuro();
+    if (r.ok) {
+      detalleV4.etapa = 'capas'; actualizaMenuV4();
+      if (!leyendaV4) { leyendaV4 = document.createElement('aside'); leyendaV4.className = 'hud-v4-capas'; pagina.appendChild(leyendaV4); }
+      leyendaV4.innerHTML = '<h2>Muro exterior · capas</h2><ol>' + r.layers.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') +
+        '</ol><p>Composición de la imagen de referencia. Espesores ilustrativos.</p>';
+    }
+    return r;
   }
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
@@ -659,7 +811,10 @@
       '<p class="hud-panel__t">Estilo</p>' +
       ['rayado', 'plano'].map(function (e) { var n = e === 'rayado' ? 'Rayado' : 'Plano'; return '<button class="hud-op hud-op--radio" type="button" data-estilo="' + e + '" aria-pressed="' + (estiloAct === e) + '">' + iconoOpcion(e) + '<span>' + n + '</span></button>'; }).join('');
     nav.innerHTML = (partes.length ? '<details class="hud-menu" name="hud"><summary class="hud-menu__t">' + iconoMenu('partes') + '<span>Partes</span></summary><div class="hud-panel hud-panel--partes">' + filasPartes(partes) + '</div></details>' : '') +
+      (ap === 'vivienda' ? '<details class="hud-menu" name="hud" data-v4-menu><summary class="hud-menu__t">' + iconoMenu('partes') + '<span>Detalle</span></summary><div class="hud-panel hud-panel--v4" data-v4-opciones></div></details>' : '') +
+      (['comercio', 'cultura', 'industria'].includes(ap) ? '<details class="hud-menu" name="hud" data-uso-menu><summary class="hud-menu__t">' + iconoMenu('partes') + '<span>Detalle</span></summary><div class="hud-panel hud-panel--v4" data-uso-opciones></div></details>' : '') +
       '<details class="hud-menu" name="hud"><summary class="hud-menu__t">' + iconoMenu('vista') + '<span>Vista</span></summary><div class="hud-panel">' + vista + '</div></details>' +
+      '<button class="hud-presentacion" type="button" data-modo-presentacion aria-pressed="' + modoPresentacion + '" aria-keyshortcuts="F8" title="Ocultar controles; F8 para recuperarlos">Modo presentación <span>(F8)</span></button>' +
       '<button class="hud-salir" type="button" data-aisla-sale>Salir <span aria-hidden="true">✕</span></button>';
     var barra = document.querySelector('.hud-barra');
     barra.parentNode.insertBefore(nav, barra.nextSibling);
@@ -698,26 +853,44 @@
   function cierraMenus(salvo) {
     [].forEach.call(document.querySelectorAll('.hud-menu[open]'), function (d) { if (d !== salvo) d.open = false; });
   }
-  document.addEventListener('pointerdown', function (ev) { if (!ev.target.closest('.hud-menu')) cierraMenus(); });
+  document.addEventListener('pointerdown', function (ev) {
+    if (urbanRotationActive) stopUrbanRotation();
+    if (!ev.target.closest('.hud-menu')) cierraMenus();
+  });
   document.addEventListener('input', function (ev) {
     var s = ev.target.closest('[data-corte-eje]');
     if (!s || !dib) return;
+    if (urbanRotationActive) stopUrbanRotation();
     ponCorte(s.getAttribute('data-corte-eje'), Number(s.value) / 100);
   });
   // Esc: cierra el menú; aislado, sale
   document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'F8') { ev.preventDefault(); if (!ev.repeat) ponModoPresentacion(!modoPresentacion); return; }
     if (ev.key !== 'Escape') return;
+    if (urbanRotationActive) stopUrbanRotation();
     if (datosAbiertos) cierraDatos();
     else if (document.querySelector('.hud-menu[open]')) cierraMenus();
     else if (aislado && !yendo) saleAislado();
   });
   document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-capa], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte]');
-    if (!b || !dib) return;
+    var b = ev.target.closest('[data-modo-presentacion], [data-capa], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte], [data-v4-separa], [data-v4-piso], [data-v4-depto], [data-v4-muro], [data-v4-explota], [data-v4-reinicia], [data-uso-separa], [data-uso-piso], [data-uso-zona]');
+    if (!b) return;
+    if (urbanRotationActive) stopUrbanRotation();
+    if (b.hasAttribute('data-modo-presentacion')) { ponModoPresentacion(!modoPresentacion); return; }
+    if (!dib) return;
     if (b.hasAttribute('data-corte-reset')) { restableceCortes(); return; }
     if (b.hasAttribute('data-corte-invierte')) { invierteCorte(b.getAttribute('data-corte-invierte')); return; }
     if (b.hasAttribute('data-ir')) { ev.preventDefault(); cierraMenus(); if (aislado) saleAislado(); ir(b.getAttribute('data-ir')); return; }
+    if (b.hasAttribute('data-v4-reinicia')) { reiniciaArbol(); return; }
     if (yendo) return;
+    if (b.hasAttribute('data-v4-separa')) { var sep = window.AtlampaControl.setFloorSeparation(1); if (sep.ok) actualizaMenuV4(); return; }
+    if (b.hasAttribute('data-v4-piso')) { seleccionaPisoV4(); return; }
+    if (b.hasAttribute('data-v4-depto')) { seleccionaDepartamentoV4(b.getAttribute('data-v4-depto')); return; }
+    if (b.hasAttribute('data-v4-muro')) { seleccionaMuroV4(b.getAttribute('data-v4-muro')); return; }
+    if (b.hasAttribute('data-v4-explota')) { explotaMuroV4(); return; }
+    if (b.hasAttribute('data-uso-separa')) { separaPisosUso(detalleUso.separacion ? 0 : 1); return; }
+    if (b.hasAttribute('data-uso-piso')) { seleccionaPisoUso(b.getAttribute('data-uso-piso')); return; }
+    if (b.hasAttribute('data-uso-zona')) { seleccionaZonaUso(b.getAttribute('data-uso-zona')); return; }
     if (b.hasAttribute('data-aisla')) { cierraMenus(); aislar(b.getAttribute('data-aisla')); }
     else if (b.hasAttribute('data-aisla-sale')) saleAislado();
     else if (b.hasAttribute('data-parte-oculta')) marcaPartesAislado(dib.ponParte(b.getAttribute('data-parte-oculta'), { oculto: b.getAttribute('aria-pressed') !== 'true' }));
@@ -895,13 +1068,165 @@
     var r = zona.getBoundingClientRect();
     return [(ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height, r];
   }
-  function acerca(f, fx, fy) { dib.acerca(f, fx, fy); escala(); zona.classList.toggle('con-zoom', dib.aumento() > 1); }
+  function acerca(f, fx, fy) { if (urbanRotationActive) stopUrbanRotation(); dib.acerca(f, fx, fy); escala(); zona.classList.toggle('con-zoom', dib.aumento() > 1); }
   function orbita(dAz, dEl) {
+    if (urbanRotationActive) stopUrbanRotation();
     azMeta += dAz;
     var lim = dib && dib.dentro && dib.dentro() ? dib.limitesDentro : LIM;   // dentro de la nave se puede mirar hacia arriba
     elMeta = Math.max(lim[0], Math.min(lim[1], elMeta + dEl));
     arranca();
   }
+  // Contrato acotado para los gestos de Jarvis. Cada llamada confirma si actuó.
+  function controlListo() { return !!dib && !yendo; }
+  window.AtlampaControl = {
+    version: 4,
+    ready: controlListo,
+    isolateUse: function (ap) {
+      if (!controlListo()) return { ok: false, reason: 'not_ready' };
+      if (!['vivienda', 'comercio', 'cultura', 'industria', 'aro'].includes(ap))
+        return { ok: false, reason: 'use_not_in_tree' };
+      if (aislado || ESCENA !== 'general' || prendida('contexto')) return { ok: false, reason: 'requires_predio' };
+      aislar(ap);
+      return { ok: true, use: ap, pending: ESCENA !== escenaDe(ap) };
+    },
+    isolateHousing: function () {
+      if (!controlListo() || ESCENA !== 'general' || prendida('contexto')) return {ok:false,reason:'requires_general'};
+      if (aislado && aislado !== 'vivienda') return {ok:false,reason:'other_isolation'};
+      if (!aislado) aislar('vivienda');
+      return {ok:aislado === 'vivienda',stage:detalleV4.etapa};
+    },
+    setUrbanContext: function (enabled) {
+      if (!controlListo() || ESCENA !== 'general' || aislado) return { ok: false, reason: 'requires_predio' };
+      ponContexto(!!enabled);
+      return { ok: true, enabled: !!enabled };
+    },
+    startUrbanRotation: function () {
+      if (!controlListo()) return { ok: false, reason: 'not_ready' };
+      if (ESCENA !== 'general' || aislado) return { ok: false, reason: 'requires_predio' };
+      if (urbanRotationActive) return { ok: true, active: true, alreadyActive: true };
+      azMeta = az;
+      mano = rapido = false;
+      urbanRotationActive = true;
+      arranca();
+      return { ok: true, active: true, degreesPerSecond: URBAN_ROTATION_DEG_PER_SECOND };
+    },
+    stopUrbanRotation: stopUrbanRotation,
+    orbit: function (deltaAzDeg, deltaElDeg) {
+      if (!controlListo()) return { ok: false, reason: 'not_ready' };
+      if (!Number.isFinite(deltaAzDeg) || !Number.isFinite(deltaElDeg)) return { ok: false, reason: 'invalid_delta' };
+      if (prendida('contexto') && deltaElDeg) return { ok: false, reason: 'context_only_rotate_y' };
+      var da = Math.max(-30, Math.min(30, deltaAzDeg));
+      var de = Math.max(-30, Math.min(30, deltaElDeg));
+      if (da) rapido = true; // usa TAU_MANO y la ruta rápida, no las flechas de 15°
+      orbita(da, de);
+      return { ok: true, azimuth: azMeta, elevation: elMeta, appliedAz: da, appliedEl: de };
+    },
+    pan: function (dx, dy) {
+      if (!controlListo()) return {ok:false,reason:'not_ready'};
+      if (prendida('contexto')) return {ok:false,reason:'context_only_rotate_y'};
+      if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > 0.15 || Math.abs(dy) > 0.15)
+        return {ok:false,reason:'invalid_delta'};
+      dib.mueve(dx, dy);
+      escala();
+      return {ok:true,appliedX:dx,appliedY:dy};
+    },
+    zoom: function (factor) {
+      if (!controlListo()) return { ok: false, reason: 'not_ready' };
+      if (prendida('contexto')) return {ok:false,reason:'context_only_rotate_y'};
+      if (!Number.isFinite(factor) || factor < 0.8 || factor > 1.25) return { ok: false, reason: 'invalid_factor' };
+      acerca(factor);
+      return { ok: true, factor: factor };
+    },
+    setFloorSeparation: function (progress) {
+      if (!controlListo()) return { ok: false, reason: 'not_ready' };
+      if (!Number.isFinite(progress) || progress < 0 || progress > 1) return { ok: false, reason: 'invalid_progress' };
+      if (ESCENA !== 'general') return { ok: false, reason: 'requires_general' };
+      if (aislado && aislado !== 'vivienda') return { ok: false, reason: 'other_isolation' };
+      if (detalleV4.etapa !== 'predio' && detalleV4.etapa !== 'vivienda') return {ok:false,reason:'detail_active'};
+      if (aislado !== 'vivienda' || detalleV4.etapa !== 'vivienda')
+        return { ok: false, reason: 'vivienda_no_aislada' };
+      if (aislado !== 'vivienda' || !dib.separaPisos) return { ok: false, reason: 'vivienda_unavailable' };
+      var estabaSeparado = dib.progresoPisos && dib.progresoPisos() > 0;
+      var result = dib.separaPisos(progress);
+      if (result.ok && estabaSeparado !== (progress > 0)) marcaPartesAislado(dib.partes());
+      return result;
+    },
+    selectFloor: function (floor, volume) {
+      if (['comercio', 'cultura', 'industria'].includes(aislado)) return seleccionaPisoUso(floor);
+      if (floor !== 4 || (volume !== undefined && volume !== 'sur')) return {ok:false,reason:'only_floor_4_south_available'};
+      return seleccionaPisoV4();
+    },
+    setUseFloorSeparation: separaPisosUso,
+    selectModule: function (id) {
+      return aislado === 'comercio' ? seleccionaZonaUso(id) : { ok: false, reason: 'commerce_floor_required' };
+    },
+    selectLocal: function (id) {
+      return aislado === 'cultura' ? seleccionaZonaUso(id) : { ok: false, reason: 'culture_floor_required' };
+    },
+    selectApartment: seleccionaDepartamentoV4,
+    pickApartment: function (clientX, clientY) {
+      if (!controlListo() || detalleV4.etapa !== 'piso') return {ok:false,reason:'piso_no_aislado'};
+      var id=dib.apartamentoEn({clientX:clientX,clientY:clientY});
+      return id ? seleccionaDepartamentoV4(id) : {ok:false,reason:'no_apartment_at_point'};
+    },
+    selectWall: seleccionaMuroV4,
+    pickWall: function (clientX, clientY) {
+      if (!controlListo() || detalleV4.etapa !== 'departamento') return {ok:false,reason:'departamento_no_aislado'};
+      var id=dib.muroEn({clientX:clientX,clientY:clientY});
+      return id ? seleccionaMuroV4(id) : {ok:false,reason:'no_exterior_wall_at_point'};
+    },
+    explodeWall: explotaMuroV4,
+    resetDetail: reiniciaArbol,
+    setLateralSeparation: function (progress) {
+      if (!controlListo()) return { ok: false, reason: 'not_ready' };
+      if (!Number.isFinite(progress) || progress < 0 || progress > 1)
+        return { ok: false, reason: 'invalid_progress' };
+      if (aislado !== 'vivienda' || detalleV4.etapa !== 'muro')
+        return { ok: false, reason: 'wall_not_selected' };
+      if (progress === 0) return { ok: true, progress: 0, stage: 'muro' };
+      var r = explotaMuroV4();
+      return r.ok ? { ok: true, progress: 1, stage: 'capas', layers: r.layers } : r;
+    },
+    getAvailableActions: function () {
+      var comunes = ['orbit', 'pan', 'zoom'];
+      if (prendida('contexto')) return { ok: true, stage: 'contexto', orbitAxis: 'y',
+        actions: ['orbit', 'resetDetail', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation'] };
+      if (!aislado && ESCENA !== 'general') return { ok: true, stage: 'apartado_sin_aislar', actions: comunes.concat(['resetDetail']) };
+      if (!aislado) return { ok: true, stage: 'predio', actions: comunes.concat(['setUrbanContext', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation', 'isolateUse', 'resetDetail']) };
+      if (aislado === 'vivienda') {
+        var a = { vivienda: ['setFloorSeparation', 'selectFloor'], piso: ['selectApartment', 'pickApartment'],
+          departamento: ['selectWall', 'pickWall'], muro: ['setLateralSeparation', 'explodeWall'], capas: [] };
+        return { ok: true, stage: detalleV4.etapa, actions: comunes.concat(a[detalleV4.etapa] || [], ['resetDetail']) };
+      }
+      var etapas = { uso: ['setUseFloorSeparation', 'selectFloor'], piso: aislado === 'industria' ? [] : [aislado === 'comercio' ? 'selectModule' : 'selectLocal'], zona: [] };
+      return { ok: true, stage: detalleUso.etapa === 'predio' ? aislado : detalleUso.etapa,
+        actions: comunes.concat(etapas[detalleUso.etapa] || [], ['resetDetail']),
+        floors: detalleUso.etapa === 'uso' && dib.pisosUso ? dib.pisosUso(aislado) : [],
+        zones: detalleUso.etapa === 'piso' && dib.zonasProvisionales ? dib.zonasProvisionales(aislado, detalleUso.piso) : [] };
+    },
+    getState: function () {
+      return { ok: true, ready: controlListo(), scene: ESCENA, isolated: aislado,
+        azimuth: azMeta, elevation: elMeta,
+        floorProgress: dib && dib.progresoPisos ? dib.progresoPisos() : 0,
+        lateralProgress: detalleV4.etapa === 'capas' ? 1 : 0,
+        detailStage: aislado === 'vivienda' ? detalleV4.etapa : detalleUso.etapa,
+        floor: detalleUso.piso, zone: detalleUso.zona, apartment: detalleV4.departamento, wall: detalleV4.muro,
+        urbanContextVisible: prendida('contexto'), urbanRotationActive: urbanRotationActive };
+    }
+  };
+  // La cámara puede detener cualquier gesto reconocido, incluso uno que el
+  // árbol rechace. Para voz y otros controles, sólo una acción ejecutada
+  // cancela el loop. El giro propio no pasa por estos métodos.
+  Object.keys(window.AtlampaControl).forEach(function (name) {
+    if (['ready', 'getState', 'getAvailableActions', 'startUrbanRotation', 'stopUrbanRotation'].includes(name)) return;
+    var original = window.AtlampaControl[name];
+    if (typeof original !== 'function') return;
+    window.AtlampaControl[name] = function () {
+      var result = original.apply(this, arguments);
+      if (result && result.ok && urbanRotationActive) stopUrbanRotation();
+      return result;
+    };
+  });
   zona.addEventListener('wheel', function (ev) {
     if (!dib) return;   // el motor 3D todavía carga
     ev.preventDefault();
@@ -949,6 +1274,8 @@
     if (!Object.keys(dedos).length) { zona.classList.remove('arrastra', 'arrastra--mueve', 'arrastra--orbita'); mano = false; }
     // un clic (sin arrastrar) sobre un apartado lo abre
     if (era && uno && recorrido < 5 && ev.type === 'pointerup' && ev.button === 0 && !yendo) {
+      if (detalleV4.etapa === 'piso') { var dep = dib.apartamentoEn(ev); if (dep) seleccionaDepartamentoV4(dep); return; }
+      if (detalleV4.etapa === 'departamento') { var muro = dib.muroEn(ev); if (muro) seleccionaMuroV4(muro); return; }
       var ap = dib.apartadoEn(ev);
       if (ap && ap !== ESCENA && PAGINAS[ap] && !aislado) {
         clearTimeout(clicPend);
@@ -1009,7 +1336,23 @@
   /* ---------- Arranque ----------
      Primero se trae atlampa-3d.js (y Three.js, del CDN); si no carga, se avisa. */
   var h = location.hash.replace('#', '').split(',');
-  import('./atlampa-3d.js' + (VER ? '?' + VER : '')).then(arranque, function (e) {
+  var bim = window.ATLAMPA_REVIT;
+  var vivienda4 = window.ATLAMPA_VIVIENDA4;
+  var modelo = bim ? fetch('./' + bim.archivo + (VER ? '?' + VER : '')).then(function (r) {
+    if (!r.ok) throw new Error('No cargó la geometría Revit: ' + r.status);
+    return r.arrayBuffer();
+  }).then(function (buffer) {
+    if (buffer.byteLength !== bim.bytes) throw new Error('La geometría Revit tiene otro tamaño');
+    bim.buffer = buffer;
+  }) : Promise.resolve();
+  var modeloVivienda4 = vivienda4 ? fetch('./' + vivienda4.file + (VER ? '?' + VER : '')).then(function (r) {
+    if (!r.ok) throw new Error('No cargó el nivel 4 sur: ' + r.status);
+    return r.arrayBuffer();
+  }).then(function (buffer) {
+    if (buffer.byteLength !== vivienda4.bytes) throw new Error('El nivel 4 sur tiene otro tamaño');
+    vivienda4.buffer = buffer;
+  }) : Promise.resolve();
+  Promise.all([import('./atlampa-3d.js' + (VER ? '?' + VER : '')), modelo, modeloVivienda4]).then(arranque, function (e) {
     console.error('No cargó el visor 3D:', e);
     var p = document.createElement('p');
     p.className = 'ad-error';

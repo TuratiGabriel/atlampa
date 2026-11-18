@@ -1,0 +1,139 @@
+{
+  "Uuid": "ca3c9c38-3d90-42c5-9cd3-f842b9b37907",
+  "IsCustomNode": false,
+  "Description": "Lectura de muros, losas, puertas y ventanas del anfitrión y vínculos; no cambia el modelo.",
+  "Name": "Atlampa - fachadas Revit",
+  "ElementResolver": {
+    "ResolutionMap": {
+      "Point": {
+        "Key": "Autodesk.DesignScript.Geometry.Point",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Rectangle": {
+        "Key": "Autodesk.DesignScript.Geometry.Rectangle",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Surface": {
+        "Key": "Autodesk.DesignScript.Geometry.Surface",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Sphere": {
+        "Key": "Autodesk.DesignScript.Geometry.Sphere",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Cylinder": {
+        "Key": "Autodesk.DesignScript.Geometry.Cylinder",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Line": {
+        "Key": "Autodesk.DesignScript.Geometry.Line",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Vector": {
+        "Key": "Autodesk.DesignScript.Geometry.Vector",
+        "Value": "ProtoGeometry.dll"
+      },
+      "PolyCurve": {
+        "Key": "Autodesk.DesignScript.Geometry.PolyCurve",
+        "Value": "ProtoGeometry.dll"
+      },
+      "PolySurface": {
+        "Key": "Autodesk.DesignScript.Geometry.PolySurface",
+        "Value": "ProtoGeometry.dll"
+      }
+    }
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "Code": "import os\npath = os.path.join(os.path.expanduser('~'), 'Documents', 'BIM Escena 3D', 'Atlampa-Interfaz', 'herramientas', 'revit-extractor', 'exportar.py')\nwith open(path, encoding='utf-8') as source:\n    exec(compile(source.read(), path, 'exec'), globals())\n",
+      "Engine": "CPython3",
+      "EngineName": "CPython3",
+      "VariableInputPorts": true,
+      "Id": "b7940d97-da12-4dab-9866-9f928c442a3b",
+      "NodeType": "PythonScriptNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "b9a41a15-9211-4db3-b9cc-e513d2f611df",
+          "Name": "resultado",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Runs an embedded Python script."
+    }
+  ],
+  "Connectors": [],
+  "Dependencies": [],
+  "NodeLibraryDependencies": [],
+  "Thumbnail": "",
+  "GraphDocumentationURL": null,
+  "ExtensionWorkspaceData": [
+    {
+      "ExtensionGuid": "28992e1d-abb9-417f-8b1b-05e053bee670",
+      "Name": "Properties",
+      "Version": "2.17",
+      "Data": {}
+    },
+    {
+      "ExtensionGuid": "DFBD9CC0-DB40-457A-939E-8C8555555A9D",
+      "Name": "Generative Design",
+      "Version": "4.0",
+      "Data": {}
+    }
+  ],
+  "Author": "None provided",
+  "Linting": {
+    "activeLinter": "None",
+    "activeLinterId": "7b75fb44-43fd-4631-a878-29f4d5d8399a",
+    "warningCount": 0,
+    "errorCount": 0
+  },
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.19.0.4746",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "_Background Preview",
+      "EyeX": -5.3452959060668945,
+      "EyeY": 22.243146896362305,
+      "EyeZ": 4.974541664123535,
+      "LookX": -0.17156505584716797,
+      "LookY": -17.0781307220459,
+      "LookZ": -12.28675365447998,
+      "UpX": -0.004545882344245911,
+      "UpY": 0.9455187916755676,
+      "UpZ": -0.32553616166114807
+    },
+    "ConnectorPins": [],
+    "NodeViews": [
+      {
+        "Id": "b7940d97-da12-4dab-9866-9f928c442a3b",
+        "Name": "Extraer fachadas (solo lectura)",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 0.0,
+        "Y": 0.0
+      }
+    ],
+    "Annotations": [],
+    "X": -1897.82278109683,
+    "Y": -2864.4645680747544,
+    "Zoom": 0.9697726550953407
+  }
+}

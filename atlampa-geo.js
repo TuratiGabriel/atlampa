@@ -18,23 +18,18 @@
   var D = window.ATLAMPA_DATOS;
 
   /* ---------- Sitio (m) ----------
-     El predio y su banqueta son los de Gabriel en Rhino (Contexto.3dm, capas
-     site::polygon y site; 2026-10-09: «ese es sobre lo que estamos
-     desarrollando»), con el mismo paso de Rhino al diagrama que el mercado
-     (u = x + 503.255, v = y + 404.153): el predio llega a la guarnición que
-     daba el satélite (el lado sur, un poco inclinado) y la banqueta es un
-     anillo de 1.80 m por fuera, a ras del predio (+0.20). Lo de enfrente se
-     ajusta al predio (Gabriel: «si el predio queda desfasado con respecto al
-     contexto edita el contexto»): los edificios salen exactos de Contexto.3dm
-     con el mismo paso (atlampa-datos.js) y las fachadas de enfrente (S) son
-     las suyas; las guarniciones de enfrente siguen de la imagen satelital
-     (las calles de CADMapper no cuadran con el predio) y Clavel se recorre
-     para seguir midiendo 7.5 m. Heliotropo ya no es calle: dentro
-     del predio queda la espuela, como paso peatonal. */
-  var PRED = [[448.076, 322.228], [558.946, 324.272], [558.946, 488.265], [447.963, 488.265]];   // predio (Rhino, antihorario)
-  var GUP = [[446.277, 320.394], [560.746, 322.506], [560.745, 490.066], [446.161, 490.065]];    // su guarnición: el borde de la banqueta (Rhino)
-  var PB = { u0: 448.02, u1: 558.946, v0: 322.228, v1: 488.265 };   // la caja del predio
-  var GU = { o: 446.22, e: 560.745, s: 320.394, n: 490.065 };       // la caja de su guarnición
+     Las fachadas BIM usan el origen interno del coordinado trasladado al
+     vértice noroeste del solar actual. El borde sur inclinado del antiguo
+     predio Rhino se endereza para el encaje con SITE_PLANTILLA. La guarnición
+     toma el contorno redondeado de la losa Revit; el predio interior y el
+     contexto urbano de Rhino/CADMapper aún requieren cotejo. */
+  var PRED = [[447.963, 322.265], [558.963, 322.265], [558.963, 488.265], [447.963, 488.265]];
+  var REVIT = window.ATLAMPA_REVIT;
+  var GUP = REVIT && REVIT.siteOutline ? REVIT.siteOutline.map(function (p) {
+    return [p[0] + REVIT.origen[0], p[1] + REVIT.origen[1]];
+  }) : [[446.3805, 320.7946], [560.3029, 320.7946], [560.3029, 489.7722], [446.3805, 489.7722]];
+  var PB = { u0: 447.963, u1: 558.963, v0: 322.265, v1: 488.265 };
+  var GU = { o: 446.3805, e: 560.3029, s: 320.7946, n: 489.7722 };
   var GF = { o: 437.5, e: 567.0, s: 313.95, n: 500.5 };             // guarniciones de enfrente
   var S = { u0: 435.75, u1: 569.17, v0: 311.45, v1: 506.98 };      // fachadas de enfrente (las de los edificios de Contexto.3dm): el bloque del sitio
   var HE = [401, 409];                                              // Heliotropo, dentro del predio (la espuela, paso peatonal)

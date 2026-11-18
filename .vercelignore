@@ -8,3 +8,9 @@
 herramientas/
 handoff/
 .github/
+backups/
+runtime-local/
+.env
+.env.*
+email_config.json
+Chats-BIM-respaldo/

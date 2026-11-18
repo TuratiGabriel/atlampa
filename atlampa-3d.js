@@ -29,6 +29,7 @@ const G = window.AtlampaGeo;
 // rótulos de calles) en su propio archivo; si no está, el motor sigue igual.
 const VER = import.meta.url.split('?')[1] || '';
 const EXTRAS = await import('./atlampa-3d-ctx.js' + (VER ? '?' + VER : '')).then(m => m, () => null);
+const VIVIENDA4_MOD = await import('./atlampa-3d-vivienda4.js' + (VER ? '?' + VER : '')).then(m => m, e => { console.warn('Sin detalle de vivienda 4:', e); return null; });
 // Arte y cultura detallado (arte_y_cultura_concepto.html, por herramientas/prepara-cultura.py):
 // va en todas las escenas, en lugar de los pabellones simples.
 const CULTURA_DET = await import('./atlampa-3d-cultura.js' + (VER ? '?' + VER : '')).then(m => m, e => { console.warn('Sin arte y cultura detallado:', e); return null; });
@@ -40,6 +41,10 @@ const ESTR = window.ATLAMPA_ESTRUCTURA || null;
 // La industria del usuario (Rhino: industry_geometry/upload, por herramientas/prepara-industria.py): reemplaza el prisma simple
 const IND = window.ATLAMPA_INDUSTRIA || null;
 const INFRA = window.ATLAMPA_INFRAESTRUCTURA || null;
+// Los binarios se cargan en paralelo al módulo. Conservamos las referencias
+// del manifiesto; `crea` se llama cuando Promise.all ya completó las cargas.
+const BIM = window.ATLAMPA_REVIT || null;
+const VIVIENDA4 = window.ATLAMPA_VIVIENDA4 || null;
 const RAD = Math.PI / 180;
 // caja [u0, v0, u1, v1] menos otra caja: las (hasta 4) cajas que quedan
 function menosCaja(c, h) {
@@ -56,7 +61,7 @@ function menosCaja(c, h) {
 const W = (u, v, z) => [u - CEN[0], z, -(v - CEN[1])];
 
 /* ---------- Estilos ---------- */
-const PAPELES = ['suelo', 'calle', 'banqueta', 'predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'proyecto', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'arbusto', 'copa', 'est', 'rampa', 'vidrio'];
+const PAPELES = ['suelo', 'calle', 'banqueta', 'predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'proyecto', 'nave', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'arbusto', 'copa', 'est', 'rampa', 'vidrio', 'vidrio-vivienda', 'vidrio-industria', 'vidrio-cultura'];
 const ESTILOS = {
   clay: {
     // Maqueta editorial: masas mate, luz difusa y un solo protagonista azul.
@@ -101,13 +106,17 @@ const ESTILOS = {
     papel: {
       suelo: { gris: 0.045, arista: 0.15 }, calle: { gris: 0.02, arista: 0.2 }, banqueta: { gris: 0.075, arista: 0.32 }, predio: { gris: 0.065, arista: 0.75 },
       plaza: { gris: 0.1, arista: 0.4 }, verde: { gris: 0.07, arista: 0 }, tezontle: { gris: 0.1, arista: 0 }, agua: { gris: 0.04, arista: 0.5 },
-      filtro: { gris: 0.09, arista: 0.35 }, nave: { gris: 0.17, arista: 0.95 }, industria: { modo: 2, tono: 0.7, paso: 2.4, gris: 0.04, arista: 0.85 }, cultura: { gris: 0.18, arista: 0.95 },
+      filtro: { gris: 0.09, arista: 0.35 }, nave: { gris: 0.17, arista: 0.95 }, industria: { gris: 0.18, arista: 0.85 }, cultura: { gris: 0.18, arista: 0.95 },
       aro: { gris: 0.24, arista: 1 }, modulo: { gris: 0.55, arista: 0.6 }, modcom: { gris: 0.17, arista: 0.95 }, arbusto: { gris: 0.12, arista: 0 }, copa: { gris: 0.1, arista: 0 },
       est: { gris: 0.05, arista: 0.4 }, rampa: { gris: 0.12, arista: 0 }, proyecto: { gris: 0.17, arista: 1 }, vidrio: { modo: 3, gris: 0.09, arista: 0.6 }
     },
     lineas: { pasto: 0.32, flor: 0.85, junco: 0.3, tronco: 0.4, sendero: 0.3, rayo: 0.15, columna: 0.4, est: 0.3, rampa: 0.75, sol: 0.45, vidrio: 0.5 }
   }
 };
+// El vidrio BIM conserva el acabado de vidrio, pero pertenece a su programa.
+for (const e of Object.values(ESTILOS)) {
+  ['vidrio-vivienda', 'vidrio-industria', 'vidrio-cultura'].forEach(p => { e.papel[p] = { ...e.papel.vidrio }; });
+}
 // colores del programa (lámina de usos), para el modo Color
 // (en tonos claros: sobre el fondo negro tienen que leerse)
 const PROGRAMA = { vivienda: '#ff5cb0', comercio: '#8a98ff', industria: '#d2d4d8', publico: '#ff6f63', cultura: '#c9a6ff', verde: '#a8e063', agua: '#8fd0ff', tez: '#ff9a6b', est: '#d2d4d8', aro: '#f2c14e', social: '#e8ff5a' };
@@ -121,17 +130,17 @@ const CLAY_TINTA = {
   est: '#b8bbbd', rampa: '#b8bbbd', contexto: '#e7e4dc', ctxsuelo: '#dadbd8', carro: '#aeb2b5'
 };
 // qué programa / espacio es cada papel
-const PROG_DE = { social: 'social', nave: 'comercio', vidrio: 'comercio', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', modcom: 'comercio', social: 'social', aro: 'aro', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est', rampa: 'est' };
+const PROG_DE = { social: 'social', nave: 'comercio', vidrio: 'comercio', 'vidrio-vivienda': 'vivienda', 'vidrio-industria': 'industria', 'vidrio-cultura': 'cultura', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', modcom: 'comercio', aro: 'aro', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est', rampa: 'est' };
 // Público / privado (un solo botón, dos colores): privado, los volúmenes de
 // vivienda y la industria; lo demás del proyecto, público (también los módulos
 // que se abren al aro, que son comercio). Lo que no es del proyecto (calles,
 // contexto, estacionamiento) no se colorea.
-const ESPACIO_DE = { modulo: 'privado', industria: 'privado' };
+const ESPACIO_DE = { modulo: 'privado', 'vidrio-vivienda': 'privado', industria: 'privado', 'vidrio-industria': 'privado' };
 const ESPACIO_COLOR = { publico: '#35d0c4', privado: '#ff7a3d' };
-const DEL_PROYECTO = ['predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'banqueta', 'nave', 'vidrio', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'arbusto', 'copa', 'proyecto'];
+const DEL_PROYECTO = ['predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'banqueta', 'nave', 'vidrio', 'vidrio-vivienda', 'vidrio-industria', 'vidrio-cultura', 'industria', 'cultura', 'aro', 'modulo', 'social', 'modcom', 'arbusto', 'copa', 'proyecto'];
 const espacioDe = papel => DEL_PROYECTO.indexOf(papel) >= 0 ? (ESPACIO_DE[papel] || 'publico') : null;
 // qué papeles resalta cada opción de Resaltar (y las líneas de plantas van con el paisaje)
-const RESALTA_PAPELES = { modulos: ['modulo', 'social'], comercio: ['nave', 'modcom', 'vidrio'], cultura: ['cultura', 'plaza'], industria: ['industria'], aro: ['aro'],
+const RESALTA_PAPELES = { modulos: ['modulo', 'social', 'vidrio-vivienda'], comercio: ['nave', 'modcom', 'vidrio'], cultura: ['cultura', 'plaza', 'vidrio-cultura'], industria: ['industria', 'vidrio-industria'], aro: ['aro'],
   paisajismo: ['verde', 'tezontle', 'agua', 'filtro', 'arbusto', 'copa'], estacionamiento: ['est', 'rampa'] };
 const LINEAS_PAISAJE = ['pasto', 'flor', 'junco', 'tronco', 'sendero', 'rayo'];
 // los árboles que se plantan con el proyecto son jóvenes (Gabriel: «no tienen tanto tiempo ahí»): 60 % del porte
@@ -150,6 +159,9 @@ const CORTE_ALTO = 1.75;
 const CORTE_POS = { value: new THREE.Vector3(1e5, 1e5, 1e5) };
 const CORTE_ACT = { value: new THREE.Vector3(0, 0, 0) };
 const CORTE_DIR = { value: new THREE.Vector3(1, 1, 1) };
+const PISO_RANGO = { value: new THREE.Vector2(-1e5, 1e5) };
+const DETALLE_MIN = { value: new THREE.Vector2(-1e5, -1e5) };
+const DETALLE_MAX = { value: new THREE.Vector2(1e5, 1e5) };
 
 /* Dibujar como a mano (las transiciones): cada arista se traza desde una de
    sus puntas, en un orden que mezcla un barrido (desde un punto, radial, o en
@@ -183,12 +195,16 @@ const DIB_LINEA = /* glsl */`
     transformed = aLado < 1.5 ? dS : mix(dS, dE, dk);
   }`;
 function dibujable(mat, U) {   // un LineBasicMaterial que se dibuja con el canal U
+  mat._dibUniforms = U;
   mat.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, U);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aOtro; attribute float aLado;' + DIB_GLSL)
-      .replace('#include <begin_vertex>', DIB_LINEA);
+    Object.assign(sh.uniforms, { uPisoRango: PISO_RANGO, uDetalleMin: DETALLE_MIN, uDetalleMax: DETALLE_MAX }, U);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aOtro; attribute float aLado; varying vec3 vDetalleW;' + DIB_GLSL)
+      .replace('#include <begin_vertex>', DIB_LINEA)
+      .replace('#include <project_vertex>', '#include <project_vertex>\n vDetalleW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vDetalleW; uniform vec2 uPisoRango; uniform vec2 uDetalleMin; uniform vec2 uDetalleMax;')
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if (vDetalleW.y < uPisoRango.x || vDetalleW.y > uPisoRango.y || vDetalleW.x < uDetalleMin.x || vDetalleW.x > uDetalleMax.x || vDetalleW.z < uDetalleMin.y || vDetalleW.z > uDetalleMax.y) discard;');
   };
-  mat.customProgramCacheKey = () => 'dib';
+  mat.customProgramCacheKey = () => 'dib-detail';
   return mat;
 }
 function canalDib() { return { uDib: { value: new THREE.Vector4(1, 1, 1, 0) }, uDibO: { value: new THREE.Vector3() }, uDibV: { value: new THREE.Vector3(0, 300, 0) } }; }
@@ -230,7 +246,7 @@ const VERT = /* glsl */`
   }`;
 const FRAG = /* glsl */`
   uniform vec3 uFondo; uniform vec3 uTinta; uniform float uModo; uniform float uTono; uniform float uPaso; uniform float uMundo;
-  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform vec3 uCortePos; uniform vec3 uCorteAct; uniform vec3 uCorteDir;
+  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform vec3 uCortePos; uniform vec3 uCorteAct; uniform vec3 uCorteDir; uniform vec2 uPisoRango; uniform vec2 uDetalleMin; uniform vec2 uDetalleMax;
   varying vec3 vN; varying vec3 vW;` + DIB_GLSL + `
   // una raya cada periodo de c (antialias con fwidth; si es muy denso, el promedio)
   float raya(float c, float grueso) {
@@ -240,6 +256,8 @@ const FRAG = /* glsl */`
     return mix(r, grueso * 1.4, smoothstep(0.25, 0.6, w));
   }
   void main() {
+    if (vW.y < uPisoRango.x || vW.y > uPisoRango.y) discard;
+    if (vW.x < uDetalleMin.x || vW.x > uDetalleMax.x || vW.z < uDetalleMin.y || vW.z > uDetalleMax.y) discard;
     if ((uCorteAct.x > 0.5 && (vW.x - uCortePos.x) * uCorteDir.x > 0.0) ||
         (uCorteAct.y > 0.5 && (vW.y - uCortePos.y) * uCorteDir.y > 0.0) ||
         (uCorteAct.z > 0.5 && (vW.z - uCortePos.z) * uCorteDir.z > 0.0)) discard;
@@ -557,7 +575,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
       uniforms: Object.assign({ uFondo: { value: new THREE.Color(0, 0, 0) }, uTinta: { value: new THREE.Color(1, 1, 1) }, uModo: { value: 0 }, uTono: { value: 0.5 },
         uPaso: { value: 3 }, uMundo: { value: 0 }, uGris: { value: 0.1 }, uGrano: { value: 0 }, uOpacidad: { value: 1 }, uLuz: { value: luz }, uPx: { value: renderer.getPixelRatio() },
-        uBrillo: { value: 1 }, uGrueso: { value: 0.22 }, uCortePos: CORTE_POS, uCorteAct: CORTE_ACT, uCorteDir: CORTE_DIR }, canalDe(papel))
+        uBrillo: { value: 1 }, uGrueso: { value: 0.22 }, uCortePos: CORTE_POS, uCorteAct: CORTE_ACT, uCorteDir: CORTE_DIR,
+        uPisoRango: PISO_RANGO, uDetalleMin: DETALLE_MIN, uDetalleMax: DETALLE_MAX }, canalDe(papel))
     });
     m.userData.papel = papel;
     return (MATS[papel] = m);
@@ -580,18 +599,20 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       if (uso) return new THREE.Color(conColor ? PROGRAMA[uso] : CLAY_PROGRAMA[uso]);
       return new THREE.Color(CLAY_TINTA[papel] || '#aeb1af');
     }
-    // el vidrio, siempre un poco azul (con Color, más)
+    // El vidrio del comercio conserva su azul; el BIM toma el color de su uso.
     if (papel === 'vidrio' && !espacioAct) return new THREE.Color(conColor ? PROGRAMA.agua : '#cfeaff');
+    if (papel.startsWith('vidrio-') && !espacioAct) return conColor
+      ? new THREE.Color(PROGRAMA[PROG_DE[papel]]).lerp(blanco, 0.5)
+      : new THREE.Color('#dce3ed');
     if (espacioAct) { const e = espacioDe(papel); return e ? new THREE.Color(ESPACIO_COLOR[e]) : blanco; }
     if (papel === 'aro' && conAro()) return new THREE.Color(PROGRAMA.aro);
     const pr = PROG_DE[papel];
     if (!conColor || !pr) return blanco;
     return new THREE.Color(PROGRAMA[pr]).lerp(blanco, 0.15);
   }
-  // ¿queda opaco con lo que está resaltado? (programa o espacio)
-  // con algo resaltado (un programa, lo público o lo privado), todo lo demás baja al 15 %
+  // Al seleccionar un uso, los demás quedan visibles y translúcidos al 15 %.
   function apagado(papel) {
-    if (!resalta || espacioAct || papel === 'aro') return false;
+    if (!resalta || espacioAct) return false;
     return (RESALTA_PAPELES[resalta] || []).indexOf(papel) < 0;
   }
   function apagadaLinea(base) {
@@ -599,9 +620,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     return !(resalta === 'paisajismo' && LINEAS_PAISAJE.indexOf(base) >= 0) && !(resalta === 'estacionamiento' && (base === 'est' || base === 'rampa'));
   }
   const TENUE = 0.15;
-  /* Nada es transparente: lo que no toca (ajeno al apartado o no resaltado)
-     se queda opaco pero apagado, y tapa lo que tiene detrás. Sin nada
-     elegido manda la planta baja: el paisaje, la plaza y lo que se desplanta
+  /* Sin nada elegido manda la planta baja: el paisaje, la plaza y lo que se desplanta
      en el piso suben; los módulos (arriba) bajan. */
   const PLANTA_BAJA = ['predio', 'plaza', 'verde', 'tezontle', 'agua', 'filtro', 'arbusto', 'copa', 'nave', 'cultura', 'industria'];
   // Inspeccionando un apartado, lo demás casi desaparece (REF)
@@ -632,7 +651,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
         else u.uTono.value = Math.min(1, u.uTono.value * 2.2);
       }
       u.uBrillo.value = enfasis(m.userData.papel, m.userData.ref) * (conEsquema ? TENUE_ESQ : 1);
-      const ap = apagado(m.userData.papel), vid = m.userData.papel === 'vidrio', inf = !!infraAct;
+      const ap = apagado(m.userData.papel), vid = m.userData.papel.startsWith('vidrio'), inf = !!infraAct;
       u.uOpacidad.value = (ap ? TENUE : 1) * (inf ? 0.09 : 1); m.transparent = ap || vid || inf; m.depthWrite = !ap && !vid && !inf;
       // inspeccionando la estructura: de lo demás, sólo el contorno (menos el aro)
       m.visible = !(enEstr && !m.userData.estr && m.userData.papel !== 'aro');
@@ -715,16 +734,16 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
      geometrías (la malla, sus aristas y las extra), que no dependen de la
      escena; ponGeos(): las pone con los materiales de esta escena. pon() hace
      las dos; con fija(clave, …) las geometrías se arman una vez por sesión. */
-  function geos(malla, papel, umbral, extraAristas) {
+  function geos(malla, papel, umbral, extraAristas, exactas) {
     const g = malla.geo ? malla.geo() : malla, c = { g };
     if (umbral !== false) {
       let eg = new THREE.EdgesGeometry(g, umbral || 25);
-      if (CROQUIS.indexOf(papel) >= 0) eg = aristasCroquis(eg);
+      if (!exactas && CROQUIS.indexOf(papel) >= 0) eg = aristasCroquis(eg);
       c.eg = pareja(eg);
     }
     if (extraAristas) {
       const eg = extraAristas.isBufferGeometry ? extraAristas : extraAristas.geo();
-      c.ex = pareja(CROQUIS.indexOf(papel) >= 0 ? aristasCroquis(eg) : eg);
+      c.ex = pareja(!exactas && CROQUIS.indexOf(papel) >= 0 ? aristasCroquis(eg) : eg);
     }
     return c;
   }
@@ -791,10 +810,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   }
 
   /* ===== 1. Sitio =====
-     El predio y su banqueta son los de Gabriel en Rhino (atlampa-geo.js: PRED,
-     GUP): la banqueta es un anillo de 1.80 m a ras del predio (+0.20), con la
-     guarnición inclinada al sur; las calles van de ahí a las guarniciones de
-     enfrente (GF), y las banquetas de enfrente como antes. */
+     La banqueta usa el perímetro de SITE_PLANTILLA en Revit; el predio interior
+     conserva la planta ajustada para ese encaje. Las calles exteriores siguen
+     el contexto existente (GF) hasta que se cotejen sus ejes en Revit. */
   const gSitio = pieza('sitio', null, 0);
   const PRED = G.PRED, GUP = G.GUP;
   // un lado de la guarnición del predio, prolongado (eje 1: u en función de v; eje 0: v en función de u)
@@ -807,7 +825,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     else if (CD) tapaHueco(m, rect(S.u0, S.v0, S.u1, S.v1), CD.pisa[0], 0);   // con el foso del auditorio abierto
     else tapa(m, rect(S.u0, S.v0, S.u1, S.v1), 0);
     suelos.push(pon(gSitio, m, 'suelo', null));
-    const [SW, SE, NE, NW] = GUP;
+    const [SW, SE, NE, NW] = [[GU.o, GU.s], [GU.e, GU.s], [GU.e, GU.n], [GU.o, GU.n]];
     const uO = v => enLinea(SW, NW, v, 1), uE = v => enLinea(SE, NE, v, 1), vS = u => enLinea(SW, SE, u, 0), vN = u => enLinea(NW, NE, u, 0);
     // calles: Fresno, Sabino, Clavel y Eulalia Guzmán (de lado a lado del bloque)
     const ar = new Malla();
@@ -1678,11 +1696,12 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (EST.elevadores && EST.elevadores.length) {
       const paso = MOD ? (MOD.paso || MOD.alto) : 3, nMax = MOD ? Math.max(...MOD.cajas.map(q => q[2])) : 7, ES = window.ATLAMPA_ESTRUCTURA;
       const zMod = MOD ? MOD.z0 + nMax * paso + MOD.alto : 24, zLosa = ES && ES.entrepiso && ES.entrepiso.length ? Math.max(...ES.entrepiso.map(q => q[1])) : 0;
-      const zTope = Math.max(zMod, zLosa), zEsp = zTope + (EST.espacioElevador || 0), fondo = -N * e;
+      const zTope = Math.max(BIM ? BIM.viviendaMaxZ : zMod, zLosa), zEsp = zTope + (EST.espacioElevador || 0), fondo = -N * e;
       const niveles = [fondo];
       for (let k = N - 1; k >= 1; k--) niveles.push(-k * e);
       niveles.push(0.2);
-      if (MOD) for (let k = 0; k <= nMax; k++) niveles.push(MOD.z0 + k * paso);
+      if (BIM) for (let k = 0; k < 12; k++) niveles.push(10.6431 + k * 3.3);
+      else if (MOD) for (let k = 0; k <= nMax; k++) niveles.push(MOD.z0 + k * paso);
       niveles.push(zTope);
       const ls = new Lineas(), le = new Lineas();
       EST.elevadores.forEach(el => {
@@ -1703,6 +1722,199 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   // él, se quita el piso del predio para ver la excavación
   if (ESC !== 'estacionamiento') gEst.userData.oculto = true;
   else gPredio.userData.oculto = gPai.userData.oculto = gPlantas.userData.oculto = true;
+
+  /* ===== Fachadas del coordinado Revit =====
+     Las caras conservan los vértices extraídos del modelo. Sólo se aplica la
+     misma traslación de sistema de coordenadas a todos los vínculos. */
+  const gBIM = {};
+  if (BIM) {
+    ['vivienda', 'comercio', 'industria', 'cultura'].forEach(ap => { delete PARTES[ap]; });
+    piezas.forEach(({ g }) => {
+      if (/^modulos\d|^industria$|^cultura$|^cultura-detalle$|^nave\d|^mercado-(perimetro|cubierta|vidrio|pa|sur-pa|sur-acero|vivienda)$/.test(g.name))
+        g.userData.oculto = true;
+    });
+    const gruposPorNivel = {}, gruposPorCategoria = {}, gruposSur4 = [];
+    const rol = { vivienda: 'modulo', comercio: 'nave', industria: 'industria', cultura: 'cultura', estacionamiento: 'est' };
+    BIM.grupos.forEach(r => {
+      if (r.programa === 'sitio') return; // el plano del solar se arma en la sección Sitio
+      if (r.programa === 'estacionamiento' && ESC !== 'estacionamiento') return;
+      const papel = r.categoria === 'windows' || r.categoria === 'curtainPanels'
+        ? ({ vivienda: 'vidrio-vivienda', industria: 'vidrio-industria', cultura: 'vidrio-cultura' }[r.programa] || 'vidrio')
+        : rol[r.programa];
+      // En el cuarto nivel los volúmenes sur y norte son disjuntos. El vacío
+      // entre y=405 y y=415 permite separarlos sin cortar ningún triángulo.
+      const src = new Float32Array(BIM.buffer, r.offset, r.floats);
+      const sectores = r.programa === 'vivienda' && r.nivel === 3
+        ? { sur: [], norte: [] } : { entero: src };
+      if (sectores.sur) for (let i = 0; i < src.length; i += 9) {
+        const y = (src[i + 1] + src[i + 4] + src[i + 7]) / 3 + BIM.origen[1];
+        const destino = y < 410 ? sectores.sur : sectores.norte;
+        for (let j = 0; j < 9; j++) destino.push(src[i + j]);
+      }
+      Object.entries(sectores).forEach(([sector, vertices]) => {
+        if (!vertices.length) return;
+        const clave = `revit-${r.programa}-${r.categoria}-${r.nivel}-${sector}${r.piezaId ? '-' + r.piezaId : ''}`;
+        const c = fija(clave, () => {
+          const pos = new Float32Array(vertices.length), o = BIM.origen;
+          for (let i = 0; i < vertices.length; i += 3) {
+            pos[i] = vertices[i] + o[0] - CEN[0];
+            pos[i + 1] = vertices[i + 2] + o[2];
+            pos[i + 2] = CEN[1] - vertices[i + 1] - o[1];
+          }
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+          geo.computeVertexNormals();
+          return geos(geo, papel, 35, null, true);
+        });
+        const g = pieza(clave, r.programa, 0.5 + r.nivel * 0.01);
+        g.userData.capa = r.programa === 'vivienda' ? 'modulos' : null;
+        g.userData.sector = sector;
+        ponGeos(g, c, papel, r.programa);
+        (gBIM[r.programa] ||= []).push(g);
+        if (r.programa === 'vivienda') {
+          (gruposPorNivel[r.nivel + (sector === 'entero' ? '' : '-' + sector)] ||= []).push(g);
+          if (sector === 'sur') gruposSur4.push(g);
+        } else {
+          const cats = (gruposPorCategoria[r.programa] ||= {});
+          (cats[r.categoria] ||= []).push(g);
+        }
+      });
+    });
+    Object.keys(gruposPorNivel).forEach(k => {
+      const n = Number(k.split('-')[0]), sector = k.endsWith('-sur') ? ' · sur' : k.endsWith('-norte') ? ' · norte' : '';
+      parte('vivienda', 'bim-n' + k, 'Nivel ' + (n + 1) + sector, gruposPorNivel[k], [0, n * 2.4, 0]);
+    });
+    // Se usa después de separar la vivienda: sólo el cuarto piso del sur.
+    gBIM.viviendaSur4 = gruposSur4;
+    const nombres = { walls: 'Muros', floors: 'Losas', doors: 'Puertas', windows: 'Ventanas', curtainPanels: 'Paneles de fachada', curtainMullions: 'Montantes', roofs: 'Cubiertas', chacuacos: 'Chacuacos', chimeneas: 'Chimeneas' };
+    Object.entries(gruposPorCategoria).forEach(([ap, cats]) => Object.entries(cats).forEach(([cat, grupos]) =>
+      parte(ap, 'bim-' + cat, nombres[cat] || cat, grupos)));
+  }
+
+  const detalle4 = VIVIENDA4_MOD && VIVIENDA4?.buffer ? VIVIENDA4_MOD.creaVivienda4({
+    THREE, data: VIVIENDA4, CEN, pieza, geos, ponGeos, pide, ray, cam: () => cam, lienzo
+  }) : null;
+  let etapaVivienda4 = 'predio';
+  // Los cortes de piso son sólo de presentación. Conservan intactos los
+  // triángulos leídos de Revit y se retiran al salir del uso aislado.
+  const PISOS_USO = {
+    comercio: [[0, 3.88], [3.88, 9.5]],
+    cultura: [[-2.98, 0], [0, 3.32], [3.32, 6.32], [6.32, 15.72]],
+    industria: [[0, 3.06], [3.06, 10.9]]
+  };
+  function limpiaCorteUso() {
+    PISO_RANGO.value.set(-1e5, 1e5);
+    DETALLE_MIN.value.set(-1e5, -1e5);
+    DETALLE_MAX.value.set(1e5, 1e5);
+  }
+  function pisosUso(ap) { return BIM && PISOS_USO[ap] ? PISOS_USO[ap].map((r, i) => ({ id: i + 1, z0: r[0], z1: r[1] })) : []; }
+  let explosionUso = null;
+  function limpiaExplosionUso() {
+    if (!explosionUso) return;
+    explosionUso.raices.forEach(g => {
+      g.traverse(o => { if ((o.isMesh || o.isLineSegments) && o.material) o.material.dispose(); });
+      raizG.remove(g);
+    });
+    if (aisl) aisl.grupos = explosionUso.original;
+    explosionUso = null;
+  }
+  function separaPisosUso(ap, progreso) {
+    if (!aisl || aisl.ap !== ap || !PISOS_USO[ap]) return { ok: false, reason: 'use_not_isolated' };
+    if (!Number.isFinite(progreso) || progreso < 0 || progreso > 1) return { ok: false, reason: 'invalid_progress' };
+    if (!BIM) return { ok: false, reason: 'bim_unavailable' };
+    if (!explosionUso && progreso > 0) {
+      const original = new Set(aisl.grupos), raices = [];
+      PISOS_USO[ap].forEach((r, i) => {
+        const raiz = new THREE.Group(); raiz.name = 'piso-' + ap + '-' + (i + 1);
+        const materiales = [];
+        original.forEach(g => {
+          const copia = g.clone(true);
+          copia.traverse(o => {
+            if (o.isMesh && o.material?.uniforms) {
+              o.material = o.material.clone();
+              o.material.uniforms.uPisoRango = { value: new THREE.Vector2(r[0], r[1]) };
+              materiales.push(o.material.uniforms.uPisoRango);
+            } else if (o.isLineSegments && o.material) {
+              const base = o.material;
+              const pisoUniform = { value: new THREE.Vector2(r[0], r[1]) };
+              o.material = dibujable(base.clone(), { ...base._dibUniforms,
+                uPisoRango: pisoUniform });
+              materiales.push(pisoUniform);
+            }
+          });
+          raiz.add(copia);
+        });
+        raiz.userData.materialesPiso = materiales;
+        raizG.add(raiz); raices.push(raiz);
+      });
+      explosionUso = { original, raices };
+      aisl.grupos = new Set(raices);
+      visibles();
+    }
+    if (explosionUso) {
+      explosionUso.raices.forEach((g, i) => {
+        const offset = i * 14 * progreso, r = PISOS_USO[ap][i];
+        g.position.y = offset;
+        g.userData.materialesPiso.forEach(u => u.value.set(r[0] + offset, r[1] + offset));
+      });
+      if (progreso === 0) { limpiaExplosionUso(); visibles(); }
+    }
+    aisl.caja = cajaAislado(); vuelaA(700); pide();
+    return { ok: true, progress: progreso, floors: pisosUso(ap) };
+  }
+  function aislaPisoUso(ap, numero) {
+    if (!aisl || aisl.ap !== ap || !PISOS_USO[ap]) return { ok: false, reason: 'use_not_isolated' };
+    const rango = PISOS_USO[ap][numero - 1];
+    if (!BIM || !rango) return { ok: false, reason: 'floor_unavailable', floors: pisosUso(ap) };
+    limpiaExplosionUso();
+    limpiaCorteUso();
+    PISO_RANGO.value.set(rango[0], rango[1]);
+    visibles();
+    aisl.caja = cajaAislado();
+    aisl.caja[4] = rango[0]; aisl.caja[5] = rango[1];
+    vuelaA(850); pide();
+    return { ok: true, use: ap, floor: numero, elevation: rango.slice() };
+  }
+  function zonasProvisionales(ap, numero) {
+    const rango = PISOS_USO[ap]?.[numero - 1];
+    if (!rango || !gBIM[ap]) return [];
+    const celdas = new Map(), paso = 12;
+    function cuenta(categoria) { gBIM[ap].filter(g => g.name.includes('-' + categoria + '-')).forEach(g => g.traverse(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      const a = o.geometry.attributes.position.array;
+      for (let i = 0; i < a.length; i += 9) {
+        const y = (a[i + 1] + a[i + 4] + a[i + 7]) / 3;
+        if (y < rango[0] || y > rango[1]) continue;
+        const x = (a[i] + a[i + 3] + a[i + 6]) / 3;
+        const z = (a[i + 2] + a[i + 5] + a[i + 8]) / 3;
+        const ix = Math.floor(x / paso), iz = Math.floor(z / paso), key = ix + ',' + iz;
+        celdas.set(key, (celdas.get(key) || 0) + 1);
+      }
+    })); }
+    cuenta('curtainPanels');
+    if (!celdas.size) cuenta('walls');
+    const elegidas = [];
+    [...celdas].sort((a, b) => b[1] - a[1]).forEach(([key, n]) => {
+      if (elegidas.length >= 3 || n < 10) return;
+      const [ix, iz] = key.split(',').map(Number);
+      if (elegidas.some(e => Math.abs(e.ix - ix) < 2 && Math.abs(e.iz - iz) < 2)) return;
+      elegidas.push({ id: 'zona-' + (elegidas.length + 1), label: (ap === 'comercio' ? 'Módulo ' : 'Local ') +
+        String.fromCharCode(65 + elegidas.length) + ' · provisional', ix, iz, count: n });
+    });
+    return elegidas;
+  }
+  function aislaZonaProvisional(ap, numero, id) {
+    if (!aisl || aisl.ap !== ap || PISO_RANGO.value.x < -1e4) return { ok: false, reason: 'floor_not_isolated' };
+    const zona = zonasProvisionales(ap, numero).find(z => z.id === id);
+    if (!zona) return { ok: false, reason: 'zone_unavailable' };
+    // Ventana amplia alrededor de una fachada real: el recorte es provisional,
+    // no representa límites oficiales del módulo o local.
+    const x0 = zona.ix * 12 - 9, x1 = x0 + 30, z0 = zona.iz * 12 - 9, z1 = z0 + 30;
+    DETALLE_MIN.value.set(x0, z0); DETALLE_MAX.value.set(x1, z1);
+    aisl.caja = [x0 + CEN[0], x1 + CEN[0], CEN[1] - z1, CEN[1] - z0, PISO_RANGO.value.x, PISO_RANGO.value.y];
+    vuelaA(850); pide();
+    return { ok: true, use: ap, floor: numero, id, label: zona.label, provisional: true };
+  }
 
   /* ===== 10. Sol: la bóveda ===== */
   const gSol = new THREE.Group(); gSol.visible = false; escena.add(gSol);
@@ -1962,7 +2174,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     });
     // el resto: el doble que antes (16 → 32) en las banquetas y los senderos
     // (por la mitad de la banqueta del predio)
-    const mitad = G.PRED.map((q, i) => [(q[0] + G.GUP[i][0]) / 2, (q[1] + G.GUP[i][1]) / 2]);
+    const esquinas = [[GU.o, GU.s], [GU.e, GU.s], [GU.e, GU.n], [GU.o, GU.n]];
+    const mitad = G.PRED.map((q, i) => [(q[0] + esquinas[i][0]) / 2, (q[1] + esquinas[i][1]) / 2]);
     ruta(mitad.concat([mitad[0]]), 22, 1.3);
     if (PAI) PAI.senderos.forEach((s, i) => { if (i % 2 === 0) ruta([[s[0], s[1]], [s[2], s[3]]], 1, 0.9); });
     // grupos quietos en los accesos peatonales (lámina 1: x 76–210, y 115–316) y en la plaza
@@ -2418,7 +2631,10 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const n = capas.nolli;
     piezas.forEach(p => { p.g.visible = !n && !p.g.userData.oculto; });
     // inspeccionando algo (un apartado), los módulos se van
-    gMods.forEach(g => { g.visible = !n && GENERAL && capas.modulos && !ocultos.has('vivienda'); });
+    gMods.forEach(g => { g.visible = !n && GENERAL && capas.modulos && !ocultos.has('vivienda') && !g.userData.oculto; });
+    if (BIM && gBIM.vivienda) gBIM.vivienda.forEach(g => {
+      g.visible = !n && GENERAL && capas.modulos && !ocultos.has('vivienda');
+    });
     gPai.visible = gPlantas.visible = !n && capas.paisaje && !gPai.userData.oculto;
     gCol.visible = gEstr.visible = !n && capas.estructura;
     gEst.visible = !n && ESC === 'estacionamiento';
@@ -2468,10 +2684,14 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (aisl) return aisl.caja;
     if (capas.nolli) return [S.u0 - 110, S.u1 + 110, S.v0 - 90, S.v1 + 90, 0, 1];
     if (capas.sol) return [CEN[0] - R_SOL, CEN[0] + R_SOL, CEN[1] - R_SOL, CEN[1] + R_SOL, 0, R_SOL];
-    if (GENERAL) return [S.u0, S.u1, S.v0, S.v1, 0, MOD ? MOD.z0 + 7 * (MOD.paso || MOD.alto) + MOD.alto : 14];
+    if (GENERAL) return [S.u0, S.u1, S.v0, S.v1, 0, BIM ? BIM.viviendaMaxZ : MOD ? MOD.z0 + 7 * (MOD.paso || MOD.alto) + MOD.alto : 14];
     return cajaAp(ESC);
   }
   function cajaAp(ap) {
+    if (BIM && BIM.bounds[ap]) {
+      const b = BIM.bounds[ap], o = BIM.origen;
+      return [b[0][0] + o[0], b[1][0] + o[0], b[0][1] + o[1], b[1][1] + o[1], b[0][2] + o[2], b[1][2] + o[2]];
+    }
     const us = [], vs = []; let z0 = 0, z1 = 10;
     const mete = q => { us.push(q[0]); vs.push(q[1]); };
     if (ap === 'estacionamiento' && EST) { EST.bloques.forEach(b => G.pares(b.planta).forEach(mete)); z0 = -EST.sotanos * EST.entrepiso; z1 = elevTope; }
@@ -2495,7 +2715,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const p = new THREE.Vector3(...W(uu, vv, zz)).sub(c0), px = p.dot(r), py = p.dot(u);
       x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
     })));
-    const aire = GENERAL || capas.sol ? 1.06 : 1.25;
+    const aire = etapaVivienda4 === 'muro' || etapaVivienda4 === 'capas' ? 1.55 :
+      GENERAL || capas.sol ? 1.06 : 1.25;
     let h = (y1 - y0) / 2 * aire, w = (x1 - x0) / 2 * aire;
     if (w / h > ASP) h = w / ASP;
     base = { c: c0.add(r.clone().multiplyScalar((x0 + x1) / 2)).add(u.clone().multiplyScalar((y0 + y1) / 2)), h };
@@ -2512,6 +2733,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
         base.h *= Math.max((a1 - a0) / 2, (b1 - b0) / 2) * aire;
       }
     }
+    // Deja la ficha de capas a la izquierda sin tapar el muro aislado.
+    if (etapaVivienda4 === 'capas') base.c.addScaledVector(r, -base.h * 0.50);
     // contexto (x): se aleja hasta ~450 m de media altura
     base.h = base.h * Math.pow(Math.max(1, 450 / base.h), Math.max(0, X));
   }
@@ -2812,6 +3035,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
      aisla(null): todo regresa y se vuelve a dibujar desde lo que estaba aislado.
      (La página pone la axonometría: perspectiva(false).) */
   function gruposDe(ap) {
+    if (BIM && gBIM[ap]) return ap === 'estacionamiento' ? [gEst, ...gBIM[ap]] : gBIM[ap].slice();
     if (ap === 'comercio' && MERCADO) return piezas.filter(p => /^mercado-|^cinta$/.test(p.g.name)).map(p => p.g);
     // la nave norte abierta: el mercado sin la nave sur (ni su planta baja, planta alta y acero) ni las columnas de la vivienda, y el aro (sin la cinta)
     if (ap === 'nave-norte' && MERCADO) return piezas.filter(p => (/^mercado-/.test(p.g.name) && !/^mercado-(pa|vivienda|sur-.*)$/.test(p.g.name)) || (p.ap === 'aro' && p.g.name !== 'cinta')).map(p => p.g);
@@ -2852,9 +3076,12 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   function aisla(ap) {
     if (!ap) {
       if (!aisl) return null;
+      limpiaExplosionUso();
+      limpiaCorteUso();
       const k = aisl.caja;
       reiniciaPartes(false);
       aisl = null; despTok++;
+      etapaVivienda4 = 'predio';
       aplicaEstilo(); visibles();
       vuelaA(1100);
       dibuja(DIB.base, barridoDesde(k), 1400);
@@ -2862,8 +3089,11 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     }
     const grupos = gruposDe(ap);
     if (!grupos.length) return null;
+    limpiaExplosionUso();
+    limpiaCorteUso();
     if (aisl) reiniciaPartes(false);   // (de un aislado a otro: lo movido regresa)
     aisl = { ap, grupos: new Set(grupos), partes: PARTES[ap] || [] };
+    etapaVivienda4 = ap === 'vivienda' ? 'vivienda' : 'predio';
     reiniciaPartes(true);
     aplicaEstilo(); visibles();
     aisl.caja = cajaAislado();
@@ -2904,6 +3134,111 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     aisl.partes.forEach(pt => { if (mueve3(pt)) pt.desplazado = !!si; });
     despliega(true);
     return partes();
+  }
+  // Progreso continuo del despiece de los niveles reales de vivienda.
+  // Reutiliza los grupos por piso y sus direcciones; no cambia la geometría fuente.
+  function separaPisos(progreso) {
+    if (!aisl || aisl.ap !== 'vivienda') return { ok: false, reason: 'vivienda_no_aislada' };
+    const pisos = aisl.partes.filter(pt => BIM ? /^bim-n\d+(?:-(?:sur|norte))?$/.test(pt.id) : /^n[0-7]$/.test(pt.id));
+    if (new Set(pisos.map(pt => BIM ? Number(pt.id.match(/^bim-n(\d+)/)[1]) : Number(pt.id.slice(1)))).size !== (BIM ? 12 : 8))
+      return { ok: false, reason: 'niveles_incompletos', levels: pisos.map(pt => pt.id) };
+    const antes = pisos.some(pt => pt.k > 0);
+    ++despTok; // interrumpe una animación previa del botón Despiece
+    pisos.forEach(pt => {
+      pt.k = progreso;
+      pt.desplazado = progreso > 0;
+      pt.objs.forEach(o => coloca(pt, o, progreso));
+    });
+    if (progreso > 0 && !antes) { aisl.caja = cajaAislado(true); vuelaA(800); }
+    else if (progreso === 0 && antes) { aisl.caja = cajaAislado(); vuelaA(800); }
+    pide();
+    return { ok: true, progress: progreso, levels: pisos.map(pt => pt.id) };
+  }
+  function progresoPisos() {
+    if (!aisl || aisl.ap !== 'vivienda') return 0;
+    const pisos = aisl.partes.filter(pt => BIM ? /^bim-n\d+(?:-(?:sur|norte))?$/.test(pt.id) : /^n[0-7]$/.test(pt.id));
+    return pisos.length ? Math.max(...pisos.map(pt => pt.k)) : 0;
+  }
+
+  function aislaPiso4Sur() {
+    if (!detalle4 || !BIM || !gBIM.viviendaSur4 || gBIM.viviendaSur4.length !== 4)
+      return { ok: false, reason: 'piso_sur_no_disponible', hasDetail: !!detalle4,
+        hasBim: !!BIM, groupCount: gBIM.viviendaSur4?.length || 0 };
+    if (!aisl || aisl.ap !== 'vivienda') return { ok: false, reason: 'vivienda_no_aislada' };
+    ++despTok;
+    reiniciaPartes(false);
+    aisl.grupos = new Set(detalle4.floorGroups());
+    aisl.partes = [];
+    etapaVivienda4 = 'piso';
+    visibles();
+    aisl.caja = cajaAislado();
+    vuelaA(900);
+    pide();
+    return { ok: true, floor: 4, volume: 'sur', elevation: 20.5431,
+      apartments: detalle4.apartmentIds() };
+  }
+  function enfocaDetalle(grupos, etapa) {
+    aisl.grupos = new Set(grupos);
+    aisl.partes = [];
+    etapaVivienda4 = etapa;
+    visibles();
+    aisl.caja = cajaAislado();
+    vuelaA(850);
+    pide();
+  }
+  function aislaDepartamento(id) {
+    if (!aisl || aisl.ap !== 'vivienda' || etapaVivienda4 !== 'piso')
+      return {ok:false,reason:'piso_no_aislado'};
+    const r=detalle4.selectApartment(id);
+    if (r.ok) enfocaDetalle(r.groups,'departamento');
+    return r.ok ? {ok:true,id:r.id,wallIds:r.wallIds} : r;
+  }
+  function aislaMuro(id) {
+    if (!aisl || etapaVivienda4 !== 'departamento')
+      return {ok:false,reason:'departamento_no_aislado'};
+    const r=detalle4.selectWall(id);
+    if (r.ok) enfocaDetalle(r.groups,'muro');
+    return r.ok ? {ok:true,id:r.id,name:r.name} : r;
+  }
+  function explotaMuro() {
+    if (!aisl || etapaVivienda4 !== 'muro') return {ok:false,reason:'muro_no_aislado'};
+    const r=detalle4.explodeWall();
+    if (r.ok) enfocaDetalle(r.groups,'capas');
+    return r.ok ? {ok:true,id:r.id,layers:r.layers} : r;
+  }
+
+  // Aparta los programas del proyecto hacia ambos lados de la vista.
+  // Se mueven grupos de representación; los vértices fuente permanecen intactos.
+  let lateral = null, progresoLateral = 0;
+  function separaLados(progreso) {
+    if (ESC !== 'general' || aisl) return { ok: false, reason: 'requires_general_unisolated' };
+    if (!Number.isFinite(progreso) || progreso < 0 || progreso > 1)
+      return { ok: false, reason: 'invalid_progress' };
+    if (!lateral && progreso > 0) {
+      cam.updateMatrixWorld(true);
+      const derecha = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
+      derecha.y = 0; derecha.normalize();
+      const programas = ['vivienda', 'comercio', 'industria', 'cultura', 'aro'];
+      const entradas = programas.map(ap => {
+        const grupos = piezas.filter(p => p.ap === ap && p.g.visible && !p.g.userData.oculto).map(p => p.g);
+        const cajaGrupo = new THREE.Box3();
+        grupos.forEach(g => cajaGrupo.expandByObject(g));
+        return { ap, grupos, centro: cajaGrupo.isEmpty() ? null : cajaGrupo.getCenter(new THREE.Vector3()) };
+      }).filter(e => e.centro && e.grupos.length);
+      if (entradas.length < 2) return { ok: false, reason: 'insufficient_programs' };
+      entradas.sort((a, b) => a.centro.dot(derecha) - b.centro.dot(derecha));
+      lateral = entradas.map((e, i) => ({ ap: e.ap,
+        grupos: e.grupos.map(g => ({ g, posicion: g.position.clone() })),
+        desplazamiento: (i - (entradas.length - 1) / 2) * 12,
+        derecha: derecha.clone() }));
+    }
+    if (lateral) lateral.forEach(e => e.grupos.forEach(({ g, posicion }) =>
+      g.position.copy(posicion).addScaledVector(e.derecha, e.desplazamiento * progreso)));
+    progresoLateral = progreso;
+    pide();
+    const programas = lateral ? lateral.map(e => e.ap) : [];
+    if (progreso === 0) lateral = null;
+    return { ok: true, progress: progreso, programs: programas };
   }
 
   /* ----- la nave norte bajo el cursor -----
@@ -2964,10 +3299,13 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   return {
     vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura,
     aisla, partes, ponParte, despiece, aislado: () => aisl ? aisl.ap : null, camara, corta,
-    naveNorteEn,
+    naveNorteEn, apartamentoEn: ev => etapaVivienda4 === 'piso' ? detalle4.apartmentAt(ev) : null,
+    muroEn: ev => etapaVivienda4 === 'departamento' ? detalle4.wallAt(ev) : null,
+    aislaDepartamento, aislaMuro, explotaMuro, etapaDetalle: () => etapaVivienda4,
     depura: () => ({ escena, capas }),   // para revisar desde la consola
     preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); },
-    contextoListo: () => !ext.listo || ext.listo(), separa,
+    contextoListo: () => !ext.listo || ext.listo(), separa, separaPisos, progresoPisos, aislaPiso4Sur,
+    separaLados, progresoLateral: () => progresoLateral, pisosUso, aislaPisoUso, separaPisosUso, zonasProvisionales, aislaZonaProvisional,
     fluye(ms) { mueveInfra(ms); if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
     minimapa: G.minimapa, limitesElevacion: [EL_MIN, EL_MAX], limitesDentro: EL_DENTRO, dentro, pasea, escena: ESC, tipos: MOD ? MOD.tipos : [],
     aumento: () => 1, azimut: () => AZ, elevacion: () => EL, estilo: cambiaEstilo, perspectiva, estilos: Object.keys(ESTILOS), motor: '3d'

@@ -1,15 +1,18 @@
-"""Servidor local del diagrama sin caché: el navegador siempre pide la última
-versión de cada archivo (con http.server a secas, a veces se quedaba con un
-JS viejo).   python diagrama/herramientas/servidor.py 8130"""
+"""Servidor local: archivos editables siempre frescos; librerías versionadas en caché."""
 import functools
 import http.server
 import os
 import sys
+from urllib.parse import urlsplit
 
 
 class SinCache(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
-        self.send_header('Cache-Control', 'no-store')
+        path = urlsplit(self.path).path
+        if path.startswith(('/lib/', '/fuentes/')):
+            self.send_header('Cache-Control', 'private, max-age=86400, immutable')
+        else:
+            self.send_header('Cache-Control', 'no-store')
         super().end_headers()
 
 
