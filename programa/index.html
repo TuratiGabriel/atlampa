@@ -205,7 +205,7 @@ a{color:var(--accent)}
 <section id="potencial">
   <span class="eyebrow">6 · Potencial construible</span>
   <h2>CAS, COS y CUS</h2>
-  <p>Normas del proyecto: COS máximo 80 %, área libre (CAS) mínima de 20 % y CUS máximo 7.2 veces el desplante máximo. Predio de <span id="pot-pred"></span> m².</p>
+  <p>Normas del proyecto: COS máximo <span id="cos-lim"></span>, área libre (CAS) mínima de <span id="cas-lim"></span> y CUS máximo <span id="cus-lim"></span> veces el desplante máximo. Predio de <span id="pot-pred"></span> m².</p>
   <div class="grid2">
     <div class="sheet"><p class="ttl">Cumplimiento</p>
       <div class="stack">
@@ -221,12 +221,12 @@ a{color:var(--accent)}
         <div class="row"><b>Máximo construible (7.2 × desplante máximo)</b><span id="maxc"></span></div>
         <div class="row"><b>Construido sobre piso</b><span id="sobre"></span></div>
         <div class="row"><b>Por construir sobre piso</b><span id="falta"></span></div>
-        <div class="row"><b>Desplante máximo (80 % del predio)</b><span id="desmax"></span></div>
+        <div class="row"><b>Desplante máximo (<span id="cos-lim-2"></span> del predio)</b><span id="desmax"></span></div>
       </div>
     </div>
   </div>
   <div class="tbl"><table id="pot-tbl"></table></div>
-  <p class="src"><b>FUENTE</b> cálculo en diagrama/herramientas/programa.py: vivienda, naves, industria y aro desde Rhino/Contexto.3dm (mallas de módulos y capa industry_bake); arte y cultura manual; sótanos = cajones × 25 m² (supuesto). El predio de la geometría es 18,305 m²; con 18,200 m² el máximo sería 7.2 × 14,560 = 104,832 m². Máximo construible = 7.2 × desplante máximo (80 % del predio).</p>
+  <p class="src"><b>FUENTE</b> cálculo en herramientas/programa.py y datos/manual.json: vivienda, naves, industria y aro desde Rhino/Contexto.3dm; arte y cultura manual; sótanos = cajones × 25 m² (supuesto). El máximo construible usa el predio publicado de 18,305 m² y el COS indicado arriba.</p>
   <p class="src flag">Lo que no está en el repo: el área construida de la nave sur en planta alta, los niveles de la industria, y si la norma cuenta vivienda elevada en el COS. Cambian el COS y el CUS.</p>
 </section>
 
@@ -334,11 +334,15 @@ fetch('programa.json', {cache: 'no-cache'}).then(r => r.json()).then(d => {
   txt('cajt', fmt(F.estacionamiento.cajones_total));
 
   // Potencial
-  const Q = F.potencial, pct = x => (100 * x).toFixed(1) + ' %';
+  const Q = F.potencial, pct = x => (100 * x).toFixed(2) + ' %';
   const ok = b => b ? ' ✓' : ' ✗';
   txt('pot-pred', fmt(Q.predio_m2));
-  txt('cas', pct(Q.CAS_proy) + ' (mín. 20 %)' + ok(Q.cumple_CAS));
-  txt('cos', pct(Q.COS_proy) + ' (máx. 80 %)' + ok(Q.cumple_COS));
+  txt('cos-lim', pct(Q.norma.COS_max));
+  txt('cos-lim-2', pct(Q.norma.COS_max));
+  txt('cas-lim', pct(Q.norma.CAS_min));
+  txt('cus-lim', Q.norma.CUS_max);
+  txt('cas', pct(Q.CAS_proy) + ' (mín. ' + pct(Q.norma.CAS_min) + ')' + ok(Q.cumple_CAS));
+  txt('cos', pct(Q.COS_proy) + ' (máx. ' + pct(Q.norma.COS_max) + ')' + ok(Q.cumple_COS));
   txt('cospb', pct(Q.COS_pb));
   txt('cus', Q.CUS_sobre_piso + ' (máx. ' + Q.CUS_max_sobre_predio + ' × predio)' + ok(Q.cumple_CUS));
   txt('cust', Q.CUS_con_sotanos);

@@ -1,5 +1,5 @@
 {
- "generado": "2026-10-12",
+ "generado": "2026-10-18",
  "figuras": {
   "vivienda": {
    "tipologias": [
@@ -114,8 +114,8 @@
   "potencial": {
    "predio_m2": 18305,
    "norma": {
-    "CAS_min": 0.2,
-    "COS_max": 0.8,
+    "CAS_min": 0.4,
+    "COS_max": 0.6,
     "CUS_max": 7.2
    },
    "construido_m2": {
@@ -128,19 +128,19 @@
    },
    "sobre_piso_m2": 32508,
    "sotanos_m2": 26300,
-   "desplante_max_m2": 14644,
-   "maximo_construible_m2": 105434,
-   "CUS_max_sobre_predio": 5.76,
+   "desplante_max_m2": 10983,
+   "maximo_construible_m2": 79077.6,
+   "CUS_max_sobre_predio": 4.32,
    "desplante_pb_m2": 8371,
    "desplante_proy_m2": 10987,
-   "COS_pb": 0.457,
-   "COS_proy": 0.6,
-   "CAS_proy": 0.4,
-   "CAS_pb": 0.543,
+   "COS_pb": 0.4573,
+   "COS_proy": 0.60022,
+   "CAS_proy": 0.39978,
+   "CAS_pb": 0.5427,
    "CUS_sobre_piso": 1.78,
    "CUS_con_sotanos": 3.21,
-   "cumple_CAS": true,
-   "cumple_COS": true,
+   "cumple_CAS": false,
+   "cumple_COS": false,
    "cumple_CUS": true,
    "nota": "La proyección de vivienda y el aro son elevados: si la norma sólo cuenta lo que toca el piso, usa COS_pb y CAS_pb. Los sótanos no cuentan para COS. El CUS máximo se aplica sobre el desplante máximo (COS_max × predio), no sobre el predio. Predio de geometría 18,305 m² (el dato del equipo, 18,200, difiere 0.6 %)."
   }

@@ -54,16 +54,16 @@
  },
  "normas": {
   "CAS_min": {
-   "valor": 0.2,
+   "valor": 0.4,
    "unidad": "fracción",
    "estado": "dato_del_equipo",
-   "fuente": "Gabriel: COS 80 %, de ahí área libre mínima 20 %"
+   "fuente": "Luis (2026-10-18): COS máximo 60 %, de ahí área libre mínima 40 %"
   },
   "COS_max": {
-   "valor": 0.8,
+   "valor": 0.6,
    "unidad": "fracción",
    "estado": "dato_del_equipo",
-   "fuente": "Gabriel (2026-10-12)"
+   "fuente": "Luis (2026-10-18): corrección expresa del COS máximo a 60 %"
   },
   "CUS_max": {
    "valor": 7.2,
