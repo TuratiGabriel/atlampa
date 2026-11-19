@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261111a'      # versión de los archivos (para que el navegador no use los viejos)
+V = '20261118-bim-elevacion1'    # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -49,7 +49,6 @@ ICONOS = {
     'nolli': '<path d="M3 3h7v7H3zM14 3h7v4h-7zM14 11h7v10h-7zM3 14h7v7H3z"/>',
     'instalacion-electrica': '<path d="m13 2-7 11h5l-1 9 8-12h-5l0-8Z"/><path d="M4 4h3M17 20h3"/>',
     'instalacion-hidraulica': '<path d="M12 2C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-13Z"/><path d="M9 16c.5 1.5 1.5 2 3 2"/>',
-    'clay': '<circle cx="12" cy="12" r="8"/><path d="M8 16c2-4 4-6 8-8"/>',
     'rayado': '<path d="M4 8h16M4 12h16M4 16h16"/><rect x="3" y="3" width="18" height="18" rx="2"/>',
     'plano': '<rect x="4" y="4" width="16" height="16"/>',
     'nada': '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
@@ -259,7 +258,7 @@ PLANTILLA = '''<!doctype html>
     <details class="hud-menu" name="hud">
       <summary class="hud-menu__t">{icon_vista}<span>Vista</span></summary>
       <div class="hud-panel hud-panel--vista">
-        <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="false">{icon_color}<span>Color</span></button>
+        <button class="hud-op hud-op--color" type="button" data-capa="color" aria-pressed="true">{icon_color}<span>Color</span></button>
         <button class="hud-op" type="button" data-capa="perspectiva" aria-pressed="false">{icon_perspectiva}<span>Perspectiva</span></button>
         <button class="hud-op" type="button" data-capa="planta" aria-pressed="false">{icon_planta}<span>Planta</span></button>
         <button class="hud-op" type="button" data-capa="elevacion" aria-pressed="false">{icon_elevacion}<span>Elevación</span></button>
@@ -276,9 +275,8 @@ PLANTILLA = '''<!doctype html>
           <li><i style="--infra:#78945f"></i>Riego</li>
         </ul>
         <p class="hud-panel__t">Estilo</p>
-        <button class="hud-op hud-op--radio" type="button" data-estilo="clay" aria-pressed="true">{icon_clay}<span>Clay</span></button>
         <button class="hud-op hud-op--radio" type="button" data-estilo="rayado" aria-pressed="false">{icon_rayado}<span>Rayado</span></button>
-        <button class="hud-op hud-op--radio" type="button" data-estilo="plano" aria-pressed="false">{icon_plano}<span>Plano</span></button>
+        <button class="hud-op hud-op--radio" type="button" data-estilo="plano" aria-pressed="true">{icon_plano}<span>Plano</span></button>
         <p class="hud-panel__t">Resaltar</p>
 {resalta}
       </div>
@@ -291,6 +289,7 @@ PLANTILLA = '''<!doctype html>
         <p class="ad-fuente">Calles © colaboradores de OpenStreetMap</p>
       </div>
     </details>
+    <button class="hud-presentacion" type="button" data-modo-presentacion aria-pressed="false" aria-keyshortcuts="F8" title="Ocultar controles; F8 para recuperarlos">Modo presentación <span>(F8)</span></button>
   </nav>
 
   <aside class="hud-ficha" data-ficha{ficha_oculta}>
@@ -322,6 +321,8 @@ PLANTILLA = '''<!doctype html>
 <script src="atlampa-estructura.js?v={v}"></script>
 <script src="atlampa-industria.js?v={v}"></script>
 <script src="atlampa-infraestructura.js?v={v}"></script>
+<script src="atlampa-revit.js?v={v}"></script>
+<script src="vivienda4-sur.js?v={v}"></script>
 <script src="atlampa-geo.js?v={v}"></script>
 <script src="atlampa-pagina.js?v={v}"></script>
 </body>
@@ -374,7 +375,7 @@ def main():
             icon_propuesto=icono('propuesto'), icon_capas=icono('capas'), icon_diagramas=icono('diagramas'),
             icon_vista=icono('vista'), icon_leyenda=icono('leyenda'), icon_predio=opcion_icono('predio'),
             icon_color=opcion_icono('color'), icon_perspectiva=opcion_icono('perspectiva'),
-            icon_planta=opcion_icono('planta'), icon_elevacion=opcion_icono('elevacion'), icon_nolli=opcion_icono('nolli'), icon_clay=opcion_icono('clay'),
+            icon_planta=opcion_icono('planta'), icon_elevacion=opcion_icono('elevacion'), icon_nolli=opcion_icono('nolli'),
             icon_instalacion_electrica=opcion_icono('instalacion-electrica'),
             icon_instalacion_hidraulica=opcion_icono('instalacion-hidraulica'),
             icon_rayado=opcion_icono('rayado'), icon_plano=opcion_icono('plano'))

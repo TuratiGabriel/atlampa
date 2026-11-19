@@ -82,6 +82,19 @@ body[data-escena="general"] .hud-ruta{ font-size:13px; }
 
 /* menús: una fila de pestañas; cada una abre su panel debajo */
 .hud-barra{ top:16px; right:var(--gutter); display:flex; gap:6px; align-items:flex-start; }
+.hud-presentacion{ min-height:36px; padding:7px 12px; color:var(--fg); background:rgba(8,9,11,.94); border:1px solid rgba(255,255,255,.35); border-radius:6px; font-size:13px; white-space:nowrap; }
+.hud-presentacion span{ color:var(--muted); }
+.hud-presentacion:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
+@media (hover:hover){ .hud-presentacion:hover{ border-color:var(--fg); } }
+/* Los controles siguen en el DOM para las órdenes de Jarvis; sólo se ocultan visualmente. */
+body.modo-presentacion .hud-cabeza,
+body.modo-presentacion .hud-barra,
+body.modo-presentacion .hud-ficha,
+body.modo-presentacion .hud-camara,
+body.modo-presentacion .hud-dato-punto,
+body.modo-presentacion .hud-datos-cerrar,
+body.modo-presentacion .ad-ayuda,
+body.modo-presentacion .ad-etiqueta{ display:none !important; }
 .hud-menu{ position:relative; }
 .hud-menu__t{
   list-style:none; cursor:pointer; display:flex; align-items:center; gap:9px; padding:7px 13px 6px;
@@ -350,6 +363,16 @@ body.sin-accesos [data-l="accesos"], body.sin-nolli [data-l="nolli"]{ display:no
 body.aislado .hud-barra:not(.hud-barra--aislado){ display:none; }
 .hud-barra--aislado{ animation:hud-abre .25s var(--ease-ui); }
 .hud-panel--partes{ min-width:330px; }
+.hud-panel--v4{ min-width:250px; max-height:min(68vh,560px); overflow:auto; scrollbar-width:thin; }
+.hud-v4-ayuda{ color:var(--muted); font-size:12px; line-height:1.4; margin:8px 12px 10px; }
+.hud-v4-reinicio{ margin-top:10px; border-top:1px solid var(--trazo); color:#ff8d88; }
+.hud-v4-capas{ position:absolute; z-index:9; left:var(--gutter); bottom:88px; width:min(350px,calc(100vw - 2 * var(--gutter))); max-height:52vh; overflow:auto; padding:17px 20px; color:#f8f4f6; background:rgba(8,9,11,.94); border:1px solid rgba(255,255,255,.38); border-radius:8px; box-shadow:0 12px 36px #0008; }
+.hud-v4-capas h2{ font-family:var(--font-display); font-size:17px; font-weight:400; margin:0 0 11px; }
+.hud-v4-capas ol{ margin:0; padding-left:21px; font-size:13px; line-height:1.55; }
+.hud-v4-capas li{ padding-left:3px; }
+.hud-v4-capas li::marker{ color:#f6a7d1; }
+.hud-v4-capas p{ color:var(--muted); font-size:11px; line-height:1.35; margin:12px 0 0; }
+body.modo-presentacion .hud-v4-capas{ display:none; }
 .hud-fila{ display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:6px; padding:3px 0; }
 .hud-fila__t{ display:flex; align-items:center; gap:8px; font-family:var(--font-display); font-size:14.5px; letter-spacing:.04em; color:var(--fg); }
 .hud-fila.es-oculta .hud-fila__t{ color:var(--muted); opacity:.6; }

@@ -5,4 +5,12 @@ __pycache__/
 .DS_Store
 node_modules/
 .env
+.env.*
+email_config.json
+Chats-BIM-respaldo/
 *.log
+backups/
+runtime-local/
+*.rvt
+*.rfa
+*.ifc
