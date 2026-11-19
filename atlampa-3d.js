@@ -809,7 +809,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   const matArbol = matAtlas(ARBOLES_TEX.tex, ARBOLES_TEX.N, 1, DIB.base);
   // Arte y cultura detallado: el paisaje sólo se quita donde estorba de verdad
-  // (el foso del auditorio, los módulos de planta baja); los árboles, además,
+  // (los módulos de planta baja; el foso del auditorio se quitó en la v35); los árboles, además,
   // bajo la losa del nivel 1. Lo demás del suelo sigue debajo del edificio.
   // (se arma una vez: ya trasladado al diagrama y con sus aristas)
   const CD = CULTURA_DET ? fija('cultura', () => {
@@ -829,10 +829,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const CAJA_N = MERCADO && MERCADO.paso3 ? MERCADO.cajaN : null;
   function conHuecoN(c, z, m, recorte) {
     menosCaja(c, CAJA_N).forEach(q => {
-      const r = recorte ? G.recortaConvexo(q, recorte) : rect(q[0], q[1], q[2], q[3]), F = CD && CD.pisa[0];
+      const r = recorte ? G.recortaConvexo(q, recorte) : rect(q[0], q[1], q[2], q[3]);
       if (!r) return;
-      if (F && F.every(p => p[0] > q[0] && p[0] < q[2] && p[1] > q[1] && p[1] < q[3])) tapaHueco(m, r, F, z);
-      else tapa(m, r, z);
+      tapa(m, r, z);   // (sin el hueco del foso de arte y cultura: el auditorio se quitó en la v35)
     });
   }
 
@@ -849,7 +848,6 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const m = new Malla();
     if (ESC === 'estacionamiento') tapaHueco(m, rect(S.u0, S.v0, S.u1, S.v1), PRED, 0);
     else if (CAJA_N) conHuecoN([S.u0, S.v0, S.u1, S.v1], 0, m);   // Comercio: sin suelo bajo la nave norte (zanja y jardín hundidos)
-    else if (CD) tapaHueco(m, rect(S.u0, S.v0, S.u1, S.v1), CD.pisa[0], 0);   // con el foso del auditorio abierto
     else tapa(m, rect(S.u0, S.v0, S.u1, S.v1), 0);
     suelos.push(pon(gSitio, m, 'suelo', null));
     const [SW, SE, NE, NW] = [[GU.o, GU.s], [GU.e, GU.s], [GU.e, GU.n], [GU.o, GU.n]];
@@ -878,7 +876,6 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   {
     const m = new Malla();
     if (CAJA_N) conHuecoN([PB.u0, PB.v0, PB.u1, PB.v1], 0.2, m, PRED);   // Comercio: la nave norte trae su propio piso
-    else if (CD) tapaHueco(m, PRED, CD.pisa[0], 0.2);   // con el hueco del foso del auditorio
     else tapa(m, PRED, 0.2);
     // el área verde es del paisaje (se queda en su apartado) pero no se pica: picar el piso no abre nada
     const verde = pon(gPredio, m, PAI ? 'verde' : 'predio', PAI ? 'paisajismo' : null, 1);
@@ -1346,6 +1343,12 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     for (let i = 1; i < P.length; i++) if (d <= P[i][0]) { const a = P[i - 1], b = P[i]; return b[0] > a[0] ? a[1] + (b[1] - a[1]) * (d - a[0]) / (b[0] - a[0]) : b[1]; }
     return P[P.length - 1][1];
   };
+  // (2026-10-14) el corte del aro ya no es de golpe: crece suave desde donde se une la cinta y se cierra suave
+  // después de que la cinta llega al piso (CINTA.corte: [t, metros]); CINTA.banda: [t, ri, re] de la cinta
+  const tabla = (T, t) => { const d = ((t - T[0][0]) % 360 + 360) % 360 + T[0][0]; if (d > T[T.length - 1][0]) return null;
+    for (let i = 1; i < T.length; i++) if (d <= T[i][0]) { const a = T[i - 1], b = T[i], f = b[0] > a[0] ? (d - a[0]) / (b[0] - a[0]) : 1; return a.map((v, k) => v + (b[k] - v) * f); } return null; };
+  const corteEn = t => { if (!CINTA) return 0; if (!CINTA.corte) return enCinta(t) ? CINTA.re - CINTA.ri : 0; const q = tabla(CINTA.corte, t); return q ? q[1] : 0; };
+  const bandaEn = t => { if (!CINTA) return null; if (!CINTA.banda) return enCinta(t) ? [CINTA.ri, CINTA.re] : null; const q = tabla(CINTA.banda, t); return q ? [q[1], q[2]] : null; };
   {
     const g = pieza('aro', 'aro', 0.6), n = 720, z1 = ANILLO.z, z0 = z1 - ANILLO.canto;
     ponGeos(g, fija('aro', () => {
@@ -1357,34 +1360,43 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const R = t => [G.aroPunto(t, ANILLO.ri), G.aroPunto(t, ANILLO.re)];
     const P = (t, r) => [ANILLO.u + Math.cos(t * RAD) * r, ANILLO.v + Math.sin(t * RAD) * r];
     let antes = null;
+    const cabos = [[], []];   // por borde (adentro, afuera): cada tramo y si va abierto
     ts.forEach((t, k) => {
       const t2 = k + 1 < ts.length ? ts[k + 1] : ts[0] + 360;
       if (t2 - t < 1e-6) return;
-      const cin = enCinta((t + t2) / 2);   // este tramo, ¿angosto?
-      const [a, A0] = R(t), [b, B0] = R(t2), A = cin ? P(t, CINTA.ri) : A0, B = cin ? P(t2, CINTA.ri) : B0;
+      const cin = enCinta((t + t2) / 2);   // este tramo, ¿junto a la cinta?
+      // el borde de afuera, recortado lo que diga corteEn (donde el aro se ensancha sobre arte y cultura manda la plataforma)
+      const corta = (q, tt) => { const c = corteEn(tt); return c > 1e-3 && Math.hypot(q[0] - ANILLO.u, q[1] - ANILLO.v) <= ANILLO.re + 0.01 ? P(tt, ANILLO.re - c) : q; };
+      const [a, A0] = R(t), [b, B0] = R(t2), A = corta(A0, t), B = corta(B0, t2);
       m.quad(W(a[0], a[1], z1), W(b[0], b[1], z1), W(B[0], B[1], z1), W(A[0], A[1], z1));
       m.quad(W(a[0], a[1], z0), W(A[0], A[1], z0), W(B[0], B[1], z0), W(b[0], b[1], z0));
       m.quad(W(A[0], A[1], z0), W(A[0], A[1], z1), W(B[0], B[1], z1), W(B[0], B[1], z0));
       m.quad(W(a[0], a[1], z0), W(b[0], b[1], z0), W(b[0], b[1], z1), W(a[0], a[1], z1));
-      // donde cambia el ancho: la cara de la orilla (de un radio al otro), con su barandal
-      if (antes !== null && antes !== cin) {
-        const q0 = P(t, CINTA.ri), q1 = A0;
-        m.quad(W(q0[0], q0[1], z0), W(q1[0], q1[1], z0), W(q1[0], q1[1], z1), W(q0[0], q0[1], z1));
-        if (Math.abs(zCinta(t) - z1) > 0.3) ln.seg(W(q0[0], q0[1], zb), W(q1[0], q1[1], zb));
-      }
+      // (el ancho cambia suave: ya no hay cara de orilla de un radio al otro)
       antes = cin;
       // barandal (pasamanos) por los dos bordes; en el tramo angosto, en el borde nuevo
       // sólo donde la cinta ya bajó más de 0.30 (antes es el mismo piso)
-      ln.seg(W(a[0], a[1], zb), W(b[0], b[1], zb));
-      if (!cin || z1 - zCinta((t + t2) / 2) > 0.3) ln.seg(W(A[0], A[1], zb), W(B[0], B[1], zb));
+      // (2026-10-14) donde llegan las escaleras de arte y cultura (X3, X6) el barandal se abre
+      const abierto = (p, q) => !!CD && !!CD.aberturas && CD.aberturas.some(P => G.dentro((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, P));
+      const oi = abierto(a, b), oe = abierto(A, B);
+      if (!oi) ln.seg(W(a[0], a[1], zb), W(b[0], b[1], zb));
+      if ((!cin || z1 - zCinta((t + t2) / 2) > 0.3) && !oe) ln.seg(W(A[0], A[1], zb), W(B[0], B[1], zb));
+      cabos[0].push({ p: a, o: oi }); cabos[1].push({ p: A, o: oe });
     });
+    // (2026-10-14, v26) donde el barandal del aro se abre para una escalera, su cabo se une con el final del barandal
+    // de la escalera (CD.bocas), el más cercano y a menos de 0.6 m: así no queda cortado y nunca cruza la escalera
+    if (CD && CD.bocas) for (const S of cabos) for (let i = 0; i < S.length; i++) {
+      const s = S[i], prev = S[(i - 1 + S.length) % S.length]; if (s.o === prev.o) continue;
+      let b = null, bd = 0.6; for (const q of CD.bocas) { const dd = Math.hypot(q[0] - s.p[0], q[1] - s.p[1]); if (dd < bd) { bd = dd; b = q; } }
+      if (b && bd > 0.03) ln.seg(W(s.p[0], s.p[1], zb), W(b[0], b[1], z1 + 0.95));
+    }
     // balaustres cada 2.4 m a lo largo de cada borde
     [r => R(r)[0], r => R(r)[1]].forEach((borde, lado) => {
       let d = 0, q = null;
       for (let i = 0; i <= 1440; i++) {
-        const t = i / 4, cin = lado === 1 && enCinta(t), p = cin ? P(t, CINTA.ri) : borde(t);
+        const t = i / 4, b0 = borde(t), cin = lado === 1 && enCinta(t), c = lado === 1 ? corteEn(t) : 0, p = c > 1e-3 && Math.hypot(b0[0] - ANILLO.u, b0[1] - ANILLO.v) <= ANILLO.re + 0.01 ? P(t, ANILLO.re - c) : b0;
         if (q) d -= Math.hypot(p[0] - q[0], p[1] - q[1]);
-        if (d <= 0 && (!cin || z1 - zCinta(t) > 0.3)) { ln.seg(W(p[0], p[1], z1), W(p[0], p[1], zb)); d += 2.4; }
+        if (d <= 0 && (!cin || z1 - zCinta(t) > 0.3) && !(CD && CD.aberturas && CD.aberturas.some(P => G.dentro(p[0], p[1], P)))) { ln.seg(W(p[0], p[1], z1), W(p[0], p[1], zb)); d += 2.4; }
         q = p;
       }
     });
@@ -1397,7 +1409,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const im = new THREE.InstancedMesh(col, mcol, cs.length), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Vector3(), V = new THREE.Vector3();
     cs.forEach((c, i) => {
       const t = Math.atan2(c[1] - ANILLO.v, c[0] - ANILLO.u) / RAD, r = Math.hypot(c[0] - ANILLO.u, c[1] - ANILLO.v);
-      const h = CINTA && r > CINTA.ri && enCinta(t) ? zCinta(t) - CINTA.canto : z0, p = W(c[0], c[1], 0);
+      // bajo el aro (con su corte) llega al aro; si no, y queda bajo la cinta, la carga; si no carga nada, no va
+      const bd = bandaEn(t), bajoAro = r - 0.4 <= ANILLO.re - corteEn(t) + 0.01, bajoCinta = !!bd && r + 0.4 > bd[0] && r - 0.4 < bd[1];
+      const h = bajoAro ? z0 : bajoCinta ? zCinta(t) - CINTA.canto : 0.001, p = W(c[0], c[1], 0);
       M.compose(V.set(p[0], p[1], p[2]), Q, E.set(1, h, 1)); im.setMatrixAt(i, M);
     });
     im.userData.ap = 'aro'; im.userData.estr = true; g.add(im); picables.push(im);
@@ -1418,7 +1432,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   /* ===== 6b. Arte y cultura (el concepto detallado) =====
      Reemplaza a los pabellones simples en todas las escenas: un edificio de
-     tres niveles con auditorio hundido, escaleras en X, fachada de diagonales
+     tres niveles (sin auditorio desde la v35), escaleras en X, fachada de diagonales
      y parasoles a +12, bajo el aro de siempre (el suyo, más chico, no va).
      Viene en el sistema de Rhino: se traslada como los módulos. Los vidrios
      no se dibujan (nada transparente): la fachada se lee por sus parteluces. */
@@ -1428,7 +1442,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const g = pieza('cultura-detalle', 'cultura', 0.45);
     // en su apartado se ve por dentro (muros, vidrios como marcos y mobiliario); en las demás escenas, módulos y núcleos como cajas
     const PARTES_CD = [['losa', 'Losas', ['m-losa', 'l-borde']], ['acero', 'Estructura de acero', ['m-acero']],
-      ['escalera', 'Escaleras', ['m-escalera', 'l-huella']], ['auditorio', 'Auditorio', ['m-auditorio']], ['aro', 'Sombrillas', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]]
+      ['escalera', 'Escaleras', ['m-escalera', 'l-huella']], ['aro', 'Sombrillas', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]]
       .concat(ESC === 'cultura' ? [['interior', 'Muros interiores', ['m-muro']], ['vidrio', 'Vidrios (marcos)', ['l-vidrio']], ['mobiliario', 'Mobiliario', ['m-mueble']]]
         : [['modulos', 'Módulos', ['m-modulo']], ['nucleo', 'Núcleos', ['m-nucleo']]]);
     PARTES_CD.forEach(([id, nombre, ks]) => {
@@ -2488,8 +2502,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     }
     // naves: su planta (recortada a las fachadas y por el círculo del aro)
     G.NAVES.forEach(nv => { const pol = G.menosCirculo(rect(nv.L.u0, nv.L.v0, nv.L.u1, nv.L.v1), [ANILLO.u, ANILLO.v], CORTE); if (pol) muro(pol, MURO); });
-    // arte y cultura: los módulos de planta baja (núcleos, oficinas…) y el foso del auditorio
-    if (CD) CD.pisa.forEach((pol, k) => muro(pol, k ? MURO : MURO * 0.7));
+    // arte y cultura: los módulos de planta baja (núcleos, oficinas…); desde la v35 ya no hay foso del auditorio
+    if (CD) CD.pisa.forEach(pol => muro(pol, MURO));
     // estructura: columnas del aro (Ø 0.8), de arte y cultura (Ø 0.6) y las que bajan de los módulos (□ 0.5, exageradas un poco)
     const punto = (u, v, r) => { const c = circ([u, v], r, 12); for (let k = 0; k < 12; k++) ed.tri(W(u, v, z), W(c[k][0], c[k][1], z), W(c[(k + 1) % 12][0], c[(k + 1) % 12][1], z)); };
     COLUMNAS.forEach(c => punto(c[0], c[1], 0.45));
