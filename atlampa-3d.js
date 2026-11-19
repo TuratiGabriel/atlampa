@@ -1840,7 +1840,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     });
     // Se usa después de separar la vivienda: sólo el cuarto piso del sur.
     gBIM.viviendaSur4 = gruposSur4;
-    const nombres = { walls: 'Muros', floors: 'Losas', doors: 'Puertas', windows: 'Ventanas', curtainPanels: 'Paneles de fachada', curtainMullions: 'Montantes', roofs: 'Cubiertas', chacuacos: 'Chacuacos', chimeneas: 'Chimeneas' };
+    const nombres = { walls: 'Muros', floors: 'Losas', doors: 'Puertas', windows: 'Ventanas', curtainPanels: 'Paneles de fachada', curtainMullions: 'Montantes', roofs: 'Cubiertas', chacuacos: 'Chacuacos', chimeneas: 'Chimeneas', columns: 'Columnas', stairsRuns: 'Escaleras · tramos', stairsLandings: 'Escaleras · descansos', railings: 'Barandales', topRails: 'Pasamanos' };
     Object.entries(gruposPorCategoria).forEach(([ap, cats]) => Object.entries(cats).forEach(([cat, grupos]) =>
       parte(ap, 'bim-' + cat, nombres[cat] || cat, grupos)));
   }

@@ -50,5 +50,5 @@ programas (y su `revitSha256`). La lectura usa el mismo formato de renglones
 que `exportar.py`, sólo con ese vínculo, y su huella queda en
 `culturaRevitSha256`. Lectura del 19-nov-2026 (v35, sin el foso del
 auditorio): 873 muros, 35 losas, 33 puertas, 318 paneles, 269 montantes y 19
-cubiertas, sin errores. Los cortes de presentación de cultura en
+cubiertas, sin errores. Para cultura también se leen columnas (`OST_Columns`, redondas y de sombrilla), escaleras (`OST_StairsRuns` y `OST_StairsLandings`, que suman la geometría de cada `Stairs`), barandales (`OST_StairsRailing`) y pasamanos (`OST_RailingTopRail`); los balaustres sueltos no, porque Revit los da en coordenadas locales (en el origen) y ya vienen dentro del barandal. Los cortes de presentación de cultura en
 `atlampa-3d.js` (`PISOS_USO`) pasaron a PB, N1 y N2 + azotea.
