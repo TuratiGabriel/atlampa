@@ -1853,7 +1853,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   // triángulos leídos de Revit y se retiran al salir del uso aislado.
   const PISOS_USO = {
     comercio: [[0, 3.88], [3.88, 9.5]],
-    cultura: [[-2.98, 0], [0, 3.32], [3.32, 6.32], [6.32, 15.72]],
+    // v35 (lectura 2026-11-19): sin el foso del auditorio; PB, N1 y N2 + azotea.
+    cultura: [[-0.55, 3.32], [3.32, 6.32], [6.32, 15.72]],
     industria: [[0, 3.06], [3.06, 10.9]]
   };
   function limpiaCorteUso() {

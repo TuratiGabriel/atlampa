@@ -40,3 +40,15 @@ abiertos. La clasificación se calcula desde las losas y ejes leídos de Revit,
 sin modificar ningún elemento del modelo. En Mercado y Arte/Cultura no se
 aplica este filtro porque sus cubiertas inclinadas y niveles variables no dan
 una clasificación igualmente inequívoca con esta extracción.
+
+## Actualizar sólo Arte y cultura
+
+Cuando sólo cambió el vínculo `ArteCultura_Aro_ARQ`, no hace falta repetir la
+lectura completa: `actualiza_cultura.py <lectura.jsonl.gz>` sustituye los
+grupos de cultura en `atlampa-revit.bin`/`.js` y deja byte por byte los demás
+programas (y su `revitSha256`). La lectura usa el mismo formato de renglones
+que `exportar.py`, sólo con ese vínculo, y su huella queda en
+`culturaRevitSha256`. Lectura del 19-nov-2026 (v35, sin el foso del
+auditorio): 873 muros, 35 losas, 33 puertas, 318 paneles, 269 montantes y 19
+cubiertas, sin errores. Los cortes de presentación de cultura en
+`atlampa-3d.js` (`PISOS_USO`) pasaron a PB, N1 y N2 + azotea.
