@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261119-vivienda-muros'    # versión de los archivos (para que el navegador no use los viejos)
+V = '20261119-subusos5'    # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -124,6 +124,11 @@ GENERAL_DESC = ('Axonometría del predio de Atlampa entre las calles del Fresno,
                 'postes, personas, accesos) y resaltan lo público, lo privado o un programa. Arrastrar orbita la cámara; con el botón derecho se mueve; '
                 'la rueda acerca hacia el cursor.')
 
+# Subusos de cada uso (los mismos colores que SUBUSO_COLOR en atlampa-3d.js)
+def subusos(*lista):
+    return ['<li><i style="background:%s;border-color:%s"></i>%s</li>' % (c, c, n) for c, n in lista]
+
+
 APARTADOS = {
     'general': {
         'titulo': 'Atlampa', 'pagina': 'index.html', 'ruta': 'Col. Atlampa, Cuauhtémoc, CDMX',
@@ -147,7 +152,8 @@ APARTADOS = {
         # (la sur: cubierta plegada en prepara-mercado.py, CUBIERTA_SUR; la de Rhino no cabía sobre su planta alta)
         'datos': ['Nave norte: 2 crujías · alero +6.20 · cumbrera +9.20', 'Nave sur: 3 crujías · las mismas aguas, subidas y plegadas (+7.90 / +10.90)',
                   'Nave sur: planta alta a +4.28 con manzanas y respiros'],
-        'extra': '', 'leyenda': [],
+        'extra': '', 'leyenda': subusos(('#8a98ff', 'Mercado'), ('#cdd4ff', 'Área libre'), ('#5468ff', 'Baños'),
+                                          ('#72c6ff', 'Acuaponia'), ('#4c56a8', 'Zona de descarga')),
     },
     'industria': {
         'titulo': 'Industria',
@@ -159,7 +165,8 @@ APARTADOS = {
         'titulo': 'Arte y cultura',
         'desc': 'Los dos pabellones curvos de arte y cultura bajo el aro, de dos niveles, con el pasaje entre ambos y la plaza cultural.',
         'datos': ['2 pabellones de 2 niveles', 'Fondo de 12 m, al ras del aro', 'Plaza cultural ≈ 1,645 m²'],
-        'extra': '', 'leyenda': [],
+        'extra': '', 'leyenda': subusos(('#9466f0', 'Comercio (PB y N1)'), ('#c9a6ff', 'Galería (N2)'),
+                                          ('#efe2ff', 'Social (azotea)'), ('#f2c14e', 'Aro y pista')),
     },
     'aro': {
         'titulo': 'Aro',

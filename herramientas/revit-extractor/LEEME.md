@@ -69,3 +69,20 @@ eso escondía también muros de fachada bajo losas en voladizo: quedaban 1,281 d
 no hace esa inferencia y dibuja todo lo que trae Revit; los niveles se reparten
 con la misma fórmula de `preparar_visor.py`. Si alguien vuelve a correr
 `preparar_visor.py` completo, hay que volver a pasar esta lectura de vivienda.
+
+## Subusos (2026-11-19)
+
+Al entrar a un uso (su página o aislado) el visor reparte sus triángulos en subusos
+con tonos del mismo uso (`SUBUSOS` y `SUBUSO_COLOR` en `atlampa-3d.js`):
+
+- **Arte y cultura:** PB y N1 comercio (z < 6.1), N2 galería (< 9.3), azotea social; el
+  aro y la pista aparte, en amarillo. Sobre los pabellones el aro son las piezas que
+  `actualiza_vinculo.py` marca con `piezaId: "aro"` (losas, muros y barandales que caben
+  en la banda r 39.2–46.9 desde z 9; las sombrillas no). En el resto del círculo es todo
+  lo que cae en la banda del aro.
+- **Vivienda:** los módulos sueltos de VIV-N1 junto al aro son comercio. En Revit nada los
+  distingue; `actualiza_vinculo.py` guarda sus losas en `subusos.vivienda` del .js.
+- **Comercio:** zonas de las plantas de Gabriel: baños (nave norte junto a Sabino y PA de
+  la nave sur), zona de descarga y acuaponia (PB sur); área libre = lo que queda dentro
+  del aro (los dos patios); el resto, mercado.
+- **Industria:** un solo color hasta que se defina su programa.

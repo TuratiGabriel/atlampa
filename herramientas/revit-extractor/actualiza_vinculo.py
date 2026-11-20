@@ -28,6 +28,40 @@ JS = VIEWER / "atlampa-revit.js"
 BIN = VIEWER / "atlampa-revit.bin"
 PREFIJO = "window.ATLAMPA_REVIT = "
 VINCULOS = {"cultura": "ArteCultura_Aro_ARQ", "vivienda": "ARQ_VIVIENDA"}
+# El aro del conjunto en el sistema del visor (ver handoff/procesos/arte-cultura-y-aro.md).
+ARO_CENTRO, ARO_R = (505.75, 409.05), (39.5, 46.55)
+
+
+def comercio_vivienda(losas, origen):
+    """Módulos de comercio de la vivienda (Diego, 2026-11-19: «los de VIV-N1 junto
+    al aro»). En Revit nada los distingue; son las losas sueltas de VIV-N1 (menos de
+    60 m², uno o dos módulos) a 3 m o menos del aro. Devuelve sus caras superiores
+    en (u, v) del visor, para que el visor pinte lo que queda encima."""
+    from math import hypot
+    zonas = []
+    for row in losas:
+        z1 = row["bbox"][1][2]
+        cara = [t for t in row["triangles"] if all(abs(t[k] - z1) < .01 for k in (2, 5, 8))]
+        area = sum(abs((t[3] - t[0]) * (t[7] - t[1]) - (t[6] - t[0]) * (t[4] - t[1])) / 2 for t in cara)
+        rs = [hypot(t[k] + origen[0] - ARO_CENTRO[0], t[k + 1] + origen[1] - ARO_CENTRO[1])
+              for t in row["triangles"] for k in (0, 3, 6)]
+        if area < 60 and min(rs) <= ARO_R[1] + 3 and max(rs) >= ARO_R[0] - 3:
+            zonas.extend([round(t[k] + origen[k % 3], 3) for k in (0, 1, 3, 4, 6, 7)] for t in cara)
+    return zonas
+
+
+def pieza_aro(programa, row, origen):
+    """Arte y cultura: los elementos que son del aro sobre los pabellones (la pista y
+    los acabados y el barandal del aro; las sombrillas son de la terraza). Sólo se
+    marcan por elemento: la losa de azotea también cruza la banda del aro, pero es
+    la terraza (social)."""
+    from math import hypot
+    if programa != "cultura" or row["category"] not in ("floors", "walls", "railings", "topRails") \
+            or not row["bbox"] or row["bbox"][0][2] < 9:
+        return ""
+    rs = [hypot(t[k] + origen[0] - ARO_CENTRO[0], t[k + 1] + origen[1] - ARO_CENTRO[1])
+          for t in row["triangles"] for k in (0, 3, 6)]
+    return "aro" if rs and min(rs) >= ARO_R[0] - .3 and max(rs) <= ARO_R[1] + .35 else ""
 
 
 def nivel(programa, row):
@@ -50,6 +84,7 @@ def run(programa, lectura):
 
     grupos, ids, faltan = defaultdict(list), defaultdict(list), defaultdict(int)
     bounds, errores, max_z = None, None, 0.0
+    losas_n1 = []
     with gzip.open(lectura, "rt", encoding="utf-8") as rows:
         for line in rows:
             row = json.loads(line)
@@ -79,7 +114,9 @@ def run(programa, lectura):
                     raise RuntimeError("Elemento sin geometría visible inesperado: {} {}".format(cat, row["id"]))
                 faltan[cat] += 1
                 continue
-            clave = (cat, nivel(programa, row))
+            clave = (cat, nivel(programa, row), pieza_aro(programa, row, meta["origen"]))
+            if programa == "vivienda" and cat == "floors" and clave[1] == 0 and row["bbox"][0][2] > 9:
+                losas_n1.append(row)
             ids[clave].append(row["id"])
             for tri in row["triangles"]:
                 grupos[clave].extend(tri)
@@ -98,10 +135,10 @@ def run(programa, lectura):
             continue
         datos = viejo[g["offset"]:g["offset"] + g["floats"] * 4]
         entradas.append(((g["programa"], g["categoria"], g["nivel"], g["piezaId"]), datos, g))
-    for (cat, niv), valores in grupos.items():
-        g = {"programa": programa, "categoria": cat, "nivel": niv, "piezaId": "",
-             "elementos": len(ids[(cat, niv)]), "triangulos": len(valores) // 9}
-        entradas.append(((programa, cat, niv, ""), struct.pack("<%sf" % len(valores), *valores), g))
+    for (cat, niv, pieza), valores in grupos.items():
+        g = {"programa": programa, "categoria": cat, "nivel": niv, "piezaId": pieza,
+             "elementos": len(ids[(cat, niv, pieza)]), "triangulos": len(valores) // 9}
+        entradas.append(((programa, cat, niv, pieza), struct.pack("<%sf" % len(valores), *valores), g))
     entradas.sort(key=lambda e: e[0])
     payload, info = bytearray(), []
     for _, datos, g in entradas:
@@ -115,6 +152,10 @@ def run(programa, lectura):
     meta[programa + "RevitSha256"] = digest
     if programa == "vivienda":
         meta["viviendaMaxZ"] = max_z
+        zonas = comercio_vivienda(losas_n1, meta["origen"])
+        if not zonas:
+            raise RuntimeError("No se encontraron los módulos de comercio de VIV-N1")
+        meta.setdefault("subusos", {})["vivienda"] = {"comercio": zonas, "z": [10.3, 13.8]}
     meta["sinMalla"] = [s for s in meta["sinMalla"] if s["programa"] != programa] + [
         {"programa": programa, "categoria": c, "elementos": n} for c, n in sorted(faltan.items())]
     BIN.write_bytes(payload)

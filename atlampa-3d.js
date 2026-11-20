@@ -129,6 +129,18 @@ const CLAY_TINTA = {
   verde: '#b7bbb5', tezontle: '#c4c2bc', agua: '#aebbc1', filtro: '#b7bbb5', arbusto: '#9ea49e', copa: '#979d98',
   est: '#b8bbbd', rampa: '#b8bbbd', contexto: '#e7e4dc', ctxsuelo: '#dadbd8', carro: '#aeb2b5'
 };
+// Subusos (Diego, 2026-11-19): tonos del mismo uso; el aro, con su amarillo. [color, clay]
+const SUBUSO_COLOR = {
+  'cul-comercio': ['#9466f0', '#6d48b0'], 'cul-galeria': ['#c9a6ff', '#9271c9'], 'cul-social': ['#efe2ff', '#c7b5e6'], aro: ['#f2c14e', '#d1a536'],
+  'viv-comercio': ['#ffc0e0', '#f0a0c8'],
+  'com-mercado': ['#8a98ff', '#4056b5'], 'com-libre': ['#cdd4ff', '#9aa6dc'], 'com-banos': ['#5468ff', '#22308a'],
+  'com-acuaponia': ['#72c6ff', '#3f8fc0'], 'com-descarga': ['#4c56a8', '#2a3270']
+};
+const SUBUSO_NOMBRE = {
+  'cul-comercio': 'Comercio (PB y N1)', 'cul-galeria': 'Galería (N2)', 'cul-social': 'Social (azotea)', aro: 'Aro y pista',
+  'viv-comercio': 'Módulos de comercio', 'com-mercado': 'Mercado', 'com-libre': 'Área libre', 'com-banos': 'Baños',
+  'com-acuaponia': 'Acuaponia', 'com-descarga': 'Zona de descarga'
+};
 // qué programa / espacio es cada papel
 const PROG_DE = { social: 'social', nave: 'comercio', vidrio: 'comercio', 'vidrio-vivienda': 'vivienda', 'vidrio-industria': 'industria', 'vidrio-cultura': 'cultura', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', modcom: 'comercio', aro: 'aro', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est', rampa: 'est' };
 // Público / privado (un solo botón, dos colores): privado, los volúmenes de
@@ -633,6 +645,15 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (!conColor || !pr) return blanco;
     return new THREE.Color(PROGRAMA[pr]).lerp(blanco, 0.15);
   }
+  // Subusos (ver SUBUSOS): dentro de su uso, el tono de su parte; fuera, el de siempre.
+  function tintaSub(d, actual) {
+    const c = d.subuso && SUBUSO_COLOR[d.subuso];
+    if (!c || espacioAct || !subusoActivo(d.subAp)) return actual;
+    const clay = estilo === ESTILOS.clay;
+    if (!conColor && !clay) return actual;
+    const col = new THREE.Color(clay && !conColor ? c[1] : c[0]);
+    return d.papel.startsWith('vidrio') ? col.lerp(blanco, 0.5) : clay ? col : col.lerp(blanco, 0.15);
+  }
   // Al seleccionar un uso, los demás quedan visibles y translúcidos al 15 %.
   function apagado(papel) {
     if (!resalta || espacioAct) return false;
@@ -667,7 +688,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       u.uModo.value = e.modo !== undefined ? e.modo : estilo === ESTILOS.plano ? 1 : 0;
       // con Color, más tinta: que contraste con el negro
       u.uFondo.value.set(estilo.fondo); u.uTono.value = (e.tono || 0.4) * (conColor ? 1.35 : 1); u.uPaso.value = e.paso || 3; u.uGrueso.value = (e.grueso || 0.22) * (conColor ? 1.3 : 1); u.uMundo.value = e.mundo || 0; u.uGris.value = e.gris || 0.1; u.uGrano.value = e.grano || 0;
-      u.uTinta.value = tinta(m.userData.papel);
+      u.uTinta.value = tintaSub(m.userData, tinta(m.userData.papel));
       // Público / privado: las áreas se llenan de su color (el croquis sólo tenía aristas)
       if (espacioAct && espacioDe(m.userData.papel)) {
         if (u.uModo.value > 1.5) { u.uGris.value = Math.max(u.uGris.value, 0.2); u.uTono.value = Math.max(u.uTono.value, 0.45); }
@@ -683,7 +704,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     });
     Object.keys(ARISTAS).forEach(k => {
       const m = ARISTAS[k], e = estilo.papel[m.userData.papel] || estilo.papel.proyecto;
-      m.color.copy(tinta(m.userData.papel));
+      m.color.copy(tintaSub(m.userData, tinta(m.userData.papel)));
       m.opacity = Math.min(1, (elevacionAct ? Math.max(0.55, e.arista || 0) : e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
       if (enEstr && m.userData.papel !== 'aro' && m.opacity > 0.001) m.opacity = 0.42;
       m.visible = m.opacity > 0.001;
@@ -1849,6 +1870,131 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     THREE, data: VIVIENDA4, CEN, pieza, geos, ponGeos, pide, ray, cam: () => cam, lienzo
   }) : null;
   let etapaVivienda4 = 'predio';
+  /* ===== Subusos: al entrar a un uso (su página o aislado), cada parte con su tono =====
+     (Diego, 2026-11-19). Cada triángulo y cada arista se reparte por dónde cae; la
+     geometría no cambia, sólo se separa en mallas con su propio material. Fuera del
+     uso, las mallas se ven igual que antes (sin tono propio). */
+  const enZona = (u, v, pol) => {
+    let d = false;
+    for (let i = 0, j = pol.length - 1; i < pol.length; j = i++) {
+      const [ui, vi] = pol[i], [uj, vj] = pol[j];
+      if ((vi > v) !== (vj > v) && u < (uj - ui) * (v - vi) / (vj - vi) + ui) d = !d;
+    }
+    return d;
+  };
+  const cercaTri = (u, v, t, tol) => {   // dentro del triángulo (u,v)×3, o a menos de tol
+    const s = (a, b, c, d, e, f) => (a - e) * (d - f) - (c - e) * (b - f);
+    const d1 = s(u, v, t[0], t[1], t[2], t[3]), d2 = s(u, v, t[2], t[3], t[4], t[5]), d3 = s(u, v, t[4], t[5], t[0], t[1]);
+    if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return true;
+    for (let k = 0; k < 6; k += 2) {
+      const ax = t[k], ay = t[k + 1], bx = t[(k + 2) % 6], by = t[(k + 3) % 6], dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1;
+      const q = Math.max(0, Math.min(1, ((u - ax) * dx + (v - ay) * dy) / L));
+      if (Math.hypot(u - ax - q * dx, v - ay - q * dy) < tol) return true;
+    }
+    return false;
+  };
+  // Zonas del mercado: de las plantas que mandó Gabriel (2026-11-19), en (u, v) del predio.
+  const ZONAS_MERCADO = [
+    ['com-banos', [[540.6, 440.9], [553.8, 440.9], [553.8, 418.7], [540.6, 418.7]], 0, 7.5],
+    ['com-banos', [[499.6, 344.6], [536.1, 344.6], [536.1, 326.1], [499.6, 326.1]], 4, 7.8],   // planta alta de la nave sur
+    ['com-descarga', [[516.8, 342], [557.3, 342], [557.3, 323.4], [516.8, 323.4]], -9, 4],
+    ['com-acuaponia', [[507, 367.6], [512.8, 365], [515.5, 355.7], [514.9, 342.5], [515.5, 324], [499.6, 324], [499.6, 347.8], [501.7, 359.7]], -9, 4]
+  ];
+  const COMERCIO_VIV = BIM && BIM.subusos && BIM.subusos.vivienda;
+  const SUBUSOS = {
+    // arte y cultura: PB y N1 comercio, N2 galería, azotea social; el aro y la pista (y la cinta que baja), aparte
+    cultura: (u, v, z0, zc, nz, dz, nombre) => {
+      // sobre los pabellones (al poniente, entre 105° y 185° desde el centro del aro) el aro
+      // son las piezas que actualiza_vinculo.py marca por elemento (la pista, sus acabados y
+      // su barandal); en el resto del círculo, todo lo que cae en la banda del aro (su vidrio,
+      // la cinta que baja y sus dos filas de columnas), a cualquier altura
+      if (/-aro$/.test(nombre)) return 'aro';
+      const r = Math.hypot(u - ANILLO.u, v - ANILLO.v), a = Math.atan2(v - ANILLO.v, u - ANILLO.u) * 180 / Math.PI;
+      if (!(a >= 105 && a <= 185) && r >= 38.9 && r <= 47) return 'aro';
+      return z0 < 6.1 ? 'cul-comercio' : z0 < 9.3 ? 'cul-galeria' : 'cul-social';
+    },
+    // vivienda: los módulos sueltos de VIV-N1 junto al aro son comercio
+    vivienda: COMERCIO_VIV ? (u, v, z0, zc, nz, dz, nombre) => {
+      if (!/^revit-/.test(nombre) || z0 < COMERCIO_VIV.z[0] || z0 >= COMERCIO_VIV.z[1]) return null;
+      return COMERCIO_VIV.comercio.some(t => cercaTri(u, v, t, 0.3)) ? 'viv-comercio' : null;
+    } : null,
+    comercio: (u, v, z0, zc) => {
+      for (const [s, pol, za, zb] of ZONAS_MERCADO) if (zc >= za && zc < zb && enZona(u, v, pol)) return s;
+      // área libre: los dos patios del aro, que son lo del mercado que queda dentro del círculo
+      return Math.hypot(u - ANILLO.u, v - ANILLO.v) < ANILLO.ri ? 'com-libre' : 'com-mercado';
+    }
+  };
+  const subusoActivo = ap => !!SUBUSOS[ap] && (ESC === ap || (!!aisl && aisl.ap === ap));
+  {
+    const claveDe = (tabla, m) => Object.keys(tabla).find(k => tabla[k] === m);
+    // Un triángulo grande que cruza el borde de una zona se parte en cuatro (hasta 6 veces)
+    // para que el límite siga la zona; sólo donde las zonas son polígonos en planta.
+    const SUBDIVIDE = { comercio: true };
+    const reparte = (o, fn, nombre, ap) => {
+      const g0 = o.geometry, g = g0.index ? g0.toNonIndexed() : g0, paso = o.isMesh ? 3 : 2;
+      const atts = Object.entries(g.attributes).map(([nom, at]) => ({ nom, n: at.itemSize, a: at.array })), ip = atts.findIndex(t => t.nom === 'position');
+      const cubetas = new Map(), parte = o.isMesh && SUBDIVIDE[ap];
+      const clasifica = V => {
+        let x = 0, y = 0, z = 0, zmin = 1e9, zmax = -1e9;
+        V.forEach(vt => { const q = vt[ip]; x += q[0]; y += q[1]; z += q[2]; zmin = Math.min(zmin, q[1]); zmax = Math.max(zmax, q[1]); });
+        let nz = 0;
+        if (V.length === 3) {   // la normal del triángulo, para la pendiente de la cinta
+          const [a, b, c] = V.map(vt => vt[ip]), ax = b[0] - a[0], ay = b[1] - a[1], az = b[2] - a[2], bx = c[0] - a[0], by = c[1] - a[1], bz = c[2] - a[2];
+          const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+          nz = cy / (Math.hypot(cx, cy, cz) || 1);
+        }
+        return fn(x / V.length + CEN[0], CEN[1] - z / V.length, zmin, y / V.length, nz, zmax - zmin, nombre);
+      };
+      const mete = (s, V) => {
+        let c = cubetas.get(s);
+        if (!c) cubetas.set(s, c = atts.map(() => []));
+        V.forEach(vt => vt.forEach((val, k) => { for (let j = 0; j < val.length; j++) c[k].push(val[j]); }));
+      };
+      const medio = (A, B) => A.map((val, k) => val.map((x, j) => (x + B[k][j]) / 2));
+      const divide = (V, prof) => {
+        const s = clasifica(V);
+        if (parte && prof < 6) {
+          const [a, b, c] = V.map(vt => vt[ip]);
+          const area = Math.hypot((b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2;
+          if (area > 0.05 && V.some(vt => clasifica([vt]) !== s)) {
+            const [A, B, C] = V, ab = medio(A, B), bc = medio(B, C), ca = medio(C, A);
+            [[A, ab, ca], [ab, B, bc], [ca, bc, C], [ab, bc, ca]].forEach(T => divide(T, prof + 1));
+            return;
+          }
+        }
+        mete(s, V);
+      };
+      const cuenta = g.attributes.position.count;
+      for (let i = 0; i < cuenta; i += paso) {
+        const V = [];
+        for (let k = 0; k < paso; k++) V.push(atts.map(t => t.a.subarray((i + k) * t.n, (i + k + 1) * t.n)));
+        divide(V, 0);
+      }
+      if (cubetas.size === 1 && cubetas.has(null)) return;
+      const tabla = o.isMesh ? MATS : ARISTAS, clave = claveDe(tabla, o.material);
+      if (!clave) return;
+      cubetas.forEach((c, s) => {
+        const ng = new THREE.BufferGeometry();
+        atts.forEach((t, k) => ng.setAttribute(t.nom, new THREE.BufferAttribute(new t.a.constructor(c[k]), t.n)));
+        const mat = s ? (o.isMesh ? material : arista)(clave + '@' + s) : o.material;
+        if (s) Object.assign(mat.userData, o.material.userData, { subuso: s, subAp: ap });
+        const nuevo = o.isMesh ? new THREE.Mesh(ng, mat) : new THREE.LineSegments(ng, mat);
+        Object.assign(nuevo.userData, o.userData);
+        o.parent.add(nuevo);
+        if (o.isMesh && picables.includes(o)) picables.push(nuevo);
+      });
+      const k = picables.indexOf(o); if (k >= 0) picables.splice(k, 1);
+      o.parent.remove(o);
+      if (!g0.userData.fija) g0.dispose();
+      if (g !== g0) g.dispose();
+    };
+    piezas.forEach(({ g, ap }) => {
+      const fn = SUBUSOS[ap]; if (!fn) return;
+      const lista = [];
+      g.traverse(o => { if ((o.isMesh || o.isLineSegments) && o.geometry?.attributes?.position && (MATS[claveDe(MATS, o.material)] || ARISTAS[claveDe(ARISTAS, o.material)])) lista.push(o); });
+      lista.forEach(o => reparte(o, fn, g.name, ap));
+    });
+  }
   // Los cortes de piso son sólo de presentación. Conservan intactos los
   // triángulos leídos de Revit y se retiran al salir del uso aislado.
   const PISOS_USO = {
@@ -3442,6 +3588,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     depura: () => ({ escena, capas, elevacion: elevacionAct, fachada: fachadaAct, camaraOrtogonal: cam === camO }),
     preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); },
     contextoListo: () => !ext.listo || ext.listo(), separa, separaPisos, progresoPisos, aislaPiso4Sur,
+    subusos: () => { const r = {}; raizG.traverse(o => { const d = o.isMesh && o.material && o.material.userData; if (d && d.subuso) { const k = d.subAp + '/' + d.subuso; r[k] = (r[k] || 0) + o.geometry.attributes.position.count / 3; } }); return r; },
     separaLados, progresoLateral: () => progresoLateral, pisosUso, aislaPisoUso, separaPisosUso, zonasProvisionales, aislaZonaProvisional,
     fluye(ms) { mueveInfra(ms); if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
     minimapa: G.minimapa, limitesElevacion: [EL_MIN, EL_MAX], limitesDentro: EL_DENTRO, dentro, pasea, escena: ESC, tipos: MOD ? MOD.tipos : [],
