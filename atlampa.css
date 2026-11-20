@@ -499,3 +499,9 @@ body.con-datos .hud-camara{ opacity:0; pointer-events:none; }
   .hud-datos-capa.saliendo .hud-datos-fondo, .hud-datos-capa.saliendo .hud-datos-panel{ animation:none; }
   .hud-datos-barrido{ display:none; }
 }
+
+/* Ver por pisos, en la ficha del uso */
+.hud-pisos{ display:flex; flex-direction:column; gap:6px; border-top:1px solid rgba(255,255,255,.12); padding-top:10px; }
+.hud-pisos__lista{ display:grid; grid-template-columns:1fr 1fr; gap:0 8px; }
+.hud-pisos__lista .hud-op{ font-size:12.5px; }
+.hud-pisos .ad-leyenda{ margin-top:4px; }

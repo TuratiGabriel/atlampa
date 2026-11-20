@@ -86,3 +86,12 @@ con tonos del mismo uso (`SUBUSOS` y `SUBUSO_COLOR` en `atlampa-3d.js`):
   la nave sur), zona de descarga y acuaponia (PB sur); área libre = lo que queda dentro
   del aro (los dos patios); el resto, mercado.
 - **Industria:** un solo color hasta que se defina su programa.
+
+## Ver por pisos (2026-11-19)
+
+En la ficha de cada uso (su página o aislado) hay un bloque "Ver por pisos": Completo,
+Sin cubierta y cada piso de arriba abajo (`VER_PISOS` en `atlampa-3d.js`). Quita las
+cubiertas de Revit (roofs, chacuacos, chimeneas) y hace un corte horizontal justo bajo la
+losa del piso de arriba, con el mismo uniform que usa `aislaPisoUso`. "Inspeccionar"
+vivienda la abre aislada (no tiene página). El aislado del mercado ahora trae también
+lo del Rhino (puestos, plataformas, patios, PB sur), no sólo la envolvente de Revit.

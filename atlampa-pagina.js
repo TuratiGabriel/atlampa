@@ -366,7 +366,7 @@
   function inspecciona(ap) {
     if (ocultos[ap]) ponOculta(ap, false);
     if (ap !== 'estructura' && dib.inspeccionaEstructura) dib.inspeccionaEstructura(false);
-    if (ap === 'vivienda') { ponResalta('modulos'); if (!GENERAL) ir('general'); }
+    if (ap === 'vivienda') aislar('vivienda');   // (no tiene página propia: se abre aislada en el predio)
     else if (ap === 'estructura') { ponResalta(''); if (dib.inspeccionaEstructura) dib.inspeccionaEstructura(true); }
     else ir(ap);
   }
@@ -429,6 +429,7 @@
     barraAislado(ap, partes);
     if (ap === 'vivienda') actualizaMenuV4();
     else actualizaMenuUso();
+    pintaPisos();
     actualizaDatos();
   }
   function saleAislado() {
@@ -449,6 +450,7 @@
     var f = document.querySelector('[data-ficha]');
     if (f && fichaAntes !== null) f.innerHTML = fichaAntes;
     fichaAntes = null;
+    pintaPisos();
     actualizaDatos();
   }
   function actualizaMenuV4() {
@@ -470,6 +472,33 @@
     if (ficha) ficha.textContent = d.etapa === 'vivienda' ? 'aislado' :
       d.etapa === 'piso' ? 'piso 4 sur' : d.etapa === 'departamento' ? d.departamento :
       d.etapa === 'muro' ? 'muro ' + d.muro : 'capas del muro';
+  }
+  /* Ver por pisos (2026-11-19): en la ficha del uso (su página o aislado), un botón por
+     paso: completo, sin cubierta y cada piso de arriba abajo. Aislado, también la
+     leyenda de sus subusos (en la página ya viene en la ficha). */
+  function usoPisos() {
+    if (!dib || !dib.pisosVer) return null;
+    if (aislado) return dib.pisosVer(aislado).length ? aislado : null;
+    return dib.pisosVer(ESCENA).length ? ESCENA : null;
+  }
+  function pintaPisos() {
+    var f = document.querySelector('[data-ficha]');
+    if (!f) return;
+    if (f.dataset.ocultaBase === undefined) f.dataset.ocultaBase = f.hidden ? '1' : '0';
+    var viejo = f.querySelector('[data-ver-pisos]');
+    if (viejo) viejo.remove();
+    var ap = usoPisos();
+    f.hidden = ap ? false : f.dataset.ocultaBase === '1';
+    if (!ap) return;
+    var pasos = dib.pisosVer(ap), d = document.createElement('div');
+    d.className = 'hud-pisos'; d.setAttribute('data-ver-pisos', '');
+    var ley = aislado && dib.subusosLeyenda ? dib.subusosLeyenda(ap) : [];
+    d.innerHTML = '<p class="hud-panel__t">Ver por pisos</p><div class="hud-pisos__lista">' + pasos.map(function (p) {
+      return '<button class="hud-op hud-op--radio" type="button" data-ver-piso="' + p.id + '" aria-pressed="' + p.activo + '"><span>' + esc(p.nombre) + '</span></button>';
+    }).join('') + '</div>' + (ley.length ? '<ul class="ad-leyenda">' + ley.map(function (l) {
+      return '<li><i style="background:' + l.color + ';border-color:' + l.color + '"></i>' + esc(l.nombre) + '</li>';
+    }).join('') + '</ul>' : '');
+    f.appendChild(d);
   }
   function actualizaMenuUso() {
     var panel = document.querySelector('[data-uso-opciones]');
@@ -499,7 +528,7 @@
     if (!controlListo() || !['comercio', 'cultura', 'industria'].includes(aislado) || detalleUso.etapa !== 'uso')
       return { ok: false, reason: 'use_not_isolated' };
     var r = dib.aislaPisoUso(aislado, Number(numero));
-    if (r.ok) { detalleUso = { etapa: 'piso', piso: r.floor, zona: null, separacion: 0 }; actualizaMenuUso(); }
+    if (r.ok) { detalleUso = { etapa: 'piso', piso: r.floor, zona: null, separacion: 0 }; actualizaMenuUso(); pintaPisos(); }
     return r;
   }
   function separaPisosUso(progreso) {
@@ -909,7 +938,7 @@
     else if (aislado && !yendo) saleAislado();
   });
   document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-modo-presentacion], [data-capa], [data-fachada], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte], [data-v4-separa], [data-v4-piso], [data-v4-depto], [data-v4-muro], [data-v4-explota], [data-v4-reinicia], [data-uso-separa], [data-uso-piso], [data-uso-zona]');
+    var b = ev.target.closest('[data-modo-presentacion], [data-capa], [data-fachada], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte], [data-v4-separa], [data-v4-piso], [data-v4-depto], [data-v4-muro], [data-v4-explota], [data-v4-reinicia], [data-uso-separa], [data-uso-piso], [data-uso-zona], [data-ver-piso]');
     if (!b) return;
     if (urbanRotationActive) stopUrbanRotation();
     if (b.hasAttribute('data-modo-presentacion')) { ponModoPresentacion(!modoPresentacion); return; }
@@ -928,6 +957,7 @@
     if (b.hasAttribute('data-uso-separa')) { separaPisosUso(detalleUso.separacion ? 0 : 1); return; }
     if (b.hasAttribute('data-uso-piso')) { seleccionaPisoUso(b.getAttribute('data-uso-piso')); return; }
     if (b.hasAttribute('data-uso-zona')) { seleccionaZonaUso(b.getAttribute('data-uso-zona')); return; }
+    if (b.hasAttribute('data-ver-piso')) { var up = usoPisos(); if (up) { dib.verPisos(up, Number(b.getAttribute('data-ver-piso'))); pintaPisos(); } return; }
     if (b.hasAttribute('data-aisla')) { cierraMenus(); aislar(b.getAttribute('data-aisla')); }
     else if (b.hasAttribute('data-aisla-sale')) saleAislado();
     else if (b.hasAttribute('data-parte-oculta')) marcaPartesAislado(dib.ponParte(b.getAttribute('data-parte-oculta'), { oculto: b.getAttribute('aria-pressed') !== 'true' }));
@@ -982,6 +1012,7 @@
     dib.vista(0, az, el);
     if (ponMini) ponMini(az);
     escala();
+    pintaPisos();
   }
 
   /* ---------- Ir a otro apartado ---------- */

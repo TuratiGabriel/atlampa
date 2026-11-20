@@ -132,7 +132,7 @@ const CLAY_TINTA = {
 // Subusos (Diego, 2026-11-19): tonos del mismo uso; el aro, con su amarillo. [color, clay]
 const SUBUSO_COLOR = {
   'cul-comercio': ['#9466f0', '#6d48b0'], 'cul-galeria': ['#c9a6ff', '#9271c9'], 'cul-social': ['#efe2ff', '#c7b5e6'], aro: ['#f2c14e', '#d1a536'],
-  'viv-comercio': ['#ffc0e0', '#f0a0c8'],
+  'viv-comercio': ['#fff0f8', '#f7c6de'],
   'com-mercado': ['#8a98ff', '#4056b5'], 'com-libre': ['#cdd4ff', '#9aa6dc'], 'com-banos': ['#5468ff', '#22308a'],
   'com-acuaponia': ['#72c6ff', '#3f8fc0'], 'com-descarga': ['#4c56a8', '#2a3270']
 };
@@ -2003,7 +2003,41 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     cultura: [[-0.55, 3.32], [3.32, 6.32], [6.32, 15.72]],
     industria: [[0, 3.06], [3.06, 10.9]]
   };
+  /* Ver por pisos (Diego, 2026-11-19): se quita la cubierta y luego cada piso, de
+     arriba abajo, para ver el interior. Es un corte horizontal (el mismo uniform que
+     usa aislaPisoUso), así que sirve en la página del uso y aislado. */
+  const VER_PISOS = {
+    // [nombre, sin cubierta, corte en m]: cada corte, justo bajo la losa del piso de arriba
+    comercio: [['Completo'], ['Sin cubierta', 1], ['Planta baja', 1, 3.5]],
+    cultura: [['Completo'], ['Sin cubierta', 1], ['Nivel 2', 1, 9.4], ['Nivel 1', 1, 5.9], ['Planta baja', 1, 2.9]],
+    industria: [['Completo'], ['Sin cubierta', 1, 5.7], ['Planta baja', 1, 2.7]],
+    vivienda: [['Completo']].concat(Array.from({ length: 11 }, (_, i) => ['Nivel ' + (11 - i), 0, 10.64 + 3.3 * (11 - i) - 0.25]))
+  };
+  const ES_TECHO = /^revit-[a-z]+-(roofs|chacuacos|chimeneas)-/;
+  let techoFuera = null, verPiso = null;
+  function pisosVer(ap) { return (VER_PISOS[ap] || []).map((p, i) => ({ id: i, nombre: p[0], activo: (verPiso ? verPiso.i : 0) === i })); }
+  function verPisos(ap, i) {
+    const lista = VER_PISOS[ap], paso = lista && lista[i];
+    if (!paso) return { ok: false, reason: 'sin_pisos' };
+    limpiaExplosionUso();
+    limpiaCorteUso();
+    if (i > 0) {
+      verPiso = { ap, i };
+      techoFuera = paso[1] ? ap : null;
+      if (paso[2] !== undefined) PISO_RANGO.value.set(-1e5, paso[2]);
+    }
+    visibles(); pide();
+    return { ok: true, use: ap, step: i, name: paso[0] };
+  }
+  function subusosLeyenda(ap) {
+    const vistos = new Set();
+    raizG.traverse(o => { const d = o.isMesh && o.material && o.material.userData; if (d && d.subuso && d.subAp === ap) vistos.add(d.subuso); });
+    const r = Object.keys(SUBUSO_COLOR).filter(k => vistos.has(k)).map(k => ({ id: k, nombre: SUBUSO_NOMBRE[k], color: SUBUSO_COLOR[k][0] }));
+    if (ap === 'vivienda' && r.length) r.unshift({ id: 'vivienda', nombre: 'Vivienda', color: PROGRAMA.vivienda });   // (lo demás no se reparte)
+    return r;
+  }
   function limpiaCorteUso() {
+    techoFuera = null; verPiso = null;
     PISO_RANGO.value.set(-1e5, 1e5);
     DETALLE_MIN.value.set(-1e5, -1e5);
     DETALLE_MAX.value.set(1e5, 1e5);
@@ -2857,6 +2891,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     // inspeccionando cualquier cosa, el aro no se oculta
     if (conAro()) piezas.forEach(p => { if (p.ap === 'aro') p.g.visible = !n; });
     aislaVisibles();
+    if (techoFuera) piezas.forEach(p => { if (p.ap === techoFuera && ES_TECHO.test(p.g.name)) p.g.visible = false; });
     if (capas.corte && !enCorte) { enCorte = true; armaCorte(); enCorte = false; }   // el contorno sigue lo que se ve
   }
   let enCorte = false;
@@ -3311,7 +3346,12 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
      aisla(null): todo regresa y se vuelve a dibujar desde lo que estaba aislado.
      (La página pone la axonometría: perspectiva(false).) */
   function gruposDe(ap) {
-    if (BIM && gBIM[ap]) return ap === 'estacionamiento' ? [gEst, ...gBIM[ap]] : gBIM[ap].slice();
+    if (BIM && gBIM[ap]) {
+      if (ap === 'estacionamiento') return [gEst, ...gBIM[ap]];
+      // el mercado: la envolvente de Revit y, dentro, lo del Rhino (puestos, plataformas, patios, PB sur)
+      if (ap === 'comercio') return gBIM[ap].concat(piezas.filter(p => p.ap === 'comercio' && /^mercado-/.test(p.g.name) && !p.g.userData.oculto).map(p => p.g));
+      return gBIM[ap].slice();
+    }
     if (ap === 'comercio' && MERCADO) return piezas.filter(p => /^mercado-|^cinta$/.test(p.g.name)).map(p => p.g);
     // la nave norte abierta: el mercado sin la nave sur (ni su planta baja, planta alta y acero) ni las columnas de la vivienda, y el aro (sin la cinta)
     if (ap === 'nave-norte' && MERCADO) return piezas.filter(p => (/^mercado-/.test(p.g.name) && !/^mercado-(pa|vivienda|sur-.*)$/.test(p.g.name)) || (p.ap === 'aro' && p.g.name !== 'cinta')).map(p => p.g);
@@ -3588,6 +3628,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     depura: () => ({ escena, capas, elevacion: elevacionAct, fachada: fachadaAct, camaraOrtogonal: cam === camO }),
     preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); },
     contextoListo: () => !ext.listo || ext.listo(), separa, separaPisos, progresoPisos, aislaPiso4Sur,
+    pisosVer, verPisos, subusosLeyenda,
     subusos: () => { const r = {}; raizG.traverse(o => { const d = o.isMesh && o.material && o.material.userData; if (d && d.subuso) { const k = d.subAp + '/' + d.subuso; r[k] = (r[k] || 0) + o.geometry.attributes.position.count / 3; } }); return r; },
     separaLados, progresoLateral: () => progresoLateral, pisosUso, aislaPisoUso, separaPisosUso, zonasProvisionales, aislaZonaProvisional,
     fluye(ms) { mueveInfra(ms); if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
