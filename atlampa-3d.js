@@ -1911,7 +1911,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     ['com-banos', [[540.6, 440.9], [553.8, 440.9], [553.8, 418.7], [540.6, 418.7]], 0, 7.5],
     ['com-banos', [[499.6, 344.6], [536.1, 344.6], [536.1, 326.1], [499.6, 326.1]], 4, 7.8],   // planta alta de la nave sur
     ['com-descarga', [[516.8, 342], [557.3, 342], [557.3, 323.4], [516.8, 323.4]], -9, 4],
-    ['com-acuaponia', [[507, 367.6], [512.8, 365], [515.5, 355.7], [514.9, 342.5], [515.5, 324], [499.6, 324], [499.6, 347.8], [501.7, 359.7]], -9, 4]
+    // acuaponia: la esquina SO de la PB sur, donde están sus tanques y camas (atlampa-mercado.js: sur.tanque, sur.cama)
+    ['com-acuaponia', [[499.6, 338], [516.5, 338], [516.5, 323.4], [499.6, 323.4]], -9, 4]
   ];
   const COMERCIO_VIV = BIM && BIM.subusos && BIM.subusos.vivienda;
   const SUBUSOS = {
