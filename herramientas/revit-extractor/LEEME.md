@@ -52,3 +52,20 @@ que `exportar.py`, sólo con ese vínculo, y su huella queda en
 auditorio): 873 muros, 35 losas, 33 puertas, 318 paneles, 269 montantes y 19
 cubiertas, sin errores. Para cultura también se leen columnas (`OST_Columns`, redondas y de sombrilla), escaleras (`OST_StairsRuns` y `OST_StairsLandings`, que suman la geometría de cada `Stairs`), barandales (`OST_StairsRailing`) y pasamanos (`OST_RailingTopRail`); los balaustres sueltos no, porque Revit los da en coordenadas locales (en el origen) y ya vienen dentro del barandal. Los cortes de presentación de cultura en
 `atlampa-3d.js` (`PISOS_USO`) pasaron a PB, N1 y N2 + azotea.
+
+## Actualizar sólo un vínculo (vivienda o cultura)
+
+`actualiza_vinculo.py <programa> <lectura.jsonl.gz>` reemplaza en
+`atlampa-revit.bin/.js` los grupos de un solo programa (`cultura` =
+ArteCultura_Aro_ARQ, `vivienda` = ARQ_VIVIENDA) y deja los demás idénticos byte
+por byte. `actualiza_cultura.py <gz>` es un atajo para cultura. La lectura se
+saca con COORDINATION.rvt abierto, por C# (revit-mcp), con el mismo formato de
+renglones que `exportar.py`, filtrando sólo ese vínculo.
+
+Vivienda (lectura 2026-11-19): `preparar_visor.py` infiere "muros interiores"
+(losa encima por ambos lados) y los omite junto con lo que alojan. En vivienda
+eso escondía también muros de fachada bajo losas en voladizo: quedaban 1,281 de
+4,541 muros, 891 de 1,075 ventanas y 36 de 218 puertas. `actualiza_vinculo.py`
+no hace esa inferencia y dibuja todo lo que trae Revit; los niveles se reparten
+con la misma fórmula de `preparar_visor.py`. Si alguien vuelve a correr
+`preparar_visor.py` completo, hay que volver a pasar esta lectura de vivienda.
