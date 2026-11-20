@@ -172,6 +172,8 @@ const CORTE_POS = { value: new THREE.Vector3(1e5, 1e5, 1e5) };
 const CORTE_ACT = { value: new THREE.Vector3(0, 0, 0) };
 const CORTE_DIR = { value: new THREE.Vector3(1, 1, 1) };
 const PISO_RANGO = { value: new THREE.Vector2(-1e5, 1e5) };
+// ver por pisos: alto de la banda que se desintegra bajo el corte mientras se mueve (0: sin banda)
+const PISO_BANDA = { value: 0 };
 const DETALLE_MIN = { value: new THREE.Vector2(-1e5, -1e5) };
 const DETALLE_MAX = { value: new THREE.Vector2(1e5, 1e5) };
 const ELEV_ACT = { value: 0 };
@@ -212,12 +214,12 @@ const DIB_LINEA = /* glsl */`
 function dibujable(mat, U) {   // un LineBasicMaterial que se dibuja con el canal U
   mat._dibUniforms = U;
   mat.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uPisoRango: PISO_RANGO, uDetalleMin: DETALLE_MIN, uDetalleMax: DETALLE_MAX, uElevacion: ELEV_ACT, uElevOrigen: ELEV_ORIG, uElevDir: ELEV_DIR }, U);
+    Object.assign(sh.uniforms, { uPisoRango: PISO_RANGO, uPisoBanda: PISO_BANDA, uDetalleMin: DETALLE_MIN, uDetalleMax: DETALLE_MAX, uElevacion: ELEV_ACT, uElevOrigen: ELEV_ORIG, uElevDir: ELEV_DIR }, U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aOtro; attribute float aLado; varying vec3 vDetalleW; varying float vElevDist; uniform vec3 uElevOrigen, uElevDir;' + DIB_GLSL)
       .replace('#include <begin_vertex>', DIB_LINEA)
       .replace('#include <project_vertex>', '#include <project_vertex>\n vDetalleW = (modelMatrix * vec4(transformed, 1.0)).xyz; vElevDist = dot(vDetalleW - uElevOrigen, uElevDir);');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vDetalleW; varying float vElevDist; uniform vec2 uPisoRango; uniform vec2 uDetalleMin; uniform vec2 uDetalleMax; uniform float uElevacion;')
-      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if (vDetalleW.y < uPisoRango.x || vDetalleW.y > uPisoRango.y || vDetalleW.x < uDetalleMin.x || vDetalleW.x > uDetalleMax.x || vDetalleW.z < uDetalleMin.y || vDetalleW.z > uDetalleMax.y) discard;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vDetalleW; varying float vElevDist; uniform vec2 uPisoRango; uniform float uPisoBanda; uniform vec2 uDetalleMin; uniform vec2 uDetalleMax; uniform float uElevacion;')
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if (vDetalleW.y < uPisoRango.x || vDetalleW.y > uPisoRango.y || vDetalleW.x < uDetalleMin.x || vDetalleW.x > uDetalleMax.x || vDetalleW.z < uDetalleMin.y || vDetalleW.z > uDetalleMax.y) discard;\n if (uPisoBanda > 0.0 && vDetalleW.y > uPisoRango.y - uPisoBanda) { vec3 q = floor(vDetalleW * 1.7); if (fract(sin(dot(q.xz + q.y * 0.37, vec2(12.9898, 78.233))) * 43758.5453) > (uPisoRango.y - vDetalleW.y) / uPisoBanda) discard; }')
       .replace('#include <color_fragment>', '#include <color_fragment>\nif (uElevacion > 0.5) { diffuseColor.rgb = vec3(0.08); diffuseColor.a *= mix(0.95, 0.5, smoothstep(9.0, 11.0, vElevDist)); }');
   };
   mat.customProgramCacheKey = () => 'dib-detail';
@@ -262,7 +264,7 @@ const VERT = /* glsl */`
   }`;
 const FRAG = /* glsl */`
   uniform vec3 uFondo; uniform vec3 uTinta; uniform float uModo; uniform float uTono; uniform float uPaso; uniform float uMundo;
-  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform vec3 uCortePos; uniform vec3 uCorteAct; uniform vec3 uCorteDir; uniform vec2 uPisoRango; uniform vec2 uDetalleMin; uniform vec2 uDetalleMax; uniform float uElevacion; uniform vec3 uElevOrigen; uniform vec3 uElevDir;
+  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform vec3 uCortePos; uniform vec3 uCorteAct; uniform vec3 uCorteDir; uniform vec2 uPisoRango; uniform float uPisoBanda; uniform vec2 uDetalleMin; uniform vec2 uDetalleMax; uniform float uElevacion; uniform vec3 uElevOrigen; uniform vec3 uElevDir;
   varying vec3 vN; varying vec3 vW;` + DIB_GLSL + `
   // una raya cada periodo de c (antialias con fwidth; si es muy denso, el promedio)
   float raya(float c, float grueso) {
@@ -273,6 +275,15 @@ const FRAG = /* glsl */`
   }
   void main() {
     if (vW.y < uPisoRango.x || vW.y > uPisoRango.y) discard;
+    // ver por pisos: bajo el corte que se mueve, lo que se va (o llega) se desmorona en migajas con el rayado del dibujo
+    if (uPisoBanda > 0.0 && vW.y > uPisoRango.y - uPisoBanda) {
+      float k = (uPisoRango.y - vW.y) / uPisoBanda;
+      if (dibAzar(floor(vW * 1.7)) > k) discard;
+      if (k < 0.75) {
+        if (raya((gl_FragCoord.x - gl_FragCoord.y) / (4.5 * uPx), 0.3) < 0.4) discard;
+        gl_FragColor = vec4(mix(uFondo, uTinta, 0.42 * uBrillo), uOpacidad); return;
+      }
+    }
     if (vW.x < uDetalleMin.x || vW.x > uDetalleMax.x || vW.z < uDetalleMin.y || vW.z > uDetalleMax.y) discard;
     if ((uCorteAct.x > 0.5 && (vW.x - uCortePos.x) * uCorteDir.x > 0.0) ||
         (uCorteAct.y > 0.5 && (vW.y - uCortePos.y) * uCorteDir.y > 0.0) ||
@@ -591,6 +602,7 @@ function crea(svg, op) {
   const ARISTAS = {};   // clave → LineBasicMaterial
   const LINEAS = {};    // nombre → LineBasicMaterial (plantas, columnas…)
   let conColor = true, resalta = null, espacioAct = null, conEsquema = false, infraAct = null, matPersEsq = null;
+  let resaltado = null, techoFuera = null, verPiso = null, animPisos = null;   // subuso destacado y ver por pisos (ver transitaPisos)
   // con el esquema compositivo, el modelo entero queda muy tenue (pero se lee: no se va a negro)
   const TENUE_ESQ = 0.32;
   // Inspeccionando la estructura (no sólo mostrándola): de lo demás sólo
@@ -610,7 +622,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       uniforms: Object.assign({ uFondo: { value: new THREE.Color(0, 0, 0) }, uTinta: { value: new THREE.Color(1, 1, 1) }, uModo: { value: 0 }, uTono: { value: 0.5 },
         uPaso: { value: 3 }, uMundo: { value: 0 }, uGris: { value: 0.1 }, uGrano: { value: 0 }, uOpacidad: { value: 1 }, uLuz: { value: luz }, uPx: { value: renderer.getPixelRatio() },
         uBrillo: { value: 1 }, uGrueso: { value: 0.22 }, uCortePos: CORTE_POS, uCorteAct: CORTE_ACT, uCorteDir: CORTE_DIR,
-        uPisoRango: PISO_RANGO, uDetalleMin: DETALLE_MIN, uDetalleMax: DETALLE_MAX,
+        uPisoRango: PISO_RANGO, uPisoBanda: PISO_BANDA, uDetalleMin: DETALLE_MIN, uDetalleMax: DETALLE_MAX,
         uElevacion: ELEV_ACT, uElevOrigen: ELEV_ORIG, uElevDir: ELEV_DIR }, canalDe(papel))
     });
     m.userData.papel = papel;
@@ -645,6 +657,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (!conColor || !pr) return blanco;
     return new THREE.Color(PROGRAMA[pr]).lerp(blanco, 0.15);
   }
+  const esResaltado = d => d.subuso === resaltado.s || (resaltado.s === 'aro' && d.papel === 'aro');
   // Subusos (ver SUBUSOS): dentro de su uso, el tono de su parte; fuera, el de siempre.
   function tintaSub(d, actual) {
     const c = d.subuso && SUBUSO_COLOR[d.subuso];
@@ -694,7 +707,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
         if (u.uModo.value > 1.5) { u.uGris.value = Math.max(u.uGris.value, 0.2); u.uTono.value = Math.max(u.uTono.value, 0.45); }
         else u.uTono.value = Math.min(1, u.uTono.value * 2.2);
       }
-      u.uBrillo.value = enfasis(m.userData.papel, m.userData.ref) * (conEsquema ? TENUE_ESQ : 1);
+      u.uBrillo.value = enfasis(m.userData.papel, m.userData.ref) * (conEsquema ? TENUE_ESQ : 1) * (resaltado && !esResaltado(m.userData) ? 0.22 : 1);
       const ap = apagado(m.userData.papel), vid = m.userData.papel.startsWith('vidrio'), inf = !!infraAct;
       u.uOpacidad.value = (ap ? TENUE : 1) * (inf ? 0.09 : 1); m.transparent = ap || vid || inf; m.depthWrite = !ap && !vid && !inf;
       // inspeccionando la estructura: de lo demás, sólo el contorno (menos el aro)
@@ -705,7 +718,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     Object.keys(ARISTAS).forEach(k => {
       const m = ARISTAS[k], e = estilo.papel[m.userData.papel] || estilo.papel.proyecto;
       m.color.copy(tintaSub(m.userData, tinta(m.userData.papel)));
-      m.opacity = Math.min(1, (elevacionAct ? Math.max(0.55, e.arista || 0) : e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
+      m.opacity = Math.min(1, (elevacionAct ? Math.max(0.55, e.arista || 0) : e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (resaltado && !esResaltado(m.userData) ? 0.2 : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
       if (enEstr && m.userData.papel !== 'aro' && m.opacity > 0.001) m.opacity = 0.42;
       m.visible = m.opacity > 0.001;
     });
@@ -2014,30 +2027,107 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     vivienda: [['Completo']].concat(Array.from({ length: 11 }, (_, i) => ['Nivel ' + (11 - i), 0, 10.64 + 3.3 * (11 - i) - 0.25]))
   };
   const ES_TECHO = /^revit-[a-z]+-(roofs|chacuacos|chimeneas)-/;
-  let techoFuera = null, verPiso = null;
-  function pisosVer(ap) { return (VER_PISOS[ap] || []).map((p, i) => ({ id: i, nombre: p[0], activo: (verPiso ? verPiso.i : 0) === i })); }
+  function pisosVer(ap) { return (VER_PISOS[ap] || []).map((p, i) => ({ id: i, nombre: p[0], activo: !resaltado && (verPiso ? verPiso.i : 0) === i })); }
+  const cajaDe = gs => { const b = new THREE.Box3(); gs.forEach(g => b.expandByObject(g)); return b; };
+  const techosDe = ap => piezas.filter(p => p.ap === ap && ES_TECHO.test(p.g.name)).map(p => p.g);
+  // termina de una vez la animación de pisos que esté a medias (los techos vuelven a su material)
+  function paraAnimPisos() {
+    if (!animPisos) return;
+    const a = animPisos; animPisos = null; a.fin();
+  }
+  /* De un estado a otro (techo fuera / corte z): el corte baja o sube animado y, bajo él,
+     lo que se va o llega se desmorona con el rayado del dibujo (PISO_BANDA); los techos
+     se desintegran igual, con un corte propio, y al final se ocultan. */
+  function transitaPisos(ap, techo, z, dur) {
+    paraAnimPisos();
+    limpiaExplosionUso();
+    DETALLE_MIN.value.set(-1e5, -1e5); DETALLE_MAX.value.set(1e5, 1e5);
+    const tope = cajaDe(gruposDe(ap)).max.y + 0.5;
+    const za = PISO_RANGO.value.y < 1e4 ? PISO_RANGO.value.y : tope, zb = z === null ? tope : z;
+    const antesTecho = techoFuera === ap, cambiaTecho = antesTecho !== techo;
+    const techos = cambiaTecho ? techosDe(ap) : [], tmp = [];
+    let rT = null, rU = null, bU = null;
+    if (techos.length) {
+      const b = cajaDe(techos); rT = [b.min.y - 0.2, b.max.y + 0.2];
+      rU = { value: new THREE.Vector2(-1e5, techo ? rT[1] : rT[0]) }; bU = { value: 0 };
+      techos.forEach(g => g.traverse(o => {
+        if (!(o.isMesh || o.isLineSegments) || !o.material) return;
+        const base = o.material;
+        const m = o.isMesh ? base.clone() : dibujable(base.clone(), { ...base._dibUniforms, uPisoRango: rU, uPisoBanda: bU });
+        if (o.isMesh) { m.uniforms.uPisoRango = rU; m.uniforms.uPisoBanda = bU; }
+        m.userData = base.userData; o.material = m; tmp.push([o, base, m]);
+      }));
+      techoFuera = null; visibles();
+    }
+    const fin = () => {
+      tmp.forEach(([o, base, m]) => { o.material = base; m.dispose(); });
+      PISO_RANGO.value.set(-1e5, z === null ? 1e5 : z); PISO_BANDA.value = 0;
+      techoFuera = techo ? ap : null;
+      visibles(); pide();
+    };
+    animPisos = { fin };
+    if (za === zb && !techos.length) { paraAnimPisos(); return; }
+    const suave = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const banda = t => 2.8 * (1 - Math.max(0, (t - 0.85) / 0.15));
+    anima(dur || 1300, t => {
+      const e = suave(t), tt = techos.length ? Math.min(1, t * 1.6) : 0, te = suave(tt);
+      if (techos.length) {   // primero se van (o al final llegan) los techos
+        const a = techo ? rT[1] : rT[0], b = techo ? rT[0] : rT[1], k = techo ? te : suave(Math.max(0, t * 1.6 - 0.6));
+        rU.value.y = a + (b - a) * k; bU.value = 2.2 * (1 - Math.max(0, (k - 0.85) / 0.15));
+      }
+      const tz = techos.length && techo ? Math.max(0, (t - 0.3) / 0.7) : techos.length ? Math.min(1, t / 0.7) : t, ez = suave(tz);
+      PISO_RANGO.value.set(-1e5, za + (zb - za) * ez); PISO_BANDA.value = za === zb ? 0 : banda(tz);
+    }, () => { if (animPisos && animPisos.fin === fin) { animPisos = null; fin(); } });
+  }
   function verPisos(ap, i) {
     const lista = VER_PISOS[ap], paso = lista && lista[i];
     if (!paso) return { ok: false, reason: 'sin_pisos' };
-    limpiaExplosionUso();
-    limpiaCorteUso();
-    if (i > 0) {
-      verPiso = { ap, i };
-      techoFuera = paso[1] ? ap : null;
-      if (paso[2] !== undefined) PISO_RANGO.value.set(-1e5, paso[2]);
-    }
-    visibles(); pide();
+    verPiso = i > 0 ? { ap, i } : null;
+    if (resaltado) { resaltado = null; aplicaEstilo(); }
+    transitaPisos(ap, i > 0 && !!paso[1], i > 0 && paso[2] !== undefined ? paso[2] : null);
     return { ok: true, use: ap, step: i, name: paso[0] };
+  }
+  /* Picarle a un subuso (en la ficha o en el modelo): se quitan los pisos de arriba y
+     se destaca; lo demás queda tenue. [sin cubierta, corte] */
+  const VISTA_SUBUSO = {
+    'cul-comercio': [1, 5.9], 'cul-galeria': [1, 9.4], 'cul-social': [1, null], aro: [0, null],
+    'viv-comercio': [0, 13.69],
+    'com-mercado': [1, null], 'com-libre': [0, null], 'com-banos': [1, null], 'com-acuaponia': [1, 3.5], 'com-descarga': [1, 3.5]
+  };
+  function resaltaSubuso(ap, s) {
+    if (!subusoActivo(ap)) return { ok: false, reason: 'use_not_active' };
+    if (!s || (resaltado && resaltado.s === s)) {   // de nuevo el mismo: se suelta
+      resaltado = null; verPiso = null; aplicaEstilo(); transitaPisos(ap, false, null);
+      return { ok: true, use: ap, subuse: null };
+    }
+    const v = VISTA_SUBUSO[s] || [0, null];
+    resaltado = { ap, s }; verPiso = null;
+    aplicaEstilo(); transitaPisos(ap, !!v[0], v[1]);
+    return { ok: true, use: ap, subuse: s, name: SUBUSO_NOMBRE[s] };
+  }
+  function subusoEn(ev) {
+    if (!ev || ev.clientX === undefined) return null;
+    const r = lienzo.getBoundingClientRect();
+    ndc.set((ev.clientX - r.left) / r.width * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, cam);
+    const hit = ray.intersectObjects(visiblesPicables(), false)
+      .find(h => h.point.y <= PISO_RANGO.value.y && !(h.object.material.userData.papel || '').startsWith('vidrio'));
+    const d = hit && hit.object.material.userData;
+    // el aro del conjunto (su propia pieza) cuenta como el aro de arte y cultura
+    if (hit && hit.object.userData.ap === 'aro' && subusoActivo('cultura')) return { ap: 'cultura', s: 'aro' };
+    return d && d.subuso && subusoActivo(d.subAp) ? { ap: d.subAp, s: d.subuso } : null;
   }
   function subusosLeyenda(ap) {
     const vistos = new Set();
     raizG.traverse(o => { const d = o.isMesh && o.material && o.material.userData; if (d && d.subuso && d.subAp === ap) vistos.add(d.subuso); });
-    const r = Object.keys(SUBUSO_COLOR).filter(k => vistos.has(k)).map(k => ({ id: k, nombre: SUBUSO_NOMBRE[k], color: SUBUSO_COLOR[k][0] }));
+    const r = Object.keys(SUBUSO_COLOR).filter(k => vistos.has(k)).map(k => ({ id: k, nombre: SUBUSO_NOMBRE[k], color: SUBUSO_COLOR[k][0], activo: !!resaltado && resaltado.s === k }));
     if (ap === 'vivienda' && r.length) r.unshift({ id: 'vivienda', nombre: 'Vivienda', color: PROGRAMA.vivienda });   // (lo demás no se reparte)
     return r;
   }
   function limpiaCorteUso() {
-    techoFuera = null; verPiso = null;
+    paraAnimPisos();
+    if (resaltado) { resaltado = null; aplicaEstilo(); }
+    techoFuera = null; verPiso = null; PISO_BANDA.value = 0;
     PISO_RANGO.value.set(-1e5, 1e5);
     DETALLE_MIN.value.set(-1e5, -1e5);
     DETALLE_MAX.value.set(1e5, 1e5);
@@ -3628,7 +3718,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     depura: () => ({ escena, capas, elevacion: elevacionAct, fachada: fachadaAct, camaraOrtogonal: cam === camO }),
     preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); },
     contextoListo: () => !ext.listo || ext.listo(), separa, separaPisos, progresoPisos, aislaPiso4Sur,
-    pisosVer, verPisos, subusosLeyenda,
+    pisosVer, verPisos, subusosLeyenda, resaltaSubuso, subusoEn, subusoResaltado: () => resaltado,
     subusos: () => { const r = {}; raizG.traverse(o => { const d = o.isMesh && o.material && o.material.userData; if (d && d.subuso) { const k = d.subAp + '/' + d.subuso; r[k] = (r[k] || 0) + o.geometry.attributes.position.count / 3; } }); return r; },
     separaLados, progresoLateral: () => progresoLateral, pisosUso, aislaPisoUso, separaPisosUso, zonasProvisionales, aislaZonaProvisional,
     fluye(ms) { mueveInfra(ms); if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},

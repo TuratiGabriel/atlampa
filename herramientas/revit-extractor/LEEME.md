@@ -95,3 +95,12 @@ cubiertas de Revit (roofs, chacuacos, chimeneas) y hace un corte horizontal just
 losa del piso de arriba, con el mismo uniform que usa `aislaPisoUso`. "Inspeccionar"
 vivienda la abre aislada (no tiene página). El aislado del mercado ahora trae también
 lo del Rhino (puestos, plataformas, patios, PB sur), no sólo la envolvente de Revit.
+
+## Destacar subusos y animación de pisos (2026-11-19)
+
+- Picarle a un subuso (en la leyenda de la ficha o en el modelo, clic sencillo) lo
+  destaca: se quitan los pisos de arriba (`VISTA_SUBUSO`) y lo demás queda tenue.
+  Otro clic en el mismo, o "Completo", lo suelta.
+- Los cambios de piso ya no son de golpe: el corte baja o sube animado y, bajo él, lo
+  que se va o llega se desmorona en migajas con el rayado del dibujo (`PISO_BANDA` en
+  los shaders). Los techos se desintegran primero con un corte propio y luego se ocultan.

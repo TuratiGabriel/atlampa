@@ -505,3 +505,7 @@ body.con-datos .hud-camara{ opacity:0; pointer-events:none; }
 .hud-pisos__lista{ display:grid; grid-template-columns:1fr 1fr; gap:0 8px; }
 .hud-pisos__lista .hud-op{ font-size:12.5px; }
 .hud-pisos .ad-leyenda{ margin-top:4px; }
+.hud-pisos .ad-leyenda button{ all:unset; display:flex; align-items:center; gap:9px; cursor:pointer; border-radius:3px; }
+.hud-pisos .ad-leyenda button:hover{ color:var(--l1, #fff); }
+.hud-pisos .ad-leyenda button[aria-pressed="true"]{ color:#fff; text-decoration:underline; text-underline-offset:3px; }
+.hud-pisos .ad-leyenda button:focus-visible{ outline:1px solid rgba(255,255,255,.6); outline-offset:2px; }
