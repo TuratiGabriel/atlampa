@@ -84,9 +84,60 @@
   function guarda(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
   function lee(k, borra) { try { var v = sessionStorage.getItem(k); if (borra) sessionStorage.removeItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   var modoPresentacion = lee('atlampa-modo-presentacion') === true;
+  var historiaActiva = false;
+  var historiaPresentacionAnterior = null;
+  var historiaAviso = document.createElement('div');
+  historiaAviso.className = 'ad-historia-espera';
+  historiaAviso.setAttribute('role', 'status');
+  historiaAviso.setAttribute('aria-live', 'polite');
+  historiaAviso.innerHTML = '<span class="ad-historia-espera__titulo">Modo historia · preexistencia esquemática</span><span>Naves orientales confirmadas; masas occidentales aproximadas desde Earth</span>';
+  trabajo.appendChild(historiaAviso);
+  function estadoHistoria() {
+    return { ok: true, storyMode: historiaActiva, storyStage: historiaActiva ? 'schematic_preexistence' : null,
+      storyStep: null, storyTransitioning: false, sceneReady: false, visibleElements: historiaActiva ? 4 : 0,
+      storyAvailableActions: historiaActiva ? ['exitStoryMode'] : [] };
+  }
+  function entrarHistoria() {
+    if (historiaActiva) return { ok: true, alreadyActive: true, ...estadoHistoria() };
+    if (!modoPresentacion) return { ok: false, reason: 'requires_presentation_mode' };
+    if (!dib || !dib.historiaModo || yendo) return { ok: false, reason: 'not_ready' };
+    if (ESCENA !== 'general' || aislado || prendida('contexto')) return { ok: false, reason: 'requires_predio' };
+    if (urbanRotationActive) stopUrbanRotation();
+    cierraMenus(); cierraDatos(true); tooltip(null);
+    dib.historiaModo(true);
+    historiaActiva = true;
+    document.body.classList.add('modo-historia');
+    [].forEach.call(document.querySelectorAll('[data-modo-historia]'), function (b) { b.setAttribute('aria-pressed', 'true'); });
+    return estadoHistoria();
+  }
+  function salirHistoria() {
+    if (!historiaActiva) return { ok: true, alreadyInactive: true, ...estadoHistoria() };
+    if (dib && dib.historiaModo) dib.historiaModo(false);
+    historiaActiva = false;
+    document.body.classList.remove('modo-historia');
+    [].forEach.call(document.querySelectorAll('[data-modo-historia]'), function (b) { b.setAttribute('aria-pressed', 'false'); });
+    historiaPresentacionAnterior = null;
+    return estadoHistoria();
+  }
+  function previsualizaHistoria() {
+    if (historiaActiva) {
+      var antes = historiaPresentacionAnterior;
+      salirHistoria();
+      if (antes === false) ponModoPresentacion(false);
+      return estadoHistoria();
+    }
+    var antes = modoPresentacion;
+    if (!antes) ponModoPresentacion(true);
+    var resultado = entrarHistoria();
+    if (resultado.ok) historiaPresentacionAnterior = antes;
+    else if (!antes) ponModoPresentacion(false);
+    return resultado;
+  }
+  window.AtlampaHistoria = { enter: entrarHistoria, exit: salirHistoria, preview: previsualizaHistoria, getState: estadoHistoria };
   document.body.classList.toggle('modo-presentacion', modoPresentacion);
   function ponModoPresentacion(si) {
     if (urbanRotationActive) stopUrbanRotation();
+    if (!si && historiaActiva) salirHistoria();
     modoPresentacion = !!si;
     if (modoPresentacion) { cierraMenus(); cierraDatos(true); tooltip(null); }
     document.body.classList.toggle('modo-presentacion', modoPresentacion);
@@ -881,6 +932,7 @@
       (ap === 'vivienda' ? '<details class="hud-menu" name="hud" data-v4-menu><summary class="hud-menu__t">' + iconoMenu('partes') + '<span>Detalle</span></summary><div class="hud-panel hud-panel--v4" data-v4-opciones></div></details>' : '') +
       (['comercio', 'cultura', 'industria'].includes(ap) ? '<details class="hud-menu" name="hud" data-uso-menu><summary class="hud-menu__t">' + iconoMenu('partes') + '<span>Detalle</span></summary><div class="hud-panel hud-panel--v4" data-uso-opciones></div></details>' : '') +
       '<details class="hud-menu" name="hud"><summary class="hud-menu__t">' + iconoMenu('vista') + '<span>Vista</span></summary><div class="hud-panel">' + vista + '</div></details>' +
+      '<button class="hud-presentacion hud-historia" type="button" data-modo-historia aria-pressed="' + historiaActiva + '" aria-keyshortcuts="F9" title="Ver preexistencia esquemática; F9 para regresar al proyecto">Modo historia <span>(F9)</span></button>' +
       '<button class="hud-presentacion" type="button" data-modo-presentacion aria-pressed="' + modoPresentacion + '" aria-keyshortcuts="F8" title="Ocultar controles; F8 para recuperarlos">Modo presentación <span>(F8)</span></button>' +
       '<button class="hud-salir" type="button" data-aisla-sale>Salir <span aria-hidden="true">✕</span></button>';
     var barra = document.querySelector('.hud-barra');
@@ -932,7 +984,9 @@
   });
   // Esc: cierra el menú; aislado, sale
   document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'F9') { ev.preventDefault(); if (!ev.repeat) previsualizaHistoria(); return; }
     if (ev.key === 'F8') { ev.preventDefault(); if (!ev.repeat) ponModoPresentacion(!modoPresentacion); return; }
+    if (historiaActiva) { if (ev.key === 'Escape') { ev.preventDefault(); salirHistoria(); } return; }
     if (ev.key !== 'Escape') return;
     if (urbanRotationActive) stopUrbanRotation();
     if (datosAbiertos) cierraDatos();
@@ -940,10 +994,12 @@
     else if (aislado && !yendo) saleAislado();
   });
   document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-modo-presentacion], [data-capa], [data-fachada], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte], [data-v4-separa], [data-v4-piso], [data-v4-depto], [data-v4-muro], [data-v4-explota], [data-v4-reinicia], [data-uso-separa], [data-uso-piso], [data-uso-zona], [data-ver-piso], [data-subuso]');
+    var b = ev.target.closest('[data-modo-historia], [data-modo-presentacion], [data-capa], [data-fachada], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte], [data-v4-separa], [data-v4-piso], [data-v4-depto], [data-v4-muro], [data-v4-explota], [data-v4-reinicia], [data-uso-separa], [data-uso-piso], [data-uso-zona], [data-ver-piso], [data-subuso]');
     if (!b) return;
     if (urbanRotationActive) stopUrbanRotation();
+    if (b.hasAttribute('data-modo-historia')) { previsualizaHistoria(); return; }
     if (b.hasAttribute('data-modo-presentacion')) { ponModoPresentacion(!modoPresentacion); return; }
+    if (historiaActiva) return;
     if (!dib) return;
     if (b.hasAttribute('data-fachada')) { seleccionaFachada(b.getAttribute('data-fachada')); return; }
     if (b.hasAttribute('data-corte-reset')) { restableceCortes(); return; }
@@ -1153,6 +1209,8 @@
   window.AtlampaControl = {
     version: 4,
     ready: controlListo,
+    enterStoryMode: entrarHistoria,
+    exitStoryMode: salirHistoria,
     isolateUse: function (ap) {
       if (!controlListo()) return { ok: false, reason: 'not_ready' };
       if (!['vivienda', 'comercio', 'cultura', 'industria', 'aro'].includes(ap))
@@ -1260,11 +1318,12 @@
       return r.ok ? { ok: true, progress: 1, stage: 'capas', layers: r.layers } : r;
     },
     getAvailableActions: function () {
+      if (historiaActiva) return { ok: true, stage: 'story_schematic_preexistence', storyMode: true, sceneReady: false, actions: ['exitStoryMode'] };
       var comunes = ['orbit', 'pan', 'zoom'];
       if (prendida('contexto')) return { ok: true, stage: 'contexto', orbitAxis: 'y',
         actions: ['orbit', 'resetDetail', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation'] };
       if (!aislado && ESCENA !== 'general') return { ok: true, stage: 'apartado_sin_aislar', actions: comunes.concat(['resetDetail']) };
-      if (!aislado) return { ok: true, stage: 'predio', actions: comunes.concat(['setUrbanContext', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation', 'isolateUse', 'resetDetail']) };
+      if (!aislado) return { ok: true, stage: 'predio', actions: comunes.concat(['setUrbanContext', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation', 'isolateUse', 'resetDetail'], modoPresentacion ? ['enterStoryMode'] : []) };
       if (aislado === 'vivienda') {
         var a = { vivienda: ['setFloorSeparation', 'selectFloor'], piso: ['selectApartment', 'pickApartment'],
           departamento: ['selectWall', 'pickWall'], muro: ['setLateralSeparation', 'explodeWall'], capas: [] };
@@ -1278,6 +1337,7 @@
     },
     getState: function () {
       return { ok: true, ready: controlListo(), scene: ESCENA, isolated: aislado,
+        storyMode: historiaActiva, storyStage: historiaActiva ? 'schematic_preexistence' : null, storyStep: null, storyTransitioning: false, sceneReady: false,
         azimuth: azMeta, elevation: elMeta,
         floorProgress: dib && dib.progresoPisos ? dib.progresoPisos() : 0,
         lateralProgress: detalleV4.etapa === 'capas' ? 1 : 0,
@@ -1290,10 +1350,11 @@
   // árbol rechace. Para voz y otros controles, sólo una acción ejecutada
   // cancela el loop. El giro propio no pasa por estos métodos.
   Object.keys(window.AtlampaControl).forEach(function (name) {
-    if (['ready', 'getState', 'getAvailableActions', 'startUrbanRotation', 'stopUrbanRotation'].includes(name)) return;
+    if (['ready', 'getState', 'getAvailableActions', 'enterStoryMode', 'exitStoryMode'].includes(name)) return;
     var original = window.AtlampaControl[name];
     if (typeof original !== 'function') return;
     window.AtlampaControl[name] = function () {
+      if (historiaActiva) return { ok: false, reason: 'story_mode_active' };
       var result = original.apply(this, arguments);
       if (result && result.ok && urbanRotationActive) stopUrbanRotation();
       return result;
@@ -1302,6 +1363,7 @@
   zona.addEventListener('wheel', function (ev) {
     if (!dib) return;   // el motor 3D todavía carga
     ev.preventDefault();
+    if (historiaActiva) return;
     if (yendo) return;
     var c = enCuadro(ev), d = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaY;
     acerca(Math.exp(-d * 0.0018), c[0], c[1]);
@@ -1310,6 +1372,7 @@
   var dedos = {}, pell = 0, modo = null, recorrido = 0;
   function distancia() { var k = Object.keys(dedos); return k.length < 2 ? 0 : Math.hypot(dedos[k[0]].x - dedos[k[1]].x, dedos[k[0]].y - dedos[k[1]].y); }
   zona.addEventListener('pointerdown', function (ev) {
+    if (historiaActiva) return;
     if (!dib) return;   // el motor 3D todavía carga
     if (yendo) return;
     dedos[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
@@ -1323,6 +1386,7 @@
     tooltip(null);
   });
   zona.addEventListener('pointermove', function (ev) {
+    if (historiaActiva) return;
     if (!dib) return;   // el motor 3D todavía carga
     var p = dedos[ev.pointerId];
     if (!p) { if (ev.pointerType === 'mouse' && !yendo) tooltip(dib.apartadoEn(ev), ev); return; }
@@ -1375,6 +1439,7 @@
   // en el vacío o ya aislado: encuadre (con la nave norte abierta, en el vacío la cierra)
   var clicPend = null;
   zona.addEventListener('dblclick', function (ev) {
+    if (historiaActiva) return;
     if (yendo || !dib) return;
     if (clicPend) { clearTimeout(clicPend); clicPend = null; }
     if (aislado === 'nave-norte' && !dib.apartadoEn(ev)) { saleAislado(); return; }
@@ -1385,6 +1450,7 @@
   });
   // teclado, con el dibujo enfocado: flechas orbitan, + / − acercan, 0 encuadra
   zona.addEventListener('keydown', function (ev) {
+    if (historiaActiva) return;
     if (!dib) return;   // el motor 3D todavía carga
     if (yendo) return;
     var k = ev.key, hecho = true;

@@ -829,6 +829,75 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     return me;
   }
   function pon(grupo, malla, papel, ap, umbral, extraAristas, estr) { return ponGeos(grupo, geos(malla, papel, umbral, extraAristas), papel, ap, estr); }
+  // Preexistencia, primer corte: Luis confirmó que las dos naves orientales
+  // son las mismas que ya figuran en el levantamiento de Contexto.3dm.
+  // Se construyen completas, sin el recorte del aro propuesto.
+  const historiaGrupo = new THREE.Group();
+  historiaGrupo.name = 'historia-preexistencia-confirmada';
+  historiaGrupo.visible = false;
+  escena.add(historiaGrupo);
+  historiaGrupo.add(new THREE.AmbientLight(0xffffff, 0.7));
+  const historiaLuz = new THREE.DirectionalLight(0xffffff, 0.7);
+  historiaLuz.position.set(-50, 90, 40);
+  historiaGrupo.add(historiaLuz);
+  const historiaBlanco = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  const historiaPiso = new THREE.MeshBasicMaterial({ color: 0x151515, side: THREE.DoubleSide });
+  const historiaContorno = new THREE.LineBasicMaterial({ color: 0xffffff });
+  function ponHistoria(grupo, malla, piso) {
+    const geometria = malla.geo();
+    grupo.add(new THREE.Mesh(geometria, piso ? historiaPiso : historiaBlanco));
+    grupo.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometria, 12), historiaContorno));
+  }
+  const historiaSuelo = new Malla();
+  tapa(historiaSuelo, rect(PB.u0, PB.v0, PB.u1, PB.v1), -0.02);
+  ponHistoria(historiaGrupo, historiaSuelo, true);
+  G.NAVES.forEach((nv, i) => {
+    const g = new THREE.Group(), m = new Malla();
+    g.name = i ? 'nave-oriente-norte' : 'nave-oriente-sur';
+    historiaGrupo.add(g);
+    const paso = (nv.u1 - nv.u0) / nv.n;
+    for (let j = 0; j < nv.n; j++) {
+      const u0 = nv.u0 + j * paso, u1 = u0 + paso, um = (u0 + u1) / 2;
+      const v0 = nv.v0, v1 = nv.v1, a = nv.alero, c = nv.cumbre;
+      const altura = u => a + (c - a) * Math.max(0, 1 - Math.abs(u - um) / (paso / 2));
+      muros(m, rect(u0, v0, u1, v1), 0, 0, altura);
+      m.tri(W(u0, v0, a), W(um, v0, c), W(u1, v0, a));
+      m.tri(W(u1, v1, a), W(um, v1, c), W(u0, v1, a));
+      m.quad(W(u0, v0, a), W(u0, v1, a), W(um, v1, c), W(um, v0, c));
+      m.quad(W(um, v0, c), W(um, v1, c), W(u1, v1, a), W(u1, v0, a));
+    }
+    ponHistoria(g, m, false);
+  });
+  // Masas occidentales interpretadas esquemáticamente de la vista cenital y
+  // oblicua de Earth facilitada por Luis. La calle de servicio central queda
+  // vacía; cotas y cubiertas de estas masas no son medidas constructivas.
+  [
+    { id: 'masa-noroeste-aproximada', planta: [449, 418.5, 522, 487], altura: 6.2 },
+    { id: 'masa-suroeste-aproximada', planta: [449, 323.5, 503.5, 395.5], altura: 6.0 }
+  ].forEach(({ id, planta, altura }) => {
+    const g = new THREE.Group(), m = new Malla();
+    g.name = id; historiaGrupo.add(g);
+    prisma(m, rect(planta[0], planta[1], planta[2], planta[3]), 0, altura);
+    ponHistoria(g, m, false);
+  });
+  let historiaActiva3D = false, historiaVisibleAntes = null, historiaFondoAntes = null;
+  function historiaModo(si) {
+    if (!!si === historiaActiva3D) return;
+    historiaActiva3D = !!si;
+    if (si) {
+      historiaVisibleAntes = new Map(escena.children.filter(o => o !== historiaGrupo).map(o => [o, o.visible]));
+      historiaFondoAntes = escena.background;
+      historiaVisibleAntes.forEach((visible, o) => { o.visible = false; });
+      historiaGrupo.visible = true;
+      escena.background = new THREE.Color('#08090b');
+    } else {
+      historiaGrupo.visible = false;
+      if (historiaVisibleAntes) historiaVisibleAntes.forEach((visible, o) => { o.visible = visible; });
+      escena.background = historiaFondoAntes;
+      historiaVisibleAntes = historiaFondoAntes = null;
+    }
+    pide();
+  }
   // lin: Lineas o una BufferGeometry de segmentos
   function ponLineas(grupo, lin, nombre, color, colorColor, ap, extra) {
     if (lin.isBufferGeometry ? !lin.attributes.position.count : !lin.p.length) return null;
@@ -3711,7 +3780,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   vista(0, AZ, EL);
 
   return {
-    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura, elevacionModo,
+    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura, elevacionModo, historiaModo,
     aisla, partes, ponParte, despiece, aislado: () => aisl ? aisl.ap : null, camara, corta,
     naveNorteEn, apartamentoEn: ev => etapaVivienda4 === 'piso' ? detalle4.apartmentAt(ev) : null,
     muroEn: ev => etapaVivienda4 === 'departamento' ? detalle4.wallAt(ev) : null,

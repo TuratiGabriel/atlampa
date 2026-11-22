@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261119-acuaponia'    # versión de los archivos (para que el navegador no use los viejos)
+V = '20261122-historia-esquema2'    # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -289,6 +289,7 @@ PLANTILLA = '''<!doctype html>
         <p class="ad-fuente">Calles © colaboradores de OpenStreetMap</p>
       </div>
     </details>
+    <button class="hud-presentacion hud-historia" type="button" data-modo-historia aria-pressed="false" aria-keyshortcuts="F9" title="Ver preexistencia esquemática; F9 para regresar al proyecto">Modo historia <span>(F9)</span></button>
     <button class="hud-presentacion" type="button" data-modo-presentacion aria-pressed="false" aria-keyshortcuts="F8" title="Ocultar controles; F8 para recuperarlos">Modo presentación <span>(F8)</span></button>
   </nav>
 

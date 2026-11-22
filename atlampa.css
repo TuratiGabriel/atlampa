@@ -86,6 +86,7 @@ body[data-escena="general"] .hud-ruta{ font-size:13px; }
 .hud-presentacion span{ color:var(--muted); }
 .hud-presentacion:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
 @media (hover:hover){ .hud-presentacion:hover{ border-color:var(--fg); } }
+body:not([data-escena="general"]) .hud-historia{ display:none; }
 /* Los controles siguen en el DOM para las órdenes de Jarvis; sólo se ocultan visualmente. */
 body.modo-presentacion .hud-cabeza,
 body.modo-presentacion .hud-barra,
@@ -95,6 +96,17 @@ body.modo-presentacion .hud-dato-punto,
 body.modo-presentacion .hud-datos-cerrar,
 body.modo-presentacion .ad-ayuda,
 body.modo-presentacion .ad-etiqueta{ display:none !important; }
+.ad-historia-espera{
+  display:none; position:absolute; top:20px; left:20px; z-index:4;
+  background:rgba(8,9,11,.88); border:1px solid #797770; border-radius:6px; color:#e5e1d9;
+  align-items:flex-start; flex-direction:column; gap:4px;
+  padding:10px 14px; pointer-events:none; font:13px var(--font-display);
+}
+.ad-historia-espera__titulo{ font-size:16px; }
+body.modo-historia .ad-3d-esquema,
+body.modo-historia .ad-3d-seccion,
+body.modo-historia .ad-3d-rotulos{ visibility:hidden !important; }
+body.modo-historia .ad-historia-espera{ display:flex; }
 .hud-menu{ position:relative; }
 .hud-menu__t{
   list-style:none; cursor:pointer; display:flex; align-items:center; gap:9px; padding:7px 13px 6px;
