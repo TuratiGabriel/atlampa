@@ -20,10 +20,11 @@ Luis confirmó que toda la manzana es el predio y que las naves orientales ya ex
 | --- | --- | --- | --- |
 | Nave oriental sur | `AtlampaGeo.NAVES[0]` | Alero 6.2 m, cumbrera 9.2 m | Media-alta: medidas de `Contexto.3dm` y confirmación de Luis de que existe. |
 | Nave oriental norte | `AtlampaGeo.NAVES[1]` | Alero 6.2 m, cumbrera 9.2 m | Media-alta: igual. |
-| Conjunto noroccidental | Envolvente `449,419,522,487`; cuatro cubiertas principales y dos casetas | Cubiertas de 4.8 a 7.8 m aproximados | Baja: interpretación de Earth cenital y oblicuo. |
-| Conjunto suroccidental | Envolvente `449,324,503,395`; volumen principal, dos anexos, hueco intermedio y monitor de cubierta | Cubiertas de 4.5 a 6.8 m aproximados | Baja: interpretación de Earth cenital y oblicuo. |
+| Conjunto noroccidental | Envolvente `449,419,522,487`; cobertizo largo de Fresno con caída hacia el patio, dos vacíos, tres naves cortas y alas en L | Cubiertas de 5.0 a 7.6 m aproximados | Media para forma relativa por Earth 3D; baja para posición y altura exactas. |
+| Conjunto suroccidental | Envolvente `449,324,503,395`; huella en L, franja sur más alta, vacío y monitor de cubierta | Cubiertas de 5.5 a 9.0 m aproximados | Media para forma relativa por Earth 3D; baja para posición y altura exactas. |
+| Franja ferroviaria y portones | Eje `ESPUELA` del visor, dentro del predio por `v≈405`; portones al oeste y este de la franja central | Rieles a nivel de suelo, cerramientos de 3.2 m esquemáticos | Media para la existencia de rieles y cierres según vista Earth y calles Fresno/Sabino; baja para alturas y posición precisa. |
 
-Los conjuntos occidentales son **volúmenes de lectura**, no un levantamiento por edificio. Su división interna y alturas tienen tolerancia visual aproximada de varios metros. La franja de servicio transversal y el hueco del conjunto suroeste quedan libres según la vista aérea. No se representaron materiales ni fachadas que Earth no permite distinguir.
+Los conjuntos occidentales son **volúmenes de lectura**, no un levantamiento por edificio. Su división interna y alturas tienen tolerancia visual aproximada de varios metros. La franja transversal conserva los rieles, pero se cierra con portones esquemáticos en Fresno y Sabino; no se presenta como paso libre. No se representaron materiales ni fachadas que Earth no permite distinguir. Las capturas de calle corresponden a mayo de 2022 (Sabino) y agosto de 2024 (Fresno); sus fechas difieren de la imagen 3D sin fecha visible.
 
 ## Registro por elemento
 
@@ -48,6 +49,6 @@ Cada elemento que se acepte llevará estos campos:
 
 ## Ensayo manual del primer corte
 
-Abrir el visor normal en el predio y pulsar **Modo historia** o **F9**. El control activa temporalmente Modo presentación y muestra la preexistencia blanca, sin controles. Pulsar **F9** de nuevo para volver al proyecto BIM y al estado previo de Modo presentación. Si Modo presentación ya estaba activo, F9 entra y sale sin revelar sus controles; **F8** sigue recuperándolos. Desde un apartado aislado la entrada se rechaza hasta volver al predio general.
+Abrir el visor normal en el predio y pulsar **Modo historia** o **F9**. El control activa temporalmente Modo presentación y muestra la preexistencia blanca con los controles de cámara. Arrastrar para orbitar, Shift + arrastrar para mover, rueda o botones para zoom; doble clic o 0 para encuadrar. Pulsar **F9** de nuevo para volver al proyecto BIM y al estado previo de Modo presentación. Si Modo presentación ya estaba activo, F9 entra y sale sin revelar sus otros controles; **F8** sigue recuperándolos. Desde un apartado aislado la entrada se rechaza hasta volver al predio general.
 
-Contrato para integraciones posteriores: `AtlampaControl.enterStoryMode()` exige predio general y Modo presentación ya activo; `exitStoryMode()` restaura la escena. `getState().storyMode` informa la entrada de forma inmediata; `getAvailableActions().actions` contiene solo `exitStoryMode` durante Historia. Los controles BIM rechazados responden `story_mode_active`.
+Contrato para integraciones posteriores: `AtlampaControl.enterStoryMode()` exige predio general y Modo presentación ya activo; `exitStoryMode()` restaura la escena. `getState().storyMode` informa la entrada de forma inmediata; `getAvailableActions().actions` contiene `orbit`, `pan`, `zoom` y `exitStoryMode` durante Historia. Los demás controles BIM rechazados responden `story_mode_active`.

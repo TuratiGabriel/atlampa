@@ -881,23 +881,50 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     prisma(m, rect(planta[0], planta[1], planta[2], planta[3]), z0, z1);
     ponHistoria(g, m, false);
   }
+  function cobertizoHistoria(grupo, id, planta, altoOeste, altoEste) {
+    const [u0, v0, u1, v1] = planta, g = new THREE.Group(), m = new Malla();
+    g.name = id; grupo.add(g);
+    muros(m, rect(u0, v0, u1, v1), 0, 0, u => altoOeste + (altoEste - altoOeste) * (u - u0) / (u1 - u0));
+    m.quad(W(u0, v0, altoOeste), W(u1, v0, altoEste), W(u1, v1, altoEste), W(u0, v1, altoOeste));
+    ponHistoria(g, m, false);
+  }
   const noroeste = new THREE.Group();
   noroeste.name = 'conjunto-noroeste-earth'; historiaGrupo.add(noroeste);
-  bloqueHistoria(noroeste, 'cubierta-oeste', [449, 419, 472, 487], 0, 5.4);
-  bloqueHistoria(noroeste, 'cubierta-centro', [472, 419, 496, 487], 0, 6.2);
-  // Franja central de lámina con cumbrera visible; al norte queda una cubierta
-  // baja con dos casetas que se distinguen en la imagen cenital.
-  naveHistoria(noroeste, { u0: 496, u1: 522, v0: 419, v1: 458, n: 1, alero: 6.3, cumbre: 7.8 });
-  bloqueHistoria(noroeste, 'azotea-norte', [496, 458, 522, 487], 0, 4.8);
-  bloqueHistoria(noroeste, 'caseta-1', [499, 475, 506, 483], 4.8, 6.2);
-  bloqueHistoria(noroeste, 'caseta-2', [510, 463, 517, 471], 4.8, 5.9);
+  // Cobertizo largo de Fresno: la cubierta baja hacia el patio interior.
+  cobertizoHistoria(noroeste, 'cubierta-fresno-inclinada', [449, 419, 469, 487], 7.2, 5.5);
+  bloqueHistoria(noroeste, 'ala-norte', [469, 468, 491, 487], 0, 5.2);
+  bloqueHistoria(noroeste, 'anexo-suroeste', [469, 419, 478, 441], 0, 5.8);
+  // Tres naves cortas separadas por juntas; las dos mayores del este vienen de G.NAVES.
+  naveHistoria(noroeste, { u0: 479, u1: 496, v0: 419, v1: 458, n: 1, alero: 6.3, cumbre: 7.6 });
+  naveHistoria(noroeste, { u0: 498, u1: 509, v0: 419, v1: 458, n: 1, alero: 5.9, cumbre: 7.5 });
+  naveHistoria(noroeste, { u0: 510, u1: 521, v0: 419, v1: 458, n: 1, alero: 5.9, cumbre: 7.5 });
+  bloqueHistoria(noroeste, 'ala-patio-oeste', [492, 462, 499, 487], 0, 5.0);
+  bloqueHistoria(noroeste, 'ala-patio-norte', [499, 479, 522, 487], 0, 5.2);
+  bloqueHistoria(noroeste, 'ala-patio-este', [516, 462, 522, 479], 0, 5.0);
 
   const suroeste = new THREE.Group();
   suroeste.name = 'conjunto-suroeste-earth'; historiaGrupo.add(suroeste);
-  bloqueHistoria(suroeste, 'cubierta-principal', [449, 324, 484, 395], 0, 6.0);
-  bloqueHistoria(suroeste, 'anexo-norte', [484, 367, 503, 395], 0, 4.5);
-  bloqueHistoria(suroeste, 'anexo-sur', [484, 324, 503, 342], 0, 4.5);
-  bloqueHistoria(suroeste, 'monitor-de-cubierta', [452, 329, 459, 357], 6.0, 6.8);
+  bloqueHistoria(suroeste, 'cubierta-principal', [449, 345, 484, 395], 0, 6.0);
+  bloqueHistoria(suroeste, 'franja-sur-dos-niveles', [449, 324, 503, 345], 0, 9.0);
+  bloqueHistoria(suroeste, 'ala-hacia-naves', [484, 372, 503, 395], 0, 5.5);
+  bloqueHistoria(suroeste, 'monitor-de-cubierta', [452, 349, 459, 376], 6.0, 6.8);
+  // Reutiliza el eje ferroviario ESPUELA del visor, al nivel original del suelo;
+  // la pasarela elevada del proyecto queda oculta durante Historia.
+  const rielesHistoria = new Lineas(), ejeVias = ESPUELA[ESPUELA.length - 1][1];
+  for (const lado of [-0.72, 0.72]) rielesHistoria.seg(W(PB.u0, ejeVias + lado, 0.12), W(ESP_FIN, ejeVias + lado, 0.12));
+  for (let u = PB.u0 + 0.5; u < ESP_FIN; u += 1.6) rielesHistoria.seg(W(u, ejeVias - 1.3, 0.1), W(u, ejeVias + 1.3, 0.1));
+  const viasHistoria = new THREE.LineSegments(rielesHistoria.geo(), historiaContorno);
+  viasHistoria.name = 'vias-existentes-eje-espuela'; historiaGrupo.add(viasHistoria);
+  function portonHistoria(id, u) {
+    const lineas = new Lineas(), v0 = 396.6, v1 = 417.5, alto = 3.2;
+    for (const v of [v0, v1]) lineas.seg(W(u, v, 0.1), W(u, v, alto));
+    for (const h of [0.2, alto]) lineas.seg(W(u, v0, h), W(u, v1, h));
+    for (let v = v0 + 1.2; v < v1; v += 1.2) lineas.seg(W(u, v, 0.2), W(u, v, alto));
+    const puerta = new THREE.LineSegments(lineas.geo(), historiaContorno);
+    puerta.name = id; historiaGrupo.add(puerta);
+  }
+  portonHistoria('porton-fresno', PB.u0 + 0.4);
+  portonHistoria('porton-sabino', PB.u1 - 0.4);
   let historiaActiva3D = false, historiaVisibleAntes = null, historiaFondoAntes = null;
   function historiaModo(si) {
     if (!!si === historiaActiva3D) return;
