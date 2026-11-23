@@ -29,6 +29,15 @@ Contar, mediante la proyección 3D y gestos, la transformación del predio desde
 - **BIM3D-Jarvis:** conservar la orden de despliegue; la integración de «retrocede en el tiempo» queda pendiente hasta que exista preexistencia visible. No añadir comandos de voz para avanzar la secuencia.
 - **BIM3D-Asesor:** coordinar contratos, preguntas, dependencias, revisión cruzada y seguimiento de rama/PR.
 
+## Instrucción de uso eficiente de recursos · 22-nov-2026
+
+1. Una sola unidad técnica y **un solo chat implementador activo** a la vez. Durante el levantamiento, ese chat es Visualizador; Presentación, Jarvis y Técnico esperan hasta que su dependencia sea real.
+2. Antes de cada unidad, fijar un resultado pequeño y verificable, sus fuentes y la prueba mínima necesaria. Reutilizar el inventario de Earth, los linderos confirmados y las decisiones de Luis; no volver a explorar o resumir todo el historial.
+3. Para la preexistencia, modelar solo huellas, masas y cubiertas reconocibles con el estilo blanco del visor. Marcar estimaciones brevemente; no perseguir precisión constructiva ni repetir capturas de Earth sin una duda concreta.
+4. Ejecutar una validación automática y un recorrido visual dirigido después de cada cambio; repetir solo si falla o cambia el código. Compartir entre chats un único contrato y un informe corto, sin pruebas duplicadas.
+5. Consultar cuota vigente antes de iniciar una unidad que incluya Jarvis y reservar capacidad para pruebas, revisión y cierre según su AGENTS.md. Si la unidad completa no cabe, detenerla antes de editar. El reinicio de cuota no autoriza por sí solo abrir trabajo no solicitado.
+6. Asesor reportará avance por hito y bloqueo concreto, sin polling narrado ni trabajo paralelo innecesario. La siguiente unidad depende de las fotos y de la revisión del primer corte por Luis.
+
 ## Primer corte verificable
 
 El primer corte debe mostrar huellas y volúmenes del estado actual respaldados por Earth/fotos, etiquetando estimaciones y vacíos de información. No se aceptará una escena vacía como resultado final del Paso 1. El submodo puede existir en estructura, pero la voz y los gestos de Historia no se activarán todavía. El paso al proyecto actual conservará el contrato existente del visor.
