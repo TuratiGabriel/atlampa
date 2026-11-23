@@ -925,21 +925,27 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   }
   portonHistoria('porton-fresno', PB.u0 + 0.4);
   portonHistoria('porton-sabino', PB.u1 - 0.4);
-  let historiaActiva3D = false, historiaVisibleAntes = null, historiaFondoAntes = null;
+  let historiaActiva3D = false, historiaVisibleAntes = null, historiaRaizAntes = null, historiaFondoAntes = null;
   function historiaModo(si) {
     if (!!si === historiaActiva3D) return;
     historiaActiva3D = !!si;
     if (si) {
       historiaVisibleAntes = new Map(escena.children.filter(o => o !== historiaGrupo).map(o => [o, o.visible]));
+      historiaRaizAntes = new Map(raizG.children.map(o => [o, o.visible]));
       historiaFondoAntes = escena.background;
       historiaVisibleAntes.forEach((visible, o) => { o.visible = false; });
+      historiaRaizAntes.forEach((visible, o) => { if (o !== ext.grupoContexto) o.visible = false; });
+      // El contexto urbano es el mismo grupo del proyecto, sin duplicar edificios.
+      raizG.visible = true;
       historiaGrupo.visible = true;
       escena.background = new THREE.Color('#08090b');
     } else {
       historiaGrupo.visible = false;
+      if (historiaRaizAntes) historiaRaizAntes.forEach((visible, o) => { if (o !== ext.grupoContexto) o.visible = visible; });
       if (historiaVisibleAntes) historiaVisibleAntes.forEach((visible, o) => { o.visible = visible; });
+      if (ext.vista) ext.vista(X);
       escena.background = historiaFondoAntes;
-      historiaVisibleAntes = historiaFondoAntes = null;
+      historiaVisibleAntes = historiaRaizAntes = historiaFondoAntes = null;
     }
     pide();
   }

@@ -89,13 +89,13 @@
   function estadoHistoria() {
     return { ok: true, storyMode: historiaActiva, storyStage: historiaActiva ? 'schematic_preexistence' : null,
       storyStep: null, storyTransitioning: false, sceneReady: false, visibleElements: historiaActiva ? 4 : 0,
-      storyAvailableActions: historiaActiva ? ['orbit', 'pan', 'zoom', 'exitStoryMode'] : [] };
+      storyAvailableActions: historiaActiva ? (prendida('contexto') ? ['orbit', 'zoom', 'setUrbanContext', 'exitStoryMode'] : ['orbit', 'pan', 'zoom', 'setUrbanContext', 'exitStoryMode']) : [] };
   }
   function entrarHistoria() {
     if (historiaActiva) return { ok: true, alreadyActive: true, ...estadoHistoria() };
     if (!modoPresentacion) return { ok: false, reason: 'requires_presentation_mode' };
     if (!dib || !dib.historiaModo || yendo) return { ok: false, reason: 'not_ready' };
-    if (ESCENA !== 'general' || aislado || prendida('contexto')) return { ok: false, reason: 'requires_predio' };
+    if (ESCENA !== 'general' || aislado) return { ok: false, reason: 'requires_predio' };
     if (urbanRotationActive) stopUrbanRotation();
     cierraMenus(); cierraDatos(true); tooltip(null);
     dib.historiaModo(true);
@@ -283,6 +283,7 @@
     [].forEach.call(n ? document.querySelectorAll('[data-capa="' + n + '"]') : [b], function (x) { x.setAttribute('aria-pressed', String(si)); });
     // la leyenda muestra sólo lo de las capas prendidas
     if (n) document.body.classList.toggle('sin-' + n, !si);
+    if (n === 'contexto') [].forEach.call(document.querySelectorAll('[data-historia-contexto]'), function (x) { x.setAttribute('aria-pressed', String(si)); });
   }
   // (los postes y el contexto son independientes: uno no apaga al otro)
   function ponContexto(si, inmediato) {
@@ -988,11 +989,12 @@
     else if (aislado && !yendo) saleAislado();
   });
   document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-modo-historia], [data-modo-presentacion], [data-capa], [data-fachada], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte], [data-v4-separa], [data-v4-piso], [data-v4-depto], [data-v4-muro], [data-v4-explota], [data-v4-reinicia], [data-uso-separa], [data-uso-piso], [data-uso-zona], [data-ver-piso], [data-subuso]');
+    var b = ev.target.closest('[data-modo-historia], [data-historia-contexto], [data-modo-presentacion], [data-capa], [data-fachada], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte], [data-v4-separa], [data-v4-piso], [data-v4-depto], [data-v4-muro], [data-v4-explota], [data-v4-reinicia], [data-uso-separa], [data-uso-piso], [data-uso-zona], [data-ver-piso], [data-subuso]');
     if (!b) return;
     if (urbanRotationActive) stopUrbanRotation();
     if (b.hasAttribute('data-modo-historia')) { previsualizaHistoria(); return; }
     if (b.hasAttribute('data-modo-presentacion')) { ponModoPresentacion(!modoPresentacion); return; }
+    if (b.hasAttribute('data-historia-contexto')) { if (historiaActiva) ponContexto(!prendida('contexto')); return; }
     if (historiaActiva && !b.hasAttribute('data-zoom')) return;
     if (!dib) return;
     if (b.hasAttribute('data-fachada')) { seleccionaFachada(b.getAttribute('data-fachada')); return; }
@@ -1238,7 +1240,6 @@
     orbit: function (deltaAzDeg, deltaElDeg) {
       if (!controlListo()) return { ok: false, reason: 'not_ready' };
       if (!Number.isFinite(deltaAzDeg) || !Number.isFinite(deltaElDeg)) return { ok: false, reason: 'invalid_delta' };
-      if (prendida('contexto') && deltaElDeg) return { ok: false, reason: 'context_only_rotate_y' };
       var da = Math.max(-30, Math.min(30, deltaAzDeg));
       var de = Math.max(-30, Math.min(30, deltaElDeg));
       if (da) rapido = true; // usa TAU_MANO y la ruta rápida, no las flechas de 15°
@@ -1247,7 +1248,7 @@
     },
     pan: function (dx, dy) {
       if (!controlListo()) return {ok:false,reason:'not_ready'};
-      if (prendida('contexto')) return {ok:false,reason:'context_only_rotate_y'};
+      if (prendida('contexto')) return {ok:false,reason:'context_pan_unavailable'};
       if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > 0.15 || Math.abs(dy) > 0.15)
         return {ok:false,reason:'invalid_delta'};
       dib.mueve(dx, dy);
@@ -1256,7 +1257,6 @@
     },
     zoom: function (factor) {
       if (!controlListo()) return { ok: false, reason: 'not_ready' };
-      if (prendida('contexto')) return {ok:false,reason:'context_only_rotate_y'};
       if (!Number.isFinite(factor) || factor < 0.8 || factor > 1.25) return { ok: false, reason: 'invalid_factor' };
       acerca(factor);
       return { ok: true, factor: factor };
@@ -1312,10 +1312,11 @@
       return r.ok ? { ok: true, progress: 1, stage: 'capas', layers: r.layers } : r;
     },
     getAvailableActions: function () {
-      if (historiaActiva) return { ok: true, stage: 'story_schematic_preexistence', storyMode: true, sceneReady: false, actions: ['orbit', 'pan', 'zoom', 'exitStoryMode'] };
+      if (historiaActiva) return { ok: true, stage: 'story_schematic_preexistence', storyMode: true, sceneReady: false,
+        actions: prendida('contexto') ? ['orbit', 'zoom', 'setUrbanContext', 'exitStoryMode'] : ['orbit', 'pan', 'zoom', 'setUrbanContext', 'exitStoryMode'] };
       var comunes = ['orbit', 'pan', 'zoom'];
-      if (prendida('contexto')) return { ok: true, stage: 'contexto', orbitAxis: 'y',
-        actions: ['orbit', 'resetDetail', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation'] };
+      if (prendida('contexto')) return { ok: true, stage: 'contexto',
+        actions: ['orbit', 'zoom', 'resetDetail', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation'] };
       if (!aislado && ESCENA !== 'general') return { ok: true, stage: 'apartado_sin_aislar', actions: comunes.concat(['resetDetail']) };
       if (!aislado) return { ok: true, stage: 'predio', actions: comunes.concat(['setUrbanContext', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation', 'isolateUse', 'resetDetail'], modoPresentacion ? ['enterStoryMode'] : []) };
       if (aislado === 'vivienda') {
@@ -1348,7 +1349,7 @@
     var original = window.AtlampaControl[name];
     if (typeof original !== 'function') return;
     window.AtlampaControl[name] = function () {
-      if (historiaActiva && !['orbit', 'pan', 'zoom'].includes(name)) return { ok: false, reason: 'story_mode_active' };
+      if (historiaActiva && !['orbit', 'pan', 'zoom', 'setUrbanContext'].includes(name)) return { ok: false, reason: 'story_mode_active' };
       var result = original.apply(this, arguments);
       if (result && result.ok && urbanRotationActive) stopUrbanRotation();
       return result;

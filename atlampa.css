@@ -98,6 +98,10 @@ body.modo-presentacion .ad-ayuda,
 body.modo-presentacion .ad-etiqueta{ display:none !important; }
 /* Historia conserva los controles de cámara para recorrer la preexistencia. */
 body.modo-presentacion.modo-historia .hud-camara{ display:flex !important; }
+.ad-context-toggle{ display:none; padding:7px 10px; min-height:28px; color:var(--muted); background:rgba(8,9,11,.94); border:1px solid rgba(255,255,255,.25); border-radius:6px; font:13px var(--font-display); white-space:nowrap; }
+body.modo-historia .ad-context-toggle{ display:block; }
+.ad-context-toggle[aria-pressed="true"]{ color:var(--fg); border-color:var(--fg); }
+.ad-context-toggle:focus-visible{ outline:1px solid var(--fg); outline-offset:2px; }
 body.modo-historia .ad-3d-esquema,
 body.modo-historia .ad-3d-seccion,
 body.modo-historia .ad-3d-rotulos{ visibility:hidden !important; }
