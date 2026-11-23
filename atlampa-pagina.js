@@ -86,12 +86,6 @@
   var modoPresentacion = lee('atlampa-modo-presentacion') === true;
   var historiaActiva = false;
   var historiaPresentacionAnterior = null;
-  var historiaAviso = document.createElement('div');
-  historiaAviso.className = 'ad-historia-espera';
-  historiaAviso.setAttribute('role', 'status');
-  historiaAviso.setAttribute('aria-live', 'polite');
-  historiaAviso.innerHTML = '<span class="ad-historia-espera__titulo">Modo historia · preexistencia esquemática</span><span>Naves orientales confirmadas; masas occidentales aproximadas desde Earth</span>';
-  trabajo.appendChild(historiaAviso);
   function estadoHistoria() {
     return { ok: true, storyMode: historiaActiva, storyStage: historiaActiva ? 'schematic_preexistence' : null,
       storyStep: null, storyTransitioning: false, sceneReady: false, visibleElements: historiaActiva ? 4 : 0,
