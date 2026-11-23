@@ -851,10 +851,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const historiaSuelo = new Malla();
   tapa(historiaSuelo, rect(PB.u0, PB.v0, PB.u1, PB.v1), -0.02);
   ponHistoria(historiaGrupo, historiaSuelo, true);
-  G.NAVES.forEach((nv, i) => {
+  function naveHistoria(grupo, nv) {
     const g = new THREE.Group(), m = new Malla();
-    g.name = i ? 'nave-oriente-norte' : 'nave-oriente-sur';
-    historiaGrupo.add(g);
+    grupo.add(g);
     const paso = (nv.u1 - nv.u0) / nv.n;
     for (let j = 0; j < nv.n; j++) {
       const u0 = nv.u0 + j * paso, u1 = u0 + paso, um = (u0 + u1) / 2;
@@ -867,19 +866,38 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       m.quad(W(um, v0, c), W(um, v1, c), W(u1, v1, a), W(u1, v0, a));
     }
     ponHistoria(g, m, false);
+  }
+  G.NAVES.forEach((nv, i) => {
+    const g = new THREE.Group();
+    g.name = i ? 'nave-oriente-norte' : 'nave-oriente-sur';
+    historiaGrupo.add(g); naveHistoria(g, nv);
   });
-  // Masas occidentales interpretadas esquemáticamente de la vista cenital y
-  // oblicua de Earth facilitada por Luis. La calle de servicio central queda
-  // vacía; cotas y cubiertas de estas masas no son medidas constructivas.
-  [
-    { id: 'masa-noroeste-aproximada', planta: [449, 418.5, 522, 487], altura: 6.2 },
-    { id: 'masa-suroeste-aproximada', planta: [449, 323.5, 503.5, 395.5], altura: 6.0 }
-  ].forEach(({ id, planta, altura }) => {
+  // La vista de Earth muestra dos conjuntos al oeste, separados de las naves
+  // del este y por un callejón transversal. Sus subdivisiones y alturas son
+  // aproximaciones de lectura, no datos constructivos medidos.
+  function bloqueHistoria(grupo, id, planta, z0, z1) {
     const g = new THREE.Group(), m = new Malla();
-    g.name = id; historiaGrupo.add(g);
-    prisma(m, rect(planta[0], planta[1], planta[2], planta[3]), 0, altura);
+    g.name = id; grupo.add(g);
+    prisma(m, rect(planta[0], planta[1], planta[2], planta[3]), z0, z1);
     ponHistoria(g, m, false);
-  });
+  }
+  const noroeste = new THREE.Group();
+  noroeste.name = 'conjunto-noroeste-earth'; historiaGrupo.add(noroeste);
+  bloqueHistoria(noroeste, 'cubierta-oeste', [449, 419, 472, 487], 0, 5.4);
+  bloqueHistoria(noroeste, 'cubierta-centro', [472, 419, 496, 487], 0, 6.2);
+  // Franja central de lámina con cumbrera visible; al norte queda una cubierta
+  // baja con dos casetas que se distinguen en la imagen cenital.
+  naveHistoria(noroeste, { u0: 496, u1: 522, v0: 419, v1: 458, n: 1, alero: 6.3, cumbre: 7.8 });
+  bloqueHistoria(noroeste, 'azotea-norte', [496, 458, 522, 487], 0, 4.8);
+  bloqueHistoria(noroeste, 'caseta-1', [499, 475, 506, 483], 4.8, 6.2);
+  bloqueHistoria(noroeste, 'caseta-2', [510, 463, 517, 471], 4.8, 5.9);
+
+  const suroeste = new THREE.Group();
+  suroeste.name = 'conjunto-suroeste-earth'; historiaGrupo.add(suroeste);
+  bloqueHistoria(suroeste, 'cubierta-principal', [449, 324, 484, 395], 0, 6.0);
+  bloqueHistoria(suroeste, 'anexo-norte', [484, 367, 503, 395], 0, 4.5);
+  bloqueHistoria(suroeste, 'anexo-sur', [484, 324, 503, 342], 0, 4.5);
+  bloqueHistoria(suroeste, 'monitor-de-cubierta', [452, 329, 459, 357], 6.0, 6.8);
   let historiaActiva3D = false, historiaVisibleAntes = null, historiaFondoAntes = null;
   function historiaModo(si) {
     if (!!si === historiaActiva3D) return;

@@ -1,6 +1,6 @@
 # Levantamiento de la preexistencia · Atlampa
 
-Estado al 22 de noviembre de 2026: **dos naves orientales confirmadas por Luis; resto en levantamiento**. La reconstrucción es esquemática y usa el estilo vigente del visor.
+Estado al 22 de noviembre de 2026: **cuatro conjuntos preexistentes representados de forma esquemática**. Google Earth es la única fuente visual disponible; Luis confirmó los linderos y que las dos naves orientales ya existen. La reconstrucción usa el estilo blanco del visor.
 
 ## Marco espacial
 
@@ -12,18 +12,18 @@ Estado al 22 de noviembre de 2026: **dos naves orientales confirmadas por Luis; 
 | Linderos confirmados por Luis | Toda la manzana central: Fresno al oeste, Sabino al este, Clavel al sur y Eulalia Guzmán al norte | Identifica el predio en la vista de Earth. Falta amarrar sus cuatro esquinas a coordenadas globales. |
 | Naves orientales confirmadas por Luis | `AtlampaGeo.NAVES[0]` al sur y `[1]` al norte: son las naves que ya existen al este del predio | Se representan completas, sin el recorte del aro propuesto. La fuente de medidas es `Contexto.3dm` y la continuidad existente la confirmó Luis. |
 | [Earth 3D, vista oblicua](https://earth.google.com/web/@19.45808797,-99.15880448,2240.39288521a,204.55874727d,35y,137.79997545h,59.99666536t,0r/data=CgRCAggBQgIIAEoNCP___________wEQAA) | Cubiertas de naves y otras masas bajas legibles; la perspectiva sirve para contrastar órdenes de altura | No permite medir todavía alturas exactas ni fecha de imagen. |
-| Earth, vista cenital acercada | Dos conjuntos occidentales grandes, uno al norte y otro al sur; separación central de servicio | Huellas y alturas aproximadas para el esquema, pendientes de fotos. |
+| [Earth, vista cenital acercada](https://earth.google.com/web/@19.4580553,-99.15882018,2240.64176136a,485.93236985d,35y,0h,0t,0r/data=CgRCAggBQgIIAEoNCP___________wEQAA) | Dos conjuntos occidentales, uno al norte y otro al sur; franja transversal de servicio, cubiertas fragmentadas y un hueco en el conjunto suroeste | Base visual del esquema. La fecha de captura de la imagen no aparece en la vista consultada. |
 
-Luis confirmó que toda la manzana es el predio y que las naves orientales ya existen. Para un primer relato visual se representan también dos masas occidentales aproximadas. Todo el estado inicial va en blanco, con sombras y contornos; los colores de uso pertenecen a etapas narrativas posteriores.
+Luis confirmó que toda la manzana es el predio y que las naves orientales ya existen. Los dos conjuntos occidentales se descomponen en cubiertas de distinta altura, anexos y huecos visibles en Earth. Todo el estado inicial va en blanco, con sombras y contornos; los colores de uso pertenecen a etapas narrativas posteriores.
 
 | Elemento esquemático | Huella local `u0,v0,u1,v1` | Altura | Confianza |
 | --- | --- | --- | --- |
 | Nave oriental sur | `AtlampaGeo.NAVES[0]` | Alero 6.2 m, cumbrera 9.2 m | Media-alta: medidas de `Contexto.3dm` y confirmación de Luis de que existe. |
 | Nave oriental norte | `AtlampaGeo.NAVES[1]` | Alero 6.2 m, cumbrera 9.2 m | Media-alta: igual. |
-| Masa noroccidental | `449,418.5,522,487` | 6.2 m aproximados | Baja: interpretación de Earth cenital/oblicuo; fotos pendientes. |
-| Masa suroccidental | `449,323.5,503.5,395.5` | 6.0 m aproximados | Baja: interpretación de Earth cenital/oblicuo; fotos pendientes. |
+| Conjunto noroccidental | Envolvente `449,419,522,487`; cuatro cubiertas principales y dos casetas | Cubiertas de 4.8 a 7.8 m aproximados | Baja: interpretación de Earth cenital y oblicuo. |
+| Conjunto suroccidental | Envolvente `449,324,503,395`; volumen principal, dos anexos, hueco intermedio y monitor de cubierta | Cubiertas de 4.5 a 6.8 m aproximados | Baja: interpretación de Earth cenital y oblicuo. |
 
-Las dos masas occidentales son **volúmenes de lectura**, no un levantamiento por edificio ni una afirmación de cubierta plana exacta. La franja de servicio central queda libre según la vista aérea.
+Los conjuntos occidentales son **volúmenes de lectura**, no un levantamiento por edificio. Su división interna y alturas tienen tolerancia visual aproximada de varios metros. La franja de servicio transversal y el hueco del conjunto suroeste quedan libres según la vista aérea. No se representaron materiales ni fachadas que Earth no permite distinguir.
 
 ## Registro por elemento
 
@@ -38,14 +38,13 @@ Cada elemento que se acepte llevará estos campos:
 | Confianza | Alta: medida/corroborada; media: concordancia de al menos dos vistas; baja: inferencia visual. Solo la geometría respaldada se mostrará como tal. |
 | Contradicciones | Imágenes de fechas distintas, cambio de ocupación o discrepancia con lindero. Se elevan a Luis antes de modelar. |
 
-## Pendientes para poder dibujar
+## Pendientes de validación
 
-1. Fotografías de Luis y fechas aproximadas de captura.
-2. Fecha de la imagen de Google Earth usada como estado de partida.
-3. Dos puntos de control identificables en Earth y en el visor para amarrar las cuatro esquinas de la manzana confirmada.
-4. Orden narrativo de qué se demuele, conserva, transforma o agrega. No se deduce de la propuesta BIM.
+1. Fecha de captura de la imagen de Google Earth usada como estado de partida; no está visible en la interfaz consultada.
+2. Dos puntos de control identificables en Earth y en el visor si después se requiere georreferenciación exacta. Por ahora basta la alineación esquemática a los cuatro linderos confirmados.
+3. Orden narrativo de qué se demuele, conserva, transforma o agrega. No se deduce de la propuesta BIM.
 
-El primer corte de `Modo historia` muestra los cuatro volúmenes esquemáticos y el suelo del predio. `sceneReady:false` indica que faltan fotos, fecha de imagen y validación de las masas occidentales.
+`Modo historia` muestra los cuatro conjuntos esquemáticos y el suelo del predio. `sceneReady:false` indica que la fecha de imagen y las alturas/divisiones occidentales siguen estimadas; no impide revisar visualmente el primer corte.
 
 ## Ensayo manual del primer corte
 
