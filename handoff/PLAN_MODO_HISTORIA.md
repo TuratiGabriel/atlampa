@@ -1,5 +1,7 @@
 # Modo historia · plan de trabajo
 
+> Antecedente del primer levantamiento. La narrativa de tres etapas, el calendario y las decisiones vigentes están en [PLAN_PRESENTACION_FINAL.md](PLAN_PRESENTACION_FINAL.md). Las indicaciones anteriores que reservaban voz y gestos para una fase futura ya fueron superadas por las decisiones de Luis del 24 de noviembre.
+
 Estado: planificación y levantamiento inicial. Rama de trabajo: `interfaz-ux`. No publicar en `master` durante el desarrollo. Prioridad vigente de Luis: visualizar la preexistencia; voz y gestos de Historia quedan para una fase posterior.
 
 ## Objetivo
