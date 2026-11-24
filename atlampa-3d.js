@@ -840,22 +840,24 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const historiaLuz = new THREE.DirectionalLight(0xffffff, 0.7);
   historiaLuz.position.set(-50, 90, 40);
   historiaGrupo.add(historiaLuz);
-  const historiaBlanco = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  // Toda la preexistencia arranca al 50% de la intensidad blanca anterior.
+  const historiaBlanco = new THREE.MeshLambertMaterial({ color: 0x808080, side: THREE.DoubleSide });
   const historiaPiso = new THREE.MeshBasicMaterial({ color: 0x151515, side: THREE.DoubleSide });
-  const historiaContorno = new THREE.LineBasicMaterial({ color: 0xffffff });
-  function ponHistoria(grupo, malla, piso) {
+  const historiaContorno = new THREE.LineBasicMaterial({ color: 0x808080 });
+  const partesConservadas = [];
+  function ponHistoria(grupo, malla, piso, materiales) {
     const geometria = malla.geo();
-    grupo.add(new THREE.Mesh(geometria, piso ? historiaPiso : historiaBlanco));
-    grupo.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometria, 12), historiaContorno));
+    grupo.add(new THREE.Mesh(geometria, piso ? historiaPiso : (materiales ? materiales.solido : historiaBlanco)));
+    grupo.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometria, 12), materiales ? materiales.contorno : historiaContorno));
   }
   const historiaSuelo = new Malla();
   tapa(historiaSuelo, rect(PB.u0, PB.v0, PB.u1, PB.v1), -0.02);
   ponHistoria(historiaGrupo, historiaSuelo, true);
-  function naveHistoria(grupo, nv) {
-    const g = new THREE.Group(), m = new Malla();
-    grupo.add(g);
+  function naveHistoria(grupo, nv, conservada) {
     const paso = (nv.u1 - nv.u0) / nv.n;
     for (let j = 0; j < nv.n; j++) {
+      const g = new THREE.Group(), m = new Malla();
+      grupo.add(g);
       const u0 = nv.u0 + j * paso, u1 = u0 + paso, um = (u0 + u1) / 2;
       const v0 = nv.v0, v1 = nv.v1, a = nv.alero, c = nv.cumbre;
       const altura = u => a + (c - a) * Math.max(0, 1 - Math.abs(u - um) / (paso / 2));
@@ -864,13 +866,32 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       m.tri(W(u1, v1, a), W(um, v1, c), W(u0, v1, a));
       m.quad(W(u0, v0, a), W(u0, v1, a), W(um, v1, c), W(um, v0, c));
       m.quad(W(um, v0, c), W(um, v1, c), W(u1, v1, a), W(u1, v0, a));
+      const materiales = conservada ? { solido: historiaBlanco.clone(), contorno: historiaContorno.clone() } : null;
+      ponHistoria(g, m, false, materiales);
+      if (conservada) {
+        // Puntos breves sobre cada cubierta: la luz aparece como salpicadura,
+        // sin alterar la geometría ni el color definitivo de las naves.
+        const puntos = [];
+        for (let k = 0; k < 24; k++) {
+          const fu = ((k * 17 + j * 7) % 29 + 0.5) / 29;
+          const fv = ((k * 11 + j * 13) % 31 + 0.5) / 31;
+          const u = u0 + (u1 - u0) * fu, v = v0 + (v1 - v0) * fv;
+          const p = W(u, v, altura(u) + 0.16);
+          puntos.push(p[0], p[1], p[2]);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(puntos, 3));
+        const salpica = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 6, sizeAttenuation: false,
+          transparent: true, opacity: 0, depthTest: false, depthWrite: false }));
+        salpica.visible = false; g.add(salpica);
+        partesConservadas.push({ materiales, salpica });
+      }
     }
-    ponHistoria(g, m, false);
   }
   G.NAVES.forEach((nv, i) => {
     const g = new THREE.Group();
     g.name = i ? 'nave-oriente-norte' : 'nave-oriente-sur';
-    historiaGrupo.add(g); naveHistoria(g, nv);
+    historiaGrupo.add(g); naveHistoria(g, nv, true);
   });
   // La vista de Earth muestra dos conjuntos al oeste, separados de las naves
   // del este y por un callejón transversal. Sus subdivisiones y alturas son
@@ -926,10 +947,49 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   portonHistoria('porton-fresno', PB.u0 + 0.4);
   portonHistoria('porton-sabino', PB.u1 - 0.4);
   let historiaActiva3D = false, historiaVisibleAntes = null, historiaRaizAntes = null, historiaFondoAntes = null;
+  let historiaSalpicaduraToken = 0, historiaNavesIluminadas = false;
+  const historiaTenue = new THREE.Color(0x808080), historiaPlena = new THREE.Color(0xffffff);
+  function historiaNavesResalta(listo) {
+    if (!historiaActiva3D) return { ok: false, reason: 'story_mode_required' };
+    if (historiaNavesIluminadas) return { ok: true, alreadyHighlighted: true, count: partesConservadas.length };
+    historiaNavesIluminadas = true;
+    const token = ++historiaSalpicaduraToken, inicio = performance.now();
+    function cuadroSalpicadura(ahora) {
+      if (token !== historiaSalpicaduraToken || !historiaActiva3D) return;
+      partesConservadas.forEach((parte, i) => {
+        const t = Math.max(0, Math.min(1, (ahora - inicio - i * 85) / 450));
+        const suave = t * t * (3 - 2 * t);
+        parte.materiales.solido.color.copy(historiaTenue).lerp(historiaPlena, suave);
+        parte.materiales.contorno.color.copy(historiaTenue).lerp(historiaPlena, suave);
+        const pulso = Math.sin(Math.PI * t);
+        parte.salpica.material.opacity = Math.max(0, pulso) * 0.9;
+        parte.salpica.visible = pulso > 0.02;
+      });
+      pide();
+      if (ahora - inicio < 850) requestAnimationFrame(cuadroSalpicadura);
+      else {
+        partesConservadas.forEach(parte => {
+          parte.materiales.solido.color.copy(historiaPlena);
+          parte.materiales.contorno.color.copy(historiaPlena);
+          parte.salpica.visible = false;
+        });
+        pide(); if (listo) listo();
+      }
+    }
+    requestAnimationFrame(cuadroSalpicadura);
+    return { ok: true, pending: true, count: partesConservadas.length };
+  }
   function historiaModo(si) {
     if (!!si === historiaActiva3D) return;
     historiaActiva3D = !!si;
+    ++historiaSalpicaduraToken;
     if (si) {
+      historiaNavesIluminadas = false;
+      partesConservadas.forEach(parte => {
+        parte.materiales.solido.color.copy(historiaTenue);
+        parte.materiales.contorno.color.copy(historiaTenue);
+        parte.salpica.material.opacity = 0; parte.salpica.visible = false;
+      });
       historiaVisibleAntes = new Map(escena.children.filter(o => o !== historiaGrupo).map(o => [o, o.visible]));
       historiaRaizAntes = new Map(raizG.children.map(o => [o, o.visible]));
       historiaFondoAntes = escena.background;
@@ -3831,7 +3891,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   vista(0, AZ, EL);
 
   return {
-    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura, elevacionModo, historiaModo,
+    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura, elevacionModo, historiaModo, historiaNavesResalta,
     aisla, partes, ponParte, despiece, aislado: () => aisl ? aisl.ap : null, camara, corta,
     naveNorteEn, apartamentoEn: ev => etapaVivienda4 === 'piso' ? detalle4.apartmentAt(ev) : null,
     muroEn: ev => etapaVivienda4 === 'departamento' ? detalle4.wallAt(ev) : null,
