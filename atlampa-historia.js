@@ -781,7 +781,7 @@ export async function crea(api) {
     const base = t.slice(0, -1), wBase = x.measureText(base).width, mo = x.measureText(t.slice(-1)), ml = x.measureText('l');
     const w = Math.ceil(wBase + mo.actualBoundingBoxRight) + 2 * pad, h = Math.ceil(px * 1.3) + 2 * pad, yb = pad + px;
     cv.width = w; cv.height = h; x.font = f; x.fillStyle = '#ffffff'; x.fillText(base, pad, yb);
-    x.fillStyle = '#ff6f63'; x.fillText(t.slice(-1), pad + wBase, yb);   // la «o»: el aro
+    x.fillStyle = 'rgba(255, 111, 99, 0.22)'; x.fillText(t.slice(-1), pad + wBase, yb);   // la sombra de la «o»: el aro flota encima
     const ocx = pad + wBase + (mo.actualBoundingBoxRight - mo.actualBoundingBoxLeft) / 2, ocy = yb - (mo.actualBoundingBoxAscent - mo.actualBoundingBoxDescent) / 2;
     const Hpx = mo.actualBoundingBoxAscent + mo.actualBoundingBoxDescent, stem = ml.actualBoundingBoxRight + ml.actualBoundingBoxLeft;
     const A = G.ANILLO, k = 2 * A.re / Hpx, a = az * RAD;
@@ -807,6 +807,8 @@ export async function crea(api) {
       }`,
     transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8
   });
+  // la «o»: el aro, levitando un poco sobre lo existente del predio (no se imprime)
+  const matO = new THREE.MeshBasicMaterial({ color: CIRCUITO, transparent: true, opacity: 0, side: THREE.DoubleSide });
   function ponImpresa(lay) {
     const U = matImpresa.uniforms;
     if (U.uMapa.value && U.uMapa.value !== lay.tex) U.uMapa.value.dispose();
@@ -819,6 +821,10 @@ export async function crea(api) {
       const ed = new Malla();
       EDIF.forEach(e => { if (e.q.some(p => p[0] > k[0] - m && p[0] < k[2] + m && p[1] > k[1] - m && p[1] < k[3] + m)) prisma(ed, e.q, 0, e.h); });
       [piso, ed, mallaExistente()].forEach(x => { if (!x.p.length) return; const o = new THREE.Mesh(x.geo(), matImpresa); o.renderOrder = 12; o.frustumCulled = false; g.add(o); });
+      const A = G.ANILLO, rm = A.re - lay.grosor / 2, circulo = [];
+      for (let i = 0; i <= 120; i++) { const t = i / 120 * Math.PI * 2; circulo.push([A.u + rm * Math.cos(t), A.v + rm * Math.sin(t)]); }
+      const alto = Math.max(...G.NAVES.map(n => n.cumbre), ...((MARCAS.existente && MARCAS.existente.masas) || []).map(x => x.alto)) + 4;
+      const aro = new THREE.Mesh(cinta(circulo, lay.grosor, alto), matO); aro.renderOrder = 13; g.add(aro);
       g.userData = { clave }; g.visible = false; gH.add(g);
       fondoAro = g;
     }
@@ -831,7 +837,7 @@ export async function crea(api) {
     const aroDe = fondoAro && fondoAro.visible ? matImpresa.uniforms.uOp.value : 0;
     if (!t || !o) {
       const de = matFondo.opacity;
-      anima(700, k => { if (tok !== fondoTok) return; matFondo.opacity = de * (1 - k); matImpresa.uniforms.uOp.value = aroDe * (1 - k); },
+      anima(700, k => { if (tok !== fondoTok) return; matFondo.opacity = de * (1 - k); matImpresa.uniforms.uOp.value = aroDe * (1 - k); matO.opacity *= (1 - k); },
         () => { if (tok === fondoTok) { fondo3D.visible = false; if (fondoAro) fondoAro.visible = false; } });
       return;
     }
@@ -840,7 +846,7 @@ export async function crea(api) {
       fondo3D.visible = false; fondoTexto = null;
       const g = ponImpresa(lay); g.visible = true;
       const meta = op.op == null ? 0.92 : op.op;
-      anima(1600, k => { if (tok === fondoTok) matImpresa.uniforms.uOp.value = aroDe + (meta - aroDe) * k; });
+      anima(1600, k => { if (tok === fondoTok) { matImpresa.uniforms.uOp.value = aroDe + (meta - aroDe) * k; matO.opacity = Math.min(1, matImpresa.uniforms.uOp.value / meta) * 0.95; } });
       return;
     }
     matFondo.depthTest = true; fondo3D.renderOrder = 1;
