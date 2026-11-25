@@ -270,37 +270,16 @@ export default [
     rotulos: []
   },
   {
-    id: 'factores',
-    titulo: 'Factores',
-    camara: { encuadre: [-150, -120, 1850, 1250], az: 'norte', el: 62, aire: 1.04, lado: 0.26, dur: 2800 },
-    capas: { colonia: true, coches: true, limite: true },
-    marcas: ['asentamientos', 'balaceras', 'cultura', 'verdes', 'espuela'],
-    compacto: true,
-    tarjeta: {
-      kicker: 'Concepto · 1 / 3',
-      titulo: 'Una colonia fragmentada',
-      texto: 'Asentamientos irregulares, violencia, un solo espacio de arte, ninguna área verde y una espuela en desuso. En Atlampa muchos flujos se han debilitado: la industria se desplaza, el suelo queda subutilizado y la espuela conserva la memoria de un movimiento que ya no ocurre.',
-      fuente: 'Lámina «circuito» · Booklet de análisis'
-    },
-    rotulos: [
-      { u: 640, v: 120, z: 6, texto: 'Asentamientos', tipo: 'factor', color: '#f5c518' },
-      { u: 1000, v: 600, z: 6, texto: 'Violencia', tipo: 'factor', color: '#ff3b30' },
-      { u: 536, v: 226, z: 40, texto: 'Un solo espacio de arte', tipo: 'factor', color: '#c9a6ff' },
-      { u: 1300, v: 880, z: 2, texto: 'Sin áreas verdes', tipo: 'factor', color: '#a8e063' },
-      { u: 331, v: 255, z: 2, texto: 'Espuela en desuso', tipo: 'factor', color: '#e8a25a' }
-    ]
-  },
-  {
     id: 'circuito',
     titulo: 'Circuito',
     // la palabra escrita sobre la colonia; su «o» es el aro del proyecto, en su lugar (un guiño a lo que será)
-    camara: { encuadre: 'fondo', az: 'norte', el: 40, aire: 1.1, lado: 0.26, dur: 3000 },
+    camara: { encuadre: 'fondo', az: 20, el: 30, aire: 1.05, lado: 0.26, dur: 3000 },   // el ángulo de la vista de Diego (el del visor por omisión)
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['asentamientos', 'cultura', 'espuela'],
     compacto: true,
     fondo: { texto: 'circuito', pos: 'aro', op: 0.9 },
     tarjeta: {
-      kicker: 'Concepto · 2 / 3',
+      kicker: 'Concepto · 1 / 2',
       titulo: 'Circuito',
       texto: '(circuitus, latín): rodear, recorrer, volver. El circuito se plantea como un dispositivo de conexión capaz de organizar relaciones entre espacios residuales, habitantes, producción y paisaje. Frente a una colonia fragmentada, reconecta lo que hoy está separado a partir de sus propios recursos.',
       leyenda: [['#ff6f63', 'la «o»: el aro del proyecto'], ['#e8a25a', 'espuela'], ['#f5c518', 'asentamientos'], ['#c9a6ff', 'cultura']],
@@ -317,7 +296,7 @@ export default [
     marcas: ['circuitoAtlampa', 'espuela', 'verdes', 'mercado'],
     rotulosDe: ['circuitoAtlampa', 'mercado'],
     tarjeta: {
-      kicker: 'Concepto · 3 / 3',
+      kicker: 'Concepto · 2 / 2',
       titulo: 'Atlampa en circuito',
       texto: 'Así como hay circuitos dentro del proyecto, el concepto busca influir en toda Atlampa. Nuestros usos extienden el circuito y el ecosistema de las necesidades de la colonia: el circuito sale del predio, retoma la espuela (≈ 1.5 km) y reconecta lo fragmentado, convirtiendo los vacíos y las estructuras existentes en oportunidades.',
       cifras: [

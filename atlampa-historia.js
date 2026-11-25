@@ -1075,7 +1075,7 @@ export async function crea(api) {
       // vuelo
       volando = true;
       if (s.fondo && s.fondo.pos === 'aro') {
-        s.fondo._diseno = disenoAro(s.fondo.texto, cs.az === 'norte' || cs.az == null ? AZ_NORTE : cs.az);
+        s.fondo._diseno = disenoAro(s.fondo.texto, s.fondo.az == null || s.fondo.az === 'norte' ? AZ_NORTE : s.fondo.az);   // la palabra, a lo largo de las calles (norte arriba), aunque la cámara gire
         if (cs.encuadre === 'fondo') { const k = s.fondo._diseno.caja, m = 30; cs.encuadre = [k[0] - m, k[1] - m, k[2] + m, k[3] + m]; }
       }
       const obj = objetivo(cs);
