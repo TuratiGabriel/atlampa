@@ -90,11 +90,14 @@
   historiaAviso.className = 'ad-historia-espera';
   historiaAviso.setAttribute('role', 'status');
   historiaAviso.setAttribute('aria-live', 'polite');
-  historiaAviso.innerHTML = '<span class="ad-historia-espera__titulo">Modo historia · preexistencia esquemática</span><span>Naves orientales confirmadas; masas occidentales aproximadas desde Earth</span>';
+  // Etapa 1 de la presentación final: por ahora vacía (sin aviso). La preexistencia
+  // esquemática de Luis sigue disponible en dib.historiaModo(true) para usarla
+  // como slide más adelante; ver PRESENTACION FINAL/CONTEXTO.md.
+  historiaAviso.innerHTML = '';
   trabajo.appendChild(historiaAviso);
   function estadoHistoria() {
-    return { ok: true, storyMode: historiaActiva, storyStage: historiaActiva ? 'schematic_preexistence' : null,
-      storyStep: null, storyTransitioning: false, sceneReady: false, visibleElements: historiaActiva ? 4 : 0,
+    return { ok: true, storyMode: historiaActiva, storyStage: historiaActiva ? 'etapa1' : null,
+      storyStep: null, storyTransitioning: false, sceneReady: false, visibleElements: 0,
       storyAvailableActions: historiaActiva ? ['exitStoryMode'] : [] };
   }
   function entrarHistoria() {
@@ -104,7 +107,6 @@
     if (ESCENA !== 'general' || aislado || prendida('contexto')) return { ok: false, reason: 'requires_predio' };
     if (urbanRotationActive) stopUrbanRotation();
     cierraMenus(); cierraDatos(true); tooltip(null);
-    dib.historiaModo(true);
     historiaActiva = true;
     document.body.classList.add('modo-historia');
     [].forEach.call(document.querySelectorAll('[data-modo-historia]'), function (b) { b.setAttribute('aria-pressed', 'true'); });
@@ -112,7 +114,7 @@
   }
   function salirHistoria() {
     if (!historiaActiva) return { ok: true, alreadyInactive: true, ...estadoHistoria() };
-    if (dib && dib.historiaModo) dib.historiaModo(false);
+    if (dib && dib.historiaModo) dib.historiaModo(false);   // por si una slide encendió la preexistencia
     historiaActiva = false;
     document.body.classList.remove('modo-historia');
     [].forEach.call(document.querySelectorAll('[data-modo-historia]'), function (b) { b.setAttribute('aria-pressed', 'false'); });
@@ -932,7 +934,7 @@
       (ap === 'vivienda' ? '<details class="hud-menu" name="hud" data-v4-menu><summary class="hud-menu__t">' + iconoMenu('partes') + '<span>Detalle</span></summary><div class="hud-panel hud-panel--v4" data-v4-opciones></div></details>' : '') +
       (['comercio', 'cultura', 'industria'].includes(ap) ? '<details class="hud-menu" name="hud" data-uso-menu><summary class="hud-menu__t">' + iconoMenu('partes') + '<span>Detalle</span></summary><div class="hud-panel hud-panel--v4" data-uso-opciones></div></details>' : '') +
       '<details class="hud-menu" name="hud"><summary class="hud-menu__t">' + iconoMenu('vista') + '<span>Vista</span></summary><div class="hud-panel">' + vista + '</div></details>' +
-      '<button class="hud-presentacion hud-historia" type="button" data-modo-historia aria-pressed="' + historiaActiva + '" aria-keyshortcuts="F9" title="Ver preexistencia esquemática; F9 para regresar al proyecto">Modo historia <span>(F9)</span></button>' +
+      '<button class="hud-presentacion hud-historia" type="button" data-modo-historia aria-pressed="' + historiaActiva + '" aria-keyshortcuts="F9" title="Presentación (etapa 1); F9 para salir">Modo historia <span>(F9)</span></button>' +
       '<button class="hud-presentacion" type="button" data-modo-presentacion aria-pressed="' + modoPresentacion + '" aria-keyshortcuts="F8" title="Ocultar controles; F8 para recuperarlos">Modo presentación <span>(F8)</span></button>' +
       '<button class="hud-salir" type="button" data-aisla-sale>Salir <span aria-hidden="true">✕</span></button>';
     var barra = document.querySelector('.hud-barra');
@@ -1318,7 +1320,7 @@
       return r.ok ? { ok: true, progress: 1, stage: 'capas', layers: r.layers } : r;
     },
     getAvailableActions: function () {
-      if (historiaActiva) return { ok: true, stage: 'story_schematic_preexistence', storyMode: true, sceneReady: false, actions: ['exitStoryMode'] };
+      if (historiaActiva) return { ok: true, stage: 'story_etapa1', storyMode: true, sceneReady: false, actions: ['exitStoryMode'] };
       var comunes = ['orbit', 'pan', 'zoom'];
       if (prendida('contexto')) return { ok: true, stage: 'contexto', orbitAxis: 'y',
         actions: ['orbit', 'resetDetail', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation'] };
@@ -1337,7 +1339,7 @@
     },
     getState: function () {
       return { ok: true, ready: controlListo(), scene: ESCENA, isolated: aislado,
-        storyMode: historiaActiva, storyStage: historiaActiva ? 'schematic_preexistence' : null, storyStep: null, storyTransitioning: false, sceneReady: false,
+        storyMode: historiaActiva, storyStage: historiaActiva ? 'etapa1' : null, storyStep: null, storyTransitioning: false, sceneReady: false,
         azimuth: azMeta, elevation: elMeta,
         floorProgress: dib && dib.progresoPisos ? dib.progresoPisos() : 0,
         lateralProgress: detalleV4.etapa === 'capas' ? 1 : 0,
@@ -1363,7 +1365,6 @@
   zona.addEventListener('wheel', function (ev) {
     if (!dib) return;   // el motor 3D todavía carga
     ev.preventDefault();
-    if (historiaActiva) return;
     if (yendo) return;
     var c = enCuadro(ev), d = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaY;
     acerca(Math.exp(-d * 0.0018), c[0], c[1]);
@@ -1372,7 +1373,6 @@
   var dedos = {}, pell = 0, modo = null, recorrido = 0;
   function distancia() { var k = Object.keys(dedos); return k.length < 2 ? 0 : Math.hypot(dedos[k[0]].x - dedos[k[1]].x, dedos[k[0]].y - dedos[k[1]].y); }
   zona.addEventListener('pointerdown', function (ev) {
-    if (historiaActiva) return;
     if (!dib) return;   // el motor 3D todavía carga
     if (yendo) return;
     dedos[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
@@ -1386,7 +1386,6 @@
     tooltip(null);
   });
   zona.addEventListener('pointermove', function (ev) {
-    if (historiaActiva) return;
     if (!dib) return;   // el motor 3D todavía carga
     var p = dedos[ev.pointerId];
     if (!p) { if (ev.pointerType === 'mouse' && !yendo) tooltip(dib.apartadoEn(ev), ev); return; }
@@ -1450,7 +1449,6 @@
   });
   // teclado, con el dibujo enfocado: flechas orbitan, + / − acercan, 0 encuadra
   zona.addEventListener('keydown', function (ev) {
-    if (historiaActiva) return;
     if (!dib) return;   // el motor 3D todavía carga
     if (yendo) return;
     var k = ev.key, hecho = true;
