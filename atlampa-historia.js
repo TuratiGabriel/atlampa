@@ -707,18 +707,45 @@ export async function crea(api) {
 
   /* ---------- 4. HTML: tarjeta, rótulos, navegación ---------- */
   const capa = document.createElement('div'); capa.className = 'hist-capa'; capa.hidden = true;
-  capa.innerHTML = '<div class="hist-fondo" aria-hidden="true"></div><div class="hist-rotulos"></div><aside class="hist-tarjeta" aria-live="polite"></aside>' +
+  capa.innerHTML = '<div class="hist-rotulos"></div><aside class="hist-tarjeta" aria-live="polite"></aside>' +
     '<nav class="hist-nav" aria-label="Slides de la presentación"><button type="button" class="hist-nav-flecha" data-hist="anterior" aria-label="Slide anterior">‹ Anterior</button>' +
     '<ol class="hist-nav-lista">' + GUION.map((s, i) => '<li><button type="button" data-hist-ir="' + i + '" title="' + s.titulo + '"><span>' + String(i + 1).padStart(2, '0') + '</span><i class="tt"> ' + s.titulo + '</i></button></li>').join('') + '</ol>' +
     '<button type="button" class="hist-nav-flecha hist-nav-sigue" data-hist="siguiente" aria-label="Slide siguiente">Siguiente ›</button></nav>' +
     '<div class="hist-carga" role="status">Armando Atlampa…</div>';
   trabajo.appendChild(capa);
-  const fondoEl = capa.querySelector('.hist-fondo');
-  function ponFondo(t) {
-    if ((fondoEl.dataset.t || '') === (t || '')) return;
-    fondoEl.dataset.t = t || '';
-    fondoEl.classList.remove('visible');
-    if (t) { fondoEl.textContent = t; requestAnimationFrame(() => requestAnimationFrame(() => fondoEl.classList.add('visible'))); }
+  // portada: la palabra del concepto, enorme y difuminada, tendida en el piso arriba a la izquierda
+  // de la vista de la slide; queda detrás de las volumetrías (los edificios la tapan)
+  const matFondo = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+  const fondo3D = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), matFondo);
+  fondo3D.renderOrder = 1; fondo3D.visible = false; gH.add(fondo3D);
+  let fondoTexto = null, fondoTok = 0;
+  function texturaFondo(t) {
+    const fam = getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() || 'sans-serif';
+    const cv = document.createElement('canvas'), x = cv.getContext('2d'), px = 260, pad = 60;
+    x.font = '300 ' + px + 'px ' + fam;
+    const w = Math.ceil(x.measureText(t).width) + 2 * pad, h = Math.ceil(px * 1.25) + 2 * pad;
+    cv.width = w; cv.height = h;
+    x.font = '300 ' + px + 'px ' + fam; x.textBaseline = 'middle'; x.fillStyle = '#ffffff';
+    x.filter = 'blur(7px)';
+    x.fillText(t, pad, h / 2);
+    const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
+    return { tex, asp: w / h };
+  }
+  function ponFondo(t, o) {
+    const tok = ++fondoTok;
+    if (!t || !o) { const de = matFondo.opacity; anima(700, k => { if (tok === fondoTok) matFondo.opacity = de * (1 - k); }, () => { if (tok === fondoTok) fondo3D.visible = false; }); return; }
+    if (fondoTexto !== t) { if (matFondo.map) matFondo.map.dispose(); const tx = texturaFondo(t); matFondo.map = tx.tex; matFondo.needsUpdate = true; fondo3D.userData.asp = tx.asp; fondoTexto = t; }
+    // marco de la cámara de la slide: arriba a la izquierda de la pantalla, sobre el piso
+    const a = o.az * RAD, e = o.el * RAD, ASP = trabajo.clientWidth / Math.max(1, trabajo.clientHeight);
+    const d = new THREE.Vector3(Math.sin(a) * Math.cos(e), -Math.sin(e), -Math.cos(a) * Math.cos(e));
+    const r = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize(), up = new THREE.Vector3().crossVectors(r, d).normalize();
+    const alto = o.h * 0.82, ancho = alto * fondo3D.userData.asp;
+    const c = new THREE.Vector3(o.c[0], o.c[1], o.c[2]).addScaledVector(r, -o.h * ASP * 0.97 + ancho / 2).addScaledVector(up, o.h * 0.97 - alto / 2 * Math.sin(e));
+    const t0 = -c.y / d.y; c.addScaledVector(d, t0); c.y = 0.35;   // al piso, a lo largo de la vista
+    fondo3D.position.copy(c); fondo3D.scale.set(ancho, 1, alto); fondo3D.rotation.set(0, -a, 0);
+    fondo3D.visible = true;
+    const de = matFondo.opacity;
+    anima(1600, k => { if (tok === fondoTok) matFondo.opacity = de + (0.26 - de) * k; });
   }
   const capaRot = capa.querySelector('.hist-rotulos'), tarjeta = capa.querySelector('.hist-tarjeta'), cargaEl = capa.querySelector('.hist-carga');
   // el visor captura el puntero al arrastrar: en los botones y la tarjeta, el clic es de la presentación
@@ -917,13 +944,14 @@ export async function crea(api) {
       if (capas.colonia !== false && revelado < 1) { const de = revelado; anima(dur * 0.95, (k, l) => aplicaRevelado(de + (1 - de) * l)); }
       // vuelo
       volando = true;
-      api.camaraA(objetivo(cs), dur, () => {
+      const obj = objetivo(cs);
+      ponFondo(s.fondo, obj);
+      api.camaraA(obj, dur, () => {
         if (tok !== irTok) return;
         volando = false;
         if (avisos.fin) avisos.fin();
       });
       if (!mismo) setTimeout(() => { if (tok === irTok && activo) muestraTarjeta(s, n); }, Math.min(900, dur * 0.45));
-      ponFondo(s.fondo);
       // lo que entra, al llegar
       setTimeout(() => {
         if (tok !== irTok || !activo) return;
@@ -984,7 +1012,7 @@ export async function crea(api) {
   function sale(av) {
     if (!activo) return;
     ++irTok; tweens = []; volando = false;
-    quitaTarjeta(); quitaRotulos(); ponFondo(null);
+    quitaTarjeta(); quitaRotulos(); ponFondo(null); fondo3D.visible = false; matFondo.opacity = 0;
     activo = false;
     gH.visible = false; capa.hidden = true; document.body.classList.remove('hist-activo');
     Object.keys(MARCA).forEach(id => aplicaMarca(id, 0));

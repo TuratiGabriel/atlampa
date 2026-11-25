@@ -529,13 +529,6 @@ body.con-datos .hud-camara{ opacity:0; pointer-events:none; }
 .hist-capa{ position:absolute; inset:0; z-index:7; pointer-events:none; --hist-am:#f5c518; --hist-rojo:#ff3b30; }
 .hist-capa[hidden]{ display:none; }
 .hist-rotulos{ position:absolute; inset:0; overflow:hidden; }
-/* portada: la palabra del concepto, enorme y difuminada detrás de la colonia */
-.hist-fondo{
-  position:absolute; inset:0; display:grid; place-items:center; padding-left:calc(360px + 6vw); overflow:hidden; pointer-events:none; white-space:nowrap;
-  font:300 clamp(110px, 15vw, 380px)/1 var(--font-display); letter-spacing:-.05em; color:rgba(255,255,255,.14);
-  filter:blur(6px); opacity:0; transform:scale(1.04); transition:opacity 1.6s var(--ease-ui), transform 2.4s var(--ease-ui);
-}
-.hist-fondo.visible{ opacity:1; transform:none; }
 .hist-rotulo{ position:absolute; left:0; top:0; width:0; height:0; pointer-events:none; opacity:0; transition:opacity .5s var(--ease-ui); }
 .hist-rotulo.visible{ opacity:1; }
 .hist-rotulo .t{
