@@ -8,7 +8,7 @@
            el        elevación (89 = cenital) · aire: holgura · dur: ms
            lado      fracción del ancho que tapa la tarjeta (se centra en el resto)
    capas:  colonia (edificios y calles de toda Atlampa), coches, limite
-   marcas: 'asentamientos' | 'balaceras' (ver MARCAS abajo)
+   marcas: 'asentamientos' | 'balaceras' (ver MARCAS abajo; en las balaceras, lado: 'izq' | 'der' pone el texto a un lado de los tiradores)
    tarjeta: kicker, titulo, texto, cifras [[valor, etiqueta, nota]], nota, fuente
    rotulos: { u, v, z, texto, sub, tipo: 'calle' | 'punto', lado: 'izq' (texto a la izquierda) }
    ============================================================ */
@@ -32,7 +32,7 @@ export const MARCAS = {
   balaceras: [
     { u: 80, v: 400, fecha: 'ago 2022', texto: 'Heliotropo 178', sub: 'herido en una fiesta · aprox.' },
     { u: 793, v: 282, fecha: 'ago 2022', texto: 'Ciprés 280', sub: 'repartidor asesinado' },
-    { u: 942, v: 643, fecha: 'feb 2023', texto: 'Nopal y Pino', sub: 'hombre asesinado en una vecindad' },
+    { u: 942, v: 643, fecha: 'feb 2023', texto: 'Nopal y Pino', sub: 'hombre asesinado en una vecindad', lado: 'der' },
     { u: 1212, v: 554, fecha: 'ago 2025', texto: 'Plaza Juárez', sub: 'Nopal y Oyamel · asesinato', lado: 'izq' },
     { u: 797, v: 675, fecha: 'ene 2026', texto: 'Ciprés, junto al puente', sub: 'ataque desde una moto · aprox.', lado: 'izq' }
   ]

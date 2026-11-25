@@ -3832,7 +3832,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       const mod = await import('./atlampa-historia.js' + (VER ? '?' + VER : ''));
       HIST = await mod.crea({
         THREE, G, W, CEN, rect, ccw, Malla, Lineas, tapa, tapaHueco, muros, prisma, pon, ponLineas, material, linea,
-        raizG, escena, trabajo, pide, aplicaEstilo, ESTILOS, dib: DIB.ctx,
+        raizG, escena, trabajo, pide, aplicaEstilo, ESTILOS, dib: DIB.ctx, FIG, matAtlas, mallaAtlas,
         camara: () => cam, camaraEstado, camaraA, alPintar: f => { histPinta = f; }
       });
     }

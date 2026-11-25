@@ -526,7 +526,7 @@ body.con-datos .hud-camara{ opacity:0; pointer-events:none; }
    Mismo lenguaje que la ficha de datos: panel oscuro de borde fino que entra
    recortado en círculo; rótulos finos en mayúsculas; el amarillo marca lo
    que se señala en cada slide. */
-.hist-capa{ position:absolute; inset:0; z-index:7; pointer-events:none; --hist-am:#f5c518; }
+.hist-capa{ position:absolute; inset:0; z-index:7; pointer-events:none; --hist-am:#f5c518; --hist-rojo:#ff3b30; }
 .hist-capa[hidden]{ display:none; }
 .hist-rotulos{ position:absolute; inset:0; overflow:hidden; }
 .hist-rotulo{ position:absolute; left:0; top:0; width:0; height:0; pointer-events:none; opacity:0; transition:opacity .5s var(--ease-ui); }
@@ -542,6 +542,27 @@ body.con-datos .hud-camara{ opacity:0; pointer-events:none; }
 .hist-rotulo--calle .t{ left:0; bottom:auto; top:0; transform:translate(-50%, -50%); align-items:center; font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.7); }
 .hist-rotulo--izq .t{ left:auto; right:10px; align-items:flex-end; text-align:right; }
 .hist-rotulo--tenue.visible{ opacity:.75; }
+/* balaceras: dos figuras rojas que se disparan (el texto, arriba o a un lado) */
+.hist-rotulo--balacera .t{ left:0; bottom:40px; transform:translateX(-50%); align-items:center; text-align:center; }
+.hist-rotulo--balacera.hist-rotulo--izq .t{ left:auto; right:40px; bottom:2px; transform:none; align-items:flex-end; text-align:right; }
+.hist-rotulo--balacera.hist-rotulo--der .t{ left:40px; right:auto; bottom:2px; transform:none; align-items:flex-start; text-align:left; }
+.hist-rotulo--balacera .t b{ color:var(--hist-rojo); }
+.hist-tiro{ position:absolute; left:-36px; bottom:-3px; width:72px; height:36px; overflow:visible; filter:drop-shadow(0 0 3px rgba(0,0,0,.9)); transform:scale(var(--tiro-esc, 1)); transform-origin:50% 100%; }
+.hist-tiro path, .hist-tiro rect{ stroke:var(--hist-rojo); stroke-width:2.2; stroke-linecap:round; fill:none; }
+.hist-tiro rect{ fill:var(--hist-rojo); stroke-width:0; }
+.hist-tiro circle{ fill:var(--hist-rojo); }
+.hist-tiro-a, .hist-tiro-b{ animation:hist-retro-a 1.3s var(--tiro-fase, 0s) infinite; }
+.hist-tiro-b{ animation-name:hist-retro-b; }
+.hist-tiro .hist-tiro-fa, .hist-tiro .hist-tiro-fb{ fill:#ffd2a8; opacity:0; transform-box:fill-box; transform-origin:center; animation:hist-fogonazo-a 1.3s var(--tiro-fase, 0s) infinite; }
+.hist-tiro .hist-tiro-fb{ animation-name:hist-fogonazo-b; }
+.hist-tiro .hist-tiro-ba, .hist-tiro .hist-tiro-bb{ stroke:#ffe3c4; stroke-width:1.6; opacity:0; animation:hist-bala-a 1.3s var(--tiro-fase, 0s) infinite; }
+.hist-tiro .hist-tiro-bb{ animation-name:hist-bala-b; }
+@keyframes hist-retro-a{ 0%, 12%, 100%{ transform:none; } 4%{ transform:translateX(-1.4px); } }
+@keyframes hist-retro-b{ 0%, 50%, 62%, 100%{ transform:none; } 54%{ transform:translateX(-1.4px); } }
+@keyframes hist-fogonazo-a{ 0%{ opacity:1; transform:scale(1.25); } 8%{ opacity:0; transform:scale(.6); } 100%{ opacity:0; } }
+@keyframes hist-fogonazo-b{ 0%, 50%{ opacity:0; } 50.1%{ opacity:1; transform:scale(1.25); } 58%{ opacity:0; transform:scale(.6); } 100%{ opacity:0; } }
+@keyframes hist-bala-a{ 0%{ opacity:1; transform:translateX(0); } 26%{ opacity:1; transform:translateX(11px); } 27%, 100%{ opacity:0; transform:translateX(11px); } }
+@keyframes hist-bala-b{ 0%, 50%{ opacity:0; transform:translateX(0); } 50.1%{ opacity:1; transform:translateX(0); } 76%{ opacity:1; transform:translateX(-11px); } 77%, 100%{ opacity:0; transform:translateX(-11px); } }
 .hist-rotulo--tenue::before{ background:transparent; border:1px solid var(--hist-am); box-shadow:none; }
 
 .hist-tarjeta{
@@ -571,20 +592,23 @@ body.con-datos .hud-camara{ opacity:0; pointer-events:none; }
 .hist-nav{
   position:absolute; left:50%; bottom:22px; transform:translateX(-50%); display:flex; align-items:center; gap:6px;
   pointer-events:auto; padding:4px; border:1px solid rgba(255,255,255,.18); border-radius:3px; background:rgba(5,5,5,.7);
-  -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); opacity:.55; transition:opacity .3s var(--ease-ui);
+  -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); opacity:.82; transition:opacity .3s var(--ease-ui);
 }
 .hist-nav:hover, .hist-nav:focus-within{ opacity:1; }
 .hist-nav-lista{ display:flex; gap:2px; margin:0; padding:0; list-style:none; }
-.hist-nav button{ all:unset; cursor:pointer; padding:6px 10px; border-radius:2px; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+.hist-nav button{ all:unset; white-space:nowrap; cursor:pointer; padding:6px 10px; border-radius:2px; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
 .hist-nav button span{ color:rgba(255,255,255,.45); }
 .hist-nav button[aria-current="true"]{ color:#fff; background:rgba(255,255,255,.08); }
 .hist-nav button[aria-current="true"] span{ color:var(--hist-am); }
 .hist-nav button:hover{ color:#fff; }
 .hist-nav button:focus-visible{ outline:1px solid rgba(255,255,255,.6); outline-offset:1px; }
-.hist-nav-flecha{ font-size:16px !important; padding:4px 10px !important; }
+.hist-nav-flecha{ padding:7px 14px !important; border:1px solid rgba(255,255,255,.2) !important; color:#fff !important; }
+.hist-nav-sigue{ background:rgba(255,255,255,.1) !important; }
+@media (hover:hover){ .hist-nav-flecha:hover{ background:rgba(255,255,255,.16) !important; } }
 .hist-carga{ position:absolute; right:var(--gutter); top:22px; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
 .hist-carga[hidden]{ display:none; }
 @media (prefers-reduced-motion:reduce){
   .hist-tarjeta.entrando, .hist-tarjeta.saliendo{ animation:none; }
   .hist-rotulo{ transition:none; }
+  .hist-tiro *{ animation:none !important; }
 }

@@ -9,7 +9,7 @@
    ============================================================ */
 const VER = import.meta.url.split('?')[1] || '';
 const conV = f => f + (VER ? '?' + VER : '');
-const AMARILLO = 0xf5c518;
+const AMARILLO = 0xf5c518, ROJO = 0xff3b30;
 
 function cargaScript(src) {
   return new Promise((ok, mal) => {
@@ -25,7 +25,7 @@ export async function crea(api) {
   const GUION = guionMod.default, MARCAS = guionMod.MARCAS;
   const H = window.ATLAMPA_HISTORIA_DATOS;
   const { THREE, G, W, CEN, Malla, Lineas, tapa, prisma, pon, ponLineas, material, raizG, trabajo, pide, aplicaEstilo, ESTILOS } = api;
-  const D = G.D, S = G.S, R = D.rect, RAD = Math.PI / 180;
+  const D = G.D, S = G.S, R = D.rect, RAD = Math.PI / 180, DC_ = api.dib;
   const pares = (a, desde) => { const r = []; for (let i = desde || 0; i < a.length; i += 2) r.push([a[i], a[i + 1]]); return r; };
   const LIM = pares(H.limite);
   const CAJA_LIM = [Math.min(...LIM.map(p => p[0])), Math.min(...LIM.map(p => p[1])), Math.max(...LIM.map(p => p[0])), Math.max(...LIM.map(p => p[1]))];
@@ -240,6 +240,78 @@ export async function crea(api) {
     carros.instanceMatrix.needsUpdate = true; aPos.needsUpdate = true; aGiro.needsUpdate = true;
   }
 
+  /* ---------- 2b. Personas en las banquetas ----------
+     Pictogramas claros (las figuras del visor, negras de contorno fino, no se
+     leen a esta escala), de un tamaño fijo en pantalla al alejarse y de tamaño
+     real al acercarse. 4 poses de caminar × 3 tipos. */
+  const FIG = (() => {
+    const T = 32, A = 64, N = 3, POSES = 4, c = document.createElement('canvas');
+    c.width = N * T; c.height = POSES * A;
+    const x = c.getContext('2d');
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    for (let f = 0; f < POSES; f++) for (let i = 0; i < N; i++) {
+      const s = Math.sin(f * Math.PI / 2), ox = i * T + 16, oy = f * A, bob = f % 2 ? 1 : 0;
+      x.fillStyle = x.strokeStyle = '#e9e7e1';
+      x.beginPath(); x.arc(ox, oy + 9 + bob, 5.2, 0, Math.PI * 2); x.fill();                    // cabeza
+      x.lineWidth = 7.5; x.beginPath(); x.moveTo(ox, oy + 19 + bob); x.lineTo(ox, oy + 35 + bob); x.stroke();   // torso
+      if (i === 1) { x.beginPath(); x.moveTo(ox - 6, oy + 44); x.lineTo(ox + 6, oy + 44); x.lineTo(ox + 3, oy + 28); x.lineTo(ox - 3, oy + 28); x.fill(); }   // falda
+      x.lineWidth = 4.2;
+      x.beginPath(); x.moveTo(ox, oy + 36 + bob); x.lineTo(ox + 9 * s, oy + 60); x.moveTo(ox, oy + 36 + bob); x.lineTo(ox - 9 * s, oy + 60); x.stroke();   // piernas
+      x.lineWidth = 3.4;
+      x.beginPath(); x.moveTo(ox, oy + 21 + bob); x.lineTo(ox - 7 * s, oy + 34); x.moveTo(ox, oy + 21 + bob); x.lineTo(ox + 7 * s, oy + 34); x.stroke();   // brazos
+      if (i === 2) { x.fillRect(ox + 3, oy + 26, 7, 9); }   // con bolsa
+    }
+    const tex = new THREE.CanvasTexture(c);
+    return { tex, N, POSES, alto: 1.72, ancho: 0.86, camina: [0, 1, 2] };
+  })();
+  const PX_PERSONA = 15, PESC = 1, PERS = [];
+  let semP = 91;
+  const azarP = () => { semP = (semP * 16807) % 2147483647; return (semP - 1) / 2147483646; };
+  H.calles.forEach(c => {
+    if (c.c === 'via') return;
+    fuera(pares(c.p), S).forEach(t => {
+      if (!dentro(t[Math.floor(t.length / 2)], LIM)) return;
+      const acc = [0];
+      for (let j = 1; j < t.length; j++) acc.push(acc[j - 1] + Math.hypot(t[j][0] - t[j - 1][0], t[j][1] - t[j - 1][1]));
+      const L = acc[acc.length - 1];
+      if (L < 30) return;
+      const off = c.c === 'mayor' ? 9 : 5.5, n = Math.max(1, Math.round(L / 60));
+      [-1, 1].forEach(lado => { for (let k = 0; k < n; k++) PERS.push({ p: t, acc, L, lado: lado * off * (0.85 + 0.3 * azarP()), s0: azarP() * L * 2,
+        vel: (1.1 + 0.5 * azarP()) * 2.2 * (azarP() < 0.5 ? 1 : -1), tile: FIG.camina[Math.floor(azarP() * FIG.camina.length)], esc: PESC * (0.9 + 0.2 * azarP()) }); });
+    });
+  });
+  const gPer = new THREE.Group(); gPer.name = 'historia-personas'; gPer.visible = false; gH.add(gPer);
+  const PM = api.mallaAtlas(Math.max(1, PERS.length), api.matAtlas(FIG.tex, FIG.N, FIG.POSES, DC_));
+  PERS.forEach((q, i) => { PM.aEsc.setXY(i, FIG.ancho * q.esc, FIG.alto * q.esc); PM.aTile.setX(i, q.tile); });
+  PM.malla.geometry.instanceCount = PERS.length;
+  gPer.add(PM.malla);
+  const derecha = new THREE.Vector3();
+  function caminan(ms) {
+    const t = ms / 1000;
+    derecha.setFromMatrixColumn(api.camara().matrixWorld, 0);
+    // tamaño: PX_PERSONA en pantalla de lejos, el real de cerca
+    // (de muy lejos se achican un poco: si no, son una multitud)
+    const mpp = 2 * api.camaraEstado().h / Math.max(1, trabajo.clientHeight), px = Math.max(7, Math.min(PX_PERSONA, PX_PERSONA * Math.sqrt(0.9 / mpp)));
+    const k = Math.max(1, px * mpp / FIG.alto);
+    if (Math.abs(k - (caminan.k || 0)) > 0.01) {
+      caminan.k = k;
+      for (let i = 0; i < PERS.length; i++) PM.aEsc.setXY(i, FIG.ancho * PERS[i].esc * k, FIG.alto * PERS[i].esc * k);
+      PM.aEsc.needsUpdate = true;
+    }
+    for (let i = 0; i < PERS.length; i++) {
+      const q = PERS[i], s = q.s0 + q.vel * t, L = q.L, tt = ((s % (2 * L)) + 2 * L) % (2 * L), d = tt <= L ? tt : 2 * L - tt, va = tt <= L ? 1 : -1;
+      let j = 1; while (j < q.acc.length - 1 && q.acc[j] < d) j++;
+      const a = q.p[j - 1], b = q.p[j], f = (d - q.acc[j - 1]) / ((q.acc[j] - q.acc[j - 1]) || 1);
+      const du = (b[0] - a[0]) * va, dv = (b[1] - a[1]) * va, n = Math.hypot(du, dv) || 1;
+      const u = a[0] + (b[0] - a[0]) * f - dv / n * q.lado * va, v = a[1] + (b[1] - a[1]) * f + du / n * q.lado * va;
+      const w = W(u + du / n, v + dv / n, 0), o = W(u, v, 0.25);
+      PM.aPos.setXYZ(i, o[0], o[1], o[2]);
+      PM.aVolt.setX(i, (w[0] - o[0]) * derecha.x + (w[2] - o[2]) * derecha.z >= 0 ? 1 : -1);
+      PM.aPose.setX(i, Math.floor(Math.abs(s) / (0.35 * q.esc * k)) % 4);
+    }
+    PM.aPos.needsUpdate = true; PM.aVolt.needsUpdate = true; PM.aPose.needsUpdate = true;
+  }
+
   /* ---------- 3. Marcas ---------- */
   const matAm = op => new THREE.MeshBasicMaterial({ color: AMARILLO, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide });
   const linAm = op => new THREE.LineBasicMaterial({ color: AMARILLO, transparent: true, opacity: op });
@@ -296,19 +368,19 @@ export async function crea(api) {
   function armaBalaceras() {
     const g = new THREE.Group(); g.name = 'marca-balaceras'; g.visible = false; gH.add(g);
     const piezas = [], rotulos = [], ondas = [];
-    const geoDisco = new THREE.CircleGeometry(5, 40).rotateX(-Math.PI / 2), geoOnda = new THREE.RingGeometry(0.86, 1, 64).rotateX(-Math.PI / 2);
+    const geoDisco = new THREE.CircleGeometry(9, 40).rotateX(-Math.PI / 2), geoOnda = new THREE.RingGeometry(0.86, 1, 64).rotateX(-Math.PI / 2);
+    const rojo = op => new THREE.MeshBasicMaterial({ color: ROJO, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide });
     MARCAS.balaceras.forEach((b, i) => {
-      const sub = new THREE.Group(), alto = 26;
-      const mD = matAm(0.95), mO1 = matAm(0), mO2 = matAm(0), mL = linAm(0.9);
+      const sub = new THREE.Group();
+      const mD = rojo(0.55), mO1 = rojo(0), mO2 = rojo(0);
       const disco = new THREE.Mesh(geoDisco, mD); disco.position.copy(V3(b.u, b.v, 0.35));
       const o1 = new THREE.Mesh(geoOnda, mO1), o2 = new THREE.Mesh(geoOnda, mO2);
       o1.position.copy(V3(b.u, b.v, 0.3)); o2.position.copy(V3(b.u, b.v, 0.3));
-      const asta = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(b.u, b.v, 0.4), V3(b.u, b.v, alto)]), mL);
-      [disco, o1, o2, asta].forEach(o => { o.renderOrder = 7; sub.add(o); });
+      [disco, o1, o2].forEach(o => { o.renderOrder = 7; sub.add(o); });
       g.add(sub);
-      piezas.push({ obj: sub, mats: [[mD, 0.95], [mL, 0.9]], crece: true, retraso: i * 260 });
+      piezas.push({ obj: sub, mats: [[mD, 0.55]], retraso: i * 260 });
       ondas.push({ o1, o2, fase: i * 0.37 });
-      rotulos.push({ u: b.u, v: b.v, z: alto, texto: b.texto, sub: b.sub, fecha: b.fecha, lado: b.lado, tipo: 'marca', retraso: 450 + i * 260 });
+      rotulos.push({ u: b.u, v: b.v, z: 0.5, texto: b.texto, sub: b.sub, fecha: b.fecha, lado: b.lado, tipo: 'balacera', retraso: 350 + i * 260 });
     });
     MARCA.balaceras = { g, piezas, rotulos, latido(ms, k) {
       ondas.forEach(w => [[w.o1, 0], [w.o2, 0.5]].forEach(([o, d]) => {
@@ -321,12 +393,15 @@ export async function crea(api) {
   /* ---------- 4. HTML: tarjeta, rótulos, navegación ---------- */
   const capa = document.createElement('div'); capa.className = 'hist-capa'; capa.hidden = true;
   capa.innerHTML = '<div class="hist-rotulos"></div><aside class="hist-tarjeta" aria-live="polite"></aside>' +
-    '<nav class="hist-nav" aria-label="Slides de la presentación"><button type="button" class="hist-nav-flecha" data-hist="anterior" aria-label="Slide anterior">‹</button>' +
+    '<nav class="hist-nav" aria-label="Slides de la presentación"><button type="button" class="hist-nav-flecha" data-hist="anterior" aria-label="Slide anterior">‹ Anterior</button>' +
     '<ol class="hist-nav-lista">' + GUION.map((s, i) => '<li><button type="button" data-hist-ir="' + i + '"><span>' + String(i + 1).padStart(2, '0') + '</span> ' + s.titulo + '</button></li>').join('') + '</ol>' +
-    '<button type="button" class="hist-nav-flecha" data-hist="siguiente" aria-label="Slide siguiente">›</button></nav>' +
+    '<button type="button" class="hist-nav-flecha hist-nav-sigue" data-hist="siguiente" aria-label="Slide siguiente">Siguiente ›</button></nav>' +
     '<div class="hist-carga" role="status">Armando Atlampa…</div>';
   trabajo.appendChild(capa);
   const capaRot = capa.querySelector('.hist-rotulos'), tarjeta = capa.querySelector('.hist-tarjeta'), cargaEl = capa.querySelector('.hist-carga');
+  // el visor captura el puntero al arrastrar: en los botones y la tarjeta, el clic es de la presentación
+  capa.addEventListener('pointerdown', ev => { if (ev.target.closest('.hist-nav, .hist-tarjeta')) ev.stopPropagation(); });
+  capa.addEventListener('wheel', ev => { if (ev.target.closest('.hist-tarjeta')) ev.stopPropagation(); });
   capa.addEventListener('click', ev => {
     const b = ev.target.closest('[data-hist], [data-hist-ir]');
     if (!b) return;
@@ -344,6 +419,12 @@ export async function crea(api) {
       (t.nota ? '<p class="hist-nota">' + esc(t.nota) + '</p>' : '') +
       (t.fuente ? '<p class="hist-fuente">' + esc(t.fuente) + '</p>' : '');
   }
+  // dos figuras que se disparan: destello, bala y retroceso, en bucle (atlampa.css)
+  const FIGURA = '<circle cx="12" cy="8" r="3.4"/><path d="M12 11.5v10M12 21.5l-3.6 8.5M12 21.5l3.6 8.5M12 14.6l9.5-1.6"/><rect x="20.6" y="11.9" width="4.4" height="2.3"/>';
+  const TIRO = '<svg class="hist-tiro" viewBox="0 0 72 36" aria-hidden="true">' +
+    '<g class="hist-tiro-a">' + FIGURA + '</g><g transform="translate(72 0) scale(-1 1)"><g class="hist-tiro-b">' + FIGURA + '</g></g>' +
+    '<circle class="hist-tiro-fa" cx="27.6" cy="13" r="2.8"/><circle class="hist-tiro-fb" cx="44.4" cy="13" r="2.8"/>' +
+    '<path class="hist-tiro-ba" d="M28 13h3.5"/><path class="hist-tiro-bb" d="M44 13h-3.5"/></svg>';
   let tarjetaTok = 0;
   function muestraTarjeta(s, i) {
     const tok = ++tarjetaTok;
@@ -363,8 +444,9 @@ export async function crea(api) {
   function ponRotulos(lista, retrasoBase) {
     lista.forEach(r => {
       const el = document.createElement('div');
-      el.className = 'hist-rotulo ' + (r.tipo || 'punto').split(' ').concat(r.lado === 'izq' ? ['izq'] : []).map(t => 'hist-rotulo--' + t).join(' ');
-      el.innerHTML = '<div class="t">' + (r.fecha ? '<b>' + esc(r.fecha) + '</b>' : '') + '<span>' + esc(r.texto) + '</span>' + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</div>';
+      el.className = 'hist-rotulo ' + (r.tipo || 'punto').split(' ').concat(r.lado ? [r.lado] : []).map(t => 'hist-rotulo--' + t).join(' ');
+      el.style.setProperty('--tiro-fase', (-(ROT.length * 0.43) % 1.3).toFixed(2) + 's');
+      el.innerHTML = (/balacera/.test(r.tipo || '') ? TIRO : '') + '<div class="t">' + (r.fecha ? '<b>' + esc(r.fecha) + '</b>' : '') + '<span>' + esc(r.texto) + '</span>' + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</div>';
       el.style.transitionDelay = ((retrasoBase || 0) + (r.retraso || 0)) + 'ms';
       capaRot.appendChild(el);
       const o = { el, p: V3(r.u, r.v, r.z || 0), dueño: r.dueño };
@@ -380,6 +462,8 @@ export async function crea(api) {
   api.alPintar(cam => {
     if (!activo) return;
     const w = trabajo.clientWidth, h = trabajo.clientHeight;
+    const mpp = 2 * api.camaraEstado().h / Math.max(1, h), escTiro = Math.max(0.6, Math.min(1.25, Math.sqrt(0.9 / mpp))).toFixed(2);
+    if (escTiro !== capaRot.dataset.esc) { capaRot.dataset.esc = escTiro; capaRot.style.setProperty('--tiro-esc', escTiro); }
     ROT.forEach(o => {
       tmp.copy(o.p).project(cam);
       const fuera = tmp.z > 1 || tmp.x < -1.2 || tmp.x > 1.2 || tmp.y < -1.2 || tmp.y > 1.2;
@@ -406,7 +490,7 @@ export async function crea(api) {
     matLim.opacity = 0.85 * Math.max(0, (x - 0.55) / 0.45);
     matVelo.opacity = 0.5 * Math.max(0, (x - 0.6) / 0.4);
     opCarros.value = Math.max(0, (x - 0.75) / 0.25);
-    gAut.visible = x > 0.75;
+    gAut.visible = x > 0.75; gPer.visible = x > 0.75;
   }
   function aplicaMarca(id, k) {
     const M = MARCA[id]; if (!M) return;
@@ -429,6 +513,7 @@ export async function crea(api) {
       return true;
     });
     if (gAut.visible && !quieto.matches) mueveCarros(ms);
+    if (gPer.visible && !quieto.matches) caminan(ms);
     Object.keys(MARCA).forEach(id => { if (MARCA[id].g.visible) MARCA[id].latido(ms, marcaK[id] || 0); });
     if (volando && avisos.mueve) avisos.mueve();
     pide();
@@ -444,7 +529,7 @@ export async function crea(api) {
     armando = new Promise(ok => {
       const tandas = [armaSuelo, armaCalles, armaLimite];
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
-      tandas.push(armaAsentamientos, armaBalaceras, () => mueveCarros(performance.now()));
+      tandas.push(armaAsentamientos, armaBalaceras, () => { mueveCarros(performance.now()); caminan(performance.now()); });
       (function sigue() {
         tandas.shift()();
         if (tandas.length) { requestAnimationFrame(sigue); return; }
@@ -468,7 +553,9 @@ export async function crea(api) {
       const p = V3(u, v, z).sub(c0), px = p.dot(r), py = p.dot(up);
       x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
     })));
-    const ASP = trabajo.clientWidth / Math.max(1, trabajo.clientHeight), lado = Math.min(0.45, cs.lado || 0);
+    // la tarjeta tapa su ancho real (360 px más márgenes): en pantallas angostas, proporcionalmente más
+    const Wt = trabajo.clientWidth, gut = Math.max(16, Math.min(40, Wt * 0.03)), ancho = Math.min(360, Wt - 2 * gut);
+    const ASP = Wt / Math.max(1, trabajo.clientHeight), lado = Math.min(0.45, Math.max(cs.lado || 0, (ancho + 2 * gut) / Wt));
     const h = Math.max((y1 - y0) / 2, (x1 - x0) / 2 / (ASP * (1 - lado))) * (cs.aire || 1.1);
     const c = c0.add(r.clone().multiplyScalar((x0 + x1) / 2)).add(up.clone().multiplyScalar((y0 + y1) / 2));
     c.addScaledVector(r, -lado * h * ASP);   // lo encuadrado, centrado a la derecha de la tarjeta
