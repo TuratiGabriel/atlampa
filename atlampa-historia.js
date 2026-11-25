@@ -265,6 +265,11 @@ export async function crea(api) {
     return { tex, N, POSES, alto: 1.72, ancho: 0.86, camina: [0, 1, 2] };
   })();
   const PX_PERSONA = 15, PESC = 1, PERS = [];
+  // alto en pantalla (px) de una persona: PX_PERSONA de lejos (algo menos si está muy lejos), el real de cerca
+  function pxPersona() {
+    const mpp = 2 * api.camaraEstado().h / Math.max(1, trabajo.clientHeight);
+    return { mpp, px: Math.max(Math.max(7, Math.min(PX_PERSONA, PX_PERSONA * Math.sqrt(0.9 / mpp))), FIG.alto / mpp) };
+  }
   let semP = 91;
   const azarP = () => { semP = (semP * 16807) % 2147483647; return (semP - 1) / 2147483646; };
   H.calles.forEach(c => {
@@ -290,9 +295,7 @@ export async function crea(api) {
     const t = ms / 1000;
     derecha.setFromMatrixColumn(api.camara().matrixWorld, 0);
     // tamaño: PX_PERSONA en pantalla de lejos, el real de cerca
-    // (de muy lejos se achican un poco: si no, son una multitud)
-    const mpp = 2 * api.camaraEstado().h / Math.max(1, trabajo.clientHeight), px = Math.max(7, Math.min(PX_PERSONA, PX_PERSONA * Math.sqrt(0.9 / mpp)));
-    const k = Math.max(1, px * mpp / FIG.alto);
+    const { mpp, px } = pxPersona(), k = Math.max(1, px * mpp / FIG.alto);
     if (Math.abs(k - (caminan.k || 0)) > 0.01) {
       caminan.k = k;
       for (let i = 0; i < PERS.length; i++) PM.aEsc.setXY(i, FIG.ancho * PERS[i].esc * k, FIG.alto * PERS[i].esc * k);
@@ -368,7 +371,7 @@ export async function crea(api) {
   function armaBalaceras() {
     const g = new THREE.Group(); g.name = 'marca-balaceras'; g.visible = false; gH.add(g);
     const piezas = [], rotulos = [], ondas = [];
-    const geoDisco = new THREE.CircleGeometry(9, 40).rotateX(-Math.PI / 2), geoOnda = new THREE.RingGeometry(0.86, 1, 64).rotateX(-Math.PI / 2);
+    const geoDisco = new THREE.CircleGeometry(4, 40).rotateX(-Math.PI / 2), geoOnda = new THREE.RingGeometry(0.86, 1, 64).rotateX(-Math.PI / 2);
     const rojo = op => new THREE.MeshBasicMaterial({ color: ROJO, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide });
     MARCAS.balaceras.forEach((b, i) => {
       const sub = new THREE.Group();
@@ -385,7 +388,7 @@ export async function crea(api) {
     MARCA.balaceras = { g, piezas, rotulos, latido(ms, k) {
       ondas.forEach(w => [[w.o1, 0], [w.o2, 0.5]].forEach(([o, d]) => {
         let f = ms / 2200 + w.fase + d; f -= Math.floor(f);
-        const r = 6 + 46 * f; o.scale.set(r, 1, r); o.material.opacity = 0.85 * (1 - f) * (1 - f) * k;
+        const r = 4 + 24 * f; o.scale.set(r, 1, r); o.material.opacity = 0.85 * (1 - f) * (1 - f) * k;
       }));
     } };
   }
@@ -420,11 +423,12 @@ export async function crea(api) {
       (t.fuente ? '<p class="hist-fuente">' + esc(t.fuente) + '</p>' : '');
   }
   // dos figuras que se disparan: destello, bala y retroceso, en bucle (atlampa.css)
-  const FIGURA = '<circle cx="12" cy="8" r="3.4"/><path d="M12 11.5v10M12 21.5l-3.6 8.5M12 21.5l3.6 8.5M12 14.6l9.5-1.6"/><rect x="20.6" y="11.9" width="4.4" height="2.3"/>';
-  const TIRO = '<svg class="hist-tiro" viewBox="0 0 72 36" aria-hidden="true">' +
-    '<g class="hist-tiro-a">' + FIGURA + '</g><g transform="translate(72 0) scale(-1 1)"><g class="hist-tiro-b">' + FIGURA + '</g></g>' +
-    '<circle class="hist-tiro-fa" cx="27.6" cy="13" r="2.8"/><circle class="hist-tiro-fb" cx="44.4" cy="13" r="2.8"/>' +
-    '<path class="hist-tiro-ba" d="M28 13h3.5"/><path class="hist-tiro-bb" d="M44 13h-3.5"/></svg>';
+  const FIGURA = '<circle cx="16" cy="9" r="5.2"/><path stroke-width="7.5" d="M16 19v16"/><path stroke-width="4.2" d="M16 36l-6 24M16 36l6 24"/>' +
+    '<path stroke-width="3.4" d="M16 21l-5 13M16 22l14-1"/><rect x="28" y="18.6" width="7" height="3.6"/>';
+  const TIRO = '<svg class="hist-tiro" viewBox="0 0 112 64" aria-hidden="true">' +
+    '<g class="hist-tiro-a">' + FIGURA + '</g><g transform="translate(112 0) scale(-1 1)"><g class="hist-tiro-b">' + FIGURA + '</g></g>' +
+    '<circle class="hist-tiro-fa" cx="38" cy="20.4" r="4.2"/><circle class="hist-tiro-fb" cx="74" cy="20.4" r="4.2"/>' +
+    '<path class="hist-tiro-ba" d="M39 20.4h6"/><path class="hist-tiro-bb" d="M73 20.4h-6"/></svg>';
   let tarjetaTok = 0;
   function muestraTarjeta(s, i) {
     const tok = ++tarjetaTok;
@@ -462,8 +466,9 @@ export async function crea(api) {
   api.alPintar(cam => {
     if (!activo) return;
     const w = trabajo.clientWidth, h = trabajo.clientHeight;
-    const mpp = 2 * api.camaraEstado().h / Math.max(1, h), escTiro = Math.max(0.6, Math.min(1.25, Math.sqrt(0.9 / mpp))).toFixed(2);
-    if (escTiro !== capaRot.dataset.esc) { capaRot.dataset.esc = escTiro; capaRot.style.setProperty('--tiro-esc', escTiro); }
+    // los tiradores, del alto de los civiles (un poco más: 1.2)
+    const altoTiro = (pxPersona().px * 1.2 * 64 / 56).toFixed(1);
+    if (altoTiro !== capaRot.dataset.tiro) { capaRot.dataset.tiro = altoTiro; capaRot.style.setProperty('--tiro-h', altoTiro + 'px'); }
     ROT.forEach(o => {
       tmp.copy(o.p).project(cam);
       const fuera = tmp.z > 1 || tmp.x < -1.2 || tmp.x > 1.2 || tmp.y < -1.2 || tmp.y > 1.2;
