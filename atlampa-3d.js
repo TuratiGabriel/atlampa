@@ -3076,7 +3076,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const EL_MIN = 2, EL_MAX = 89, H_MIN = 1.5, H_MAX = 3000, H_INT = 3;   // H_INT: desde ahí, inspeccionando, el zoom camina
   // (la cámara arranca con la altura y el giro del tablero: el primer encuadre ya es el bueno)
   let AZ = typeof op.az === 'number' ? ((op.az % 360) + 360) % 360 : 20, EL = typeof op.el === 'number' ? Math.max(2, Math.min(89, op.el)) : 30, X = -1, ASP = 1;
-  let base = { c: new THREE.Vector3(), h: 100 };
+  let base = { c: new THREE.Vector3(), h: 100 }, eje = null;   // eje: el punto sobre el que se gira (ver pivote)
   function caja() {   // [u0, u1, v0, v1, z0, z1] de lo que se encuadra
     if (aisl) return aisl.caja;
     if (capas.nolli) return [S.u0 - 110, S.u1 + 110, S.v0 - 90, S.v1 + 90, 0, 1];
@@ -3105,6 +3105,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   }
   // encuadra la caja: centro y media altura en el plano de vista
   function encuadra() {
+    eje = null;
     const k = caja(), d = direccion(), up = new THREE.Vector3(0, 1, 0), r = new THREE.Vector3().crossVectors(d, up).normalize(), u = new THREE.Vector3().crossVectors(r, d).normalize();
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     const c0 = new THREE.Vector3(...W((k[0] + k[1]) / 2, (k[2] + k[3]) / 2, (k[4] + k[5]) / 2));
@@ -3142,7 +3143,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     camO.position.copy(c).addScaledVector(d, -1500); camO.up.set(0, 1, 0); camO.lookAt(c); camO.updateProjectionMatrix();
     const dist = h / Math.tan(camP.fov / 2 * RAD);
     camP.aspect = ASP; camP.position.copy(c).addScaledVector(d, -dist); camP.up.set(0, 1, 0); camP.lookAt(c);
-    camP.near = dist < 100 ? Math.max(0.05, dist * 0.01) : Math.max(1, dist * 0.05);   // de cerca casi nada se recorta (se puede estar adentro) camP.far = Math.max(dist * 20, 3000); camP.updateProjectionMatrix();
+    camP.near = dist < 100 ? Math.max(0.05, dist * 0.01) : Math.max(1, dist * 0.05);   // de cerca casi nada se recorta (se puede estar adentro)
+    camP.far = Math.max(dist * 20, 3000); camP.updateProjectionMatrix();
     pide();
   }
 
@@ -3252,9 +3254,14 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const EL_DENTRO = [-60, 85];
   function vista(x, az, el) {
     const fija = dentro() ? camP.position.clone() : null;
+    const antes = !fija && eje && !elevacionAct ? marco() : null;
     if (az !== undefined) AZ = elevacionAct ? { norte: 180, sur: 0, este: 270, oeste: 90 }[fachadaAct] : ((az % 360) + 360) % 360;
     if (el !== undefined) EL = elevacionAct ? 0 : fija ? Math.max(EL_DENTRO[0], Math.min(EL_DENTRO[1], el)) : Math.max(EL_MIN, Math.min(EL_MAX, el));
     if (fija) base.c.copy(fija).addScaledVector(direccion(), base.h / Math.tan(camP.fov / 2 * RAD));
+    else if (antes) {   // orbita alrededor del eje: base.c guarda su posición relativa en el marco de la cámara
+      const k = base.c.clone().sub(eje), m = marco();
+      base.c.copy(eje).addScaledVector(m.r, k.dot(antes.r)).addScaledVector(m.u, k.dot(antes.u)).addScaledVector(m.d, k.dot(antes.d));
+    }
     const nx = GENERAL ? Math.max(0, Math.min(1, x || 0)) : 0;
     if (nx !== X) { X = nx; encuadra(); if (ext.vista) ext.vista(X); }   // al abrir (y con el contexto)
     ponCamara();
@@ -3268,7 +3275,27 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const p = new THREE.Vector3();
     return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), p) ? p : base.c.clone();
   }
+  // Eje del giro. Con el zoom hacia el cursor y el paneo, base.c (lo que se
+  // mira) se queda flotando, lejos del modelo o junto a la cámara, y girar
+  // alrededor de él sacaba el proyecto de cuadro. Al empezar a girar se fija
+  // el eje en el modelo que está al centro de la vista o, si ahí no hay nada,
+  // en el centro del proyecto; vista() hace orbitar la cámara alrededor de ese
+  // punto (se queda quieto en pantalla). Se suelta al mover, acercar o encuadrar.
+  function marco() {
+    const d = direccion(), r = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize();
+    return { d, r, u: new THREE.Vector3().crossVectors(r, d).normalize() };
+  }
+  function pivote() {
+    eje = null;
+    if (dentro() || elevacionAct) return false;   // dentro de una nave girar es mirar alrededor
+    ndc.set(0, 0); ray.setFromCamera(ndc, cam);
+    const hit = ray.intersectObjects(visiblesPicables().concat(suelos), false)[0];
+    if (hit) eje = hit.point.clone();
+    else { const k = caja(); eje = new THREE.Vector3(...W((k[0] + k[1]) / 2, (k[2] + k[3]) / 2, (k[4] + k[5]) / 2)); }
+    return true;
+  }
   function acerca(f, fx, fy) {
+    eje = null;
     if (fx === undefined) { fx = 0.5; fy = 0.5; }
     // al llegar al tope del zoom la cámara sigue de frente: lo que mira avanza con ella y se mete al interior
     if (f > 1 && base.h / f < H_INT) {
@@ -3292,7 +3319,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     ponCamara();
   }
   function mueve(dfx, dfy) {
-    vueloTok++;
+    vueloTok++; eje = null;
     const d = direccion(), r = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize(), u = new THREE.Vector3().crossVectors(r, d).normalize();
     base.c.addScaledVector(r, -dfx * 2 * base.h * ASP).addScaledVector(u, dfy * 2 * base.h);
     ponCamara();
@@ -3304,7 +3331,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   }
   // caminar (WASD / Q E): adelante y de lado en horizontal, arriba en vertical; dentro, a pasos de 0.5 m
   function pasea(adelante, lado, arriba) {
-    vueloTok++;
+    vueloTok++; eje = null;
     const d = direccion(), f = new THREE.Vector3(d.x, 0, d.z).normalize(), r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0));
     const paso = dentro() ? 0.5 : base.h * 0.1;
     base.c.addScaledVector(f, adelante * paso).addScaledVector(r, lado * paso).addScaledVector(new THREE.Vector3(0, 1, 0), arriba * paso);
@@ -3780,7 +3807,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   vista(0, AZ, EL);
 
   return {
-    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura, elevacionModo, historiaModo,
+    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, pivote, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura, elevacionModo, historiaModo,
     aisla, partes, ponParte, despiece, aislado: () => aisl ? aisl.ap : null, camara, corta,
     naveNorteEn, apartamentoEn: ev => etapaVivienda4 === 'piso' ? detalle4.apartmentAt(ev) : null,
     muroEn: ev => etapaVivienda4 === 'departamento' ? detalle4.wallAt(ev) : null,

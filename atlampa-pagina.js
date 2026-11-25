@@ -1395,7 +1395,7 @@
     recorrido += Math.abs(dx) + Math.abs(dy);
     p.x = ev.clientX; p.y = ev.clientY;
     if (n === 1 && modo === 'mueve') { dib.mueve(dx / r.width, dy / r.height); escala(); }
-    else if (n === 1 && recorrido > 3) { mano = true; orbita(-dx * GIRO_PX, dy * ALTO_PX); }
+    else if (n === 1 && recorrido > 3) { if (!mano && dib.pivote) dib.pivote(); mano = true; orbita(-dx * GIRO_PX, dy * ALTO_PX); }
     if (n === 2) {
       var d = distancia(), k = Object.keys(dedos), cx = (dedos[k[0]].x + dedos[k[1]].x) / 2, cy = (dedos[k[0]].y + dedos[k[1]].y) / 2;
       if (pell && d) acerca(d / pell, (cx - r.left) / r.width, (cy - r.top) / r.height);
@@ -1454,6 +1454,7 @@
     if (!dib) return;   // el motor 3D todavía carga
     if (yendo) return;
     var k = ev.key, hecho = true;
+    if (/^Arrow/.test(k) && dib.pivote && !prendida('elevacion')) dib.pivote();   // gira sobre lo que está al centro
     if (k === 'ArrowLeft') orbita(15, 0);
     else if (k === 'ArrowRight') orbita(-15, 0);
     else if (k === 'ArrowUp') orbita(0, 5);
