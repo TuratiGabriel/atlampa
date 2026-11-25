@@ -397,6 +397,8 @@ export async function crea(api) {
   /* ---------- 3b. Marcas de la segunda parte: cultura, verdes, espuela y el circuito ---------- */
   const matC = (c, op) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide });
   const linC = (c, op) => new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: op });
+  // los flujos del metabolismo urbano (lámina «circuito»): un color por flujo en los pulsos
+  const COLORES_FLUJOS = (MARCAS.flujos || [['#ffffff', 'flujos']]).map(f => f[0]);
   function grupoMarca(id) { const g = new THREE.Group(); g.name = 'marca-' + id; g.visible = false; gH.add(g); return g; }
   // tira plana a lo largo de una polilínea; los triángulos van en orden, así que se puede «trazar» con drawRange
   function cinta(pts, ancho, z) {
@@ -458,9 +460,10 @@ export async function crea(api) {
       const n = Math.max(1, Math.round(L / (o.cada || 80)));
       for (let k = 0; k < n; k++) items.push({ pts, acc, L, s0: k * L / n });
     });
-    const mat = new THREE.MeshBasicMaterial({ color: o.color, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+    const mat = new THREE.MeshBasicMaterial({ color: o.colores ? 0xffffff : o.color, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
     const im = new THREE.InstancedMesh(geoPulso, mat, Math.max(1, items.length));
     im.count = items.length; im.frustumCulled = false; im.renderOrder = 8;
+    if (o.colores) { const cs = o.colores.map(c => new THREE.Color(c)); items.forEach((it, i) => im.setColorAt(i, cs[i % cs.length])); im.instanceColor.needsUpdate = true; }
     const M4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), e3 = new THREE.Vector3(o.largo || 10, 1, o.ancho || 3);
     function mueve(ms) {
       const t = ms / 1000;
@@ -571,8 +574,8 @@ export async function crea(api) {
       const geo = cinta(pts, 3.4, 0.45), m = matC(CIRCUITO, 0.9), mesh = new THREE.Mesh(geo, m); mesh.renderOrder = 7; g.add(mesh);
       piezas.push({ obj: mesh, mats: [[m, 0.9]], traza: { g: geo, n: geo.attributes.position.count }, dur: 1200, retraso: 900 });
     });
-    const pA = pulsos([anillo], { color: 0xffffff, cada: 26, vel: 11, largo: 6, ancho: 2.2, z: A.z + 0.75 });
-    const pE = pulsos(esp, { color: 0xffffff, cada: 36, vel: 11, largo: 6, ancho: 2, z: 0.6 });
+    const pA = pulsos([anillo], { colores: COLORES_FLUJOS, cada: 14, vel: 10, largo: 5, ancho: 2.4, z: A.z + 0.75 });
+    const pE = pulsos(esp, { colores: COLORES_FLUJOS, cada: 18, vel: 10, largo: 5, ancho: 2.2, z: 0.6 });
     g.add(pA.obj, pE.obj);
     piezas.push({ obj: pA.obj, mats: [[pA.mat, 0.9]], retraso: 1500 }, { obj: pE.obj, mats: [[pE.mat, 0.9]], retraso: 1900 });
     (d.rotulos || []).forEach((x, i) => rotulos.push(Object.assign({ tipo: 'marca circuito', retraso: 1000 + i * 250 }, x)));
@@ -614,24 +617,25 @@ export async function crea(api) {
     // a los parques de fuera: líneas punteadas
     (d.parques || []).forEach(x => {
       const v = H.verdes.find(y => y.n === x.nombre); if (!v) return;
-      const c = centro(pares(v.p)), m = new THREE.LineDashedMaterial({ color: CIRCUITO, dashSize: 22, gapSize: 14, transparent: true, opacity: 0.95 });
+      const c = centro(pares(v.p)), m = new THREE.LineDashedMaterial({ color: VERDE, dashSize: 22, gapSize: 14, transparent: true, opacity: 0.95 });
       const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(x.de[0], x.de[1], 0.7), V3(c[0], c[1], 0.7)]), m);
       ln.computeLineDistances(); ln.renderOrder = 7; g.add(ln);
       const t = cuando(x.de) + 300;
       piezas.push({ obj: ln, mats: [[m, 0.9]], retraso: t });
-      rotulos.push({ u: c[0], v: c[1], z: 1, texto: x.texto || x.nombre, tipo: 'marca verde', retraso: t + 400 });
+      rotulos.push({ u: c[0], v: c[1], z: 1, texto: x.texto || x.nombre, sub: x.sub, lado: x.lado, tipo: 'marca verde', retraso: t + 400 });
       caminos.push([x.de, c]);
     });
     const latidos = [];
     (d.nodos || []).forEach(n => {
       const t = cuando([n.u, n.v]) + 200;
-      const ani = new THREE.Mesh(new THREE.RingGeometry(12, 17, 48).rotateX(-Math.PI / 2), matC(CIRCUITO, 0.95));
+      const col = n.color ? new THREE.Color(n.color) : CIRCUITO;
+      const ani = new THREE.Mesh(new THREE.RingGeometry(12, 17, 48).rotateX(-Math.PI / 2), matC(col, 0.95));
       ani.position.copy(V3(n.u, n.v, 0.8)); ani.renderOrder = 8; g.add(ani);
       piezas.push({ obj: ani, mats: [[ani.material, 0.95]], retraso: t });
-      latidos.push(ondas(g, n.u, n.v, CIRCUITO, 16, 60, (n.u * 0.013) % 1));
-      if (n.texto) rotulos.push({ u: n.u, v: n.v, z: 1, texto: n.texto, sub: n.sub, lado: n.lado, tipo: 'marca circuito', retraso: t + 300 });
+      latidos.push(ondas(g, n.u, n.v, col, 16, 60, (n.u * 0.013) % 1));
+      if (n.texto) rotulos.push({ u: n.u, v: n.v, z: 1, texto: n.texto, sub: n.sub, lado: n.lado, color: n.color, tipo: 'marca circuito' + (n.color ? ' colorido' : ''), retraso: t + 300 });
     });
-    const pl = pulsos(caminos, { color: 0xffffff, cada: 80, vel: 34, largo: 22, ancho: 5, z: 0.85 });
+    const pl = pulsos(caminos, { colores: COLORES_FLUJOS, cada: 60, vel: 34, largo: 22, ancho: 5.5, z: 0.85 });
     g.add(pl.obj); piezas.push({ obj: pl.obj, mats: [[pl.mat, 0.9]], retraso: DUR });
     MARCA.circuitoAtlampa = { g, piezas, rotulos, latido: (ms, k) => { pl.mueve(ms); latidos.forEach(f => f(ms, k)); } };
   }
@@ -665,7 +669,7 @@ export async function crea(api) {
     const M4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), e3 = new THREE.Vector3();
     let t0 = null;
     function abre(ms) {
-      const t = t0 == null ? 0 : ms - t0;
+      const t = t0 == null ? 0 : Math.max(0, ms - t0);
       let todos = true;
       puestos.forEach((p, i) => {
         const k = Math.max(0, Math.min(1, (t - DUR * p.s / L) / 450)), e = k < 1 ? k * (1 + 0.25 * Math.sin(k * Math.PI)) : 1;
@@ -692,10 +696,10 @@ export async function crea(api) {
     let listoAbre = false;
     (d.rotulos || []).forEach((x, i) => rotulos.push(Object.assign({ tipo: 'marca mercado', retraso: 1200 + i * 300 }, x)));
     MARCA.mercado = { g, piezas, rotulos,
-      entra() { t0 = performance.now(); listoAbre = false; opG.value = 0; },
+      entra() { t0 = performance.now() + (d.retraso || 0); listoAbre = false; opG.value = 0; },
       latido(ms, k) {
         if (!listoAbre) listoAbre = abre(performance.now());
-        const t = t0 == null ? 0 : performance.now() - t0;
+        const t = t0 == null ? 0 : Math.max(0, performance.now() - t0);
         opG.value = Math.max(0, Math.min(1, (t - DUR * 0.4) / 900)) * k;
         if (opG.value > 0 && !quieto.matches) mueveGente(GENTE, GM, ms);
       } };
@@ -703,12 +707,19 @@ export async function crea(api) {
 
   /* ---------- 4. HTML: tarjeta, rótulos, navegación ---------- */
   const capa = document.createElement('div'); capa.className = 'hist-capa'; capa.hidden = true;
-  capa.innerHTML = '<div class="hist-rotulos"></div><aside class="hist-tarjeta" aria-live="polite"></aside>' +
+  capa.innerHTML = '<div class="hist-fondo" aria-hidden="true"></div><div class="hist-rotulos"></div><aside class="hist-tarjeta" aria-live="polite"></aside>' +
     '<nav class="hist-nav" aria-label="Slides de la presentación"><button type="button" class="hist-nav-flecha" data-hist="anterior" aria-label="Slide anterior">‹ Anterior</button>' +
     '<ol class="hist-nav-lista">' + GUION.map((s, i) => '<li><button type="button" data-hist-ir="' + i + '" title="' + s.titulo + '"><span>' + String(i + 1).padStart(2, '0') + '</span><i class="tt"> ' + s.titulo + '</i></button></li>').join('') + '</ol>' +
     '<button type="button" class="hist-nav-flecha hist-nav-sigue" data-hist="siguiente" aria-label="Slide siguiente">Siguiente ›</button></nav>' +
     '<div class="hist-carga" role="status">Armando Atlampa…</div>';
   trabajo.appendChild(capa);
+  const fondoEl = capa.querySelector('.hist-fondo');
+  function ponFondo(t) {
+    if ((fondoEl.dataset.t || '') === (t || '')) return;
+    fondoEl.dataset.t = t || '';
+    fondoEl.classList.remove('visible');
+    if (t) { fondoEl.textContent = t; requestAnimationFrame(() => requestAnimationFrame(() => fondoEl.classList.add('visible'))); }
+  }
   const capaRot = capa.querySelector('.hist-rotulos'), tarjeta = capa.querySelector('.hist-tarjeta'), cargaEl = capa.querySelector('.hist-carga');
   // el visor captura el puntero al arrastrar: en los botones y la tarjeta, el clic es de la presentación
   capa.addEventListener('pointerdown', ev => { if (ev.target.closest('.hist-nav, .hist-tarjeta')) ev.stopPropagation(); });
@@ -730,6 +741,7 @@ export async function crea(api) {
       '<h2 class="hist-titulo">' + esc(t.titulo) + '</h2>' +
       (t.texto ? '<p class="hist-texto">' + esc(t.texto) + '</p>' : '') +
       (t.cifras && t.cifras.length ? '<dl class="hist-cifras">' + t.cifras.map(c => '<div><dd>' + esc(c[0]) + '</dd><dt>' + esc(c[1]) + (c[2] ? '<span>' + esc(c[2]) + '</span>' : '') + '</dt></div>').join('') + '</dl>' : '') +
+      (t.leyenda ? '<ul class="hist-leyenda">' + t.leyenda.map(x => '<li><i style="background:' + esc(x[0]) + '"></i>' + esc(x[1]) + '</li>').join('') + '</ul>' : '') +
       (t.nota ? '<p class="hist-nota">' + esc(t.nota) + '</p>' : '') +
       (t.fuente ? '<p class="hist-fuente">' + esc(t.fuente) + '</p>' : '');
   }
@@ -911,6 +923,7 @@ export async function crea(api) {
         if (avisos.fin) avisos.fin();
       });
       if (!mismo) setTimeout(() => { if (tok === irTok && activo) muestraTarjeta(s, n); }, Math.min(900, dur * 0.45));
+      ponFondo(s.fondo);
       // lo que entra, al llegar
       setTimeout(() => {
         if (tok !== irTok || !activo) return;
@@ -971,7 +984,7 @@ export async function crea(api) {
   function sale(av) {
     if (!activo) return;
     ++irTok; tweens = []; volando = false;
-    quitaTarjeta(); quitaRotulos();
+    quitaTarjeta(); quitaRotulos(); ponFondo(null);
     activo = false;
     gH.visible = false; capa.hidden = true; document.body.classList.remove('hist-activo');
     Object.keys(MARCA).forEach(id => aplicaMarca(id, 0));

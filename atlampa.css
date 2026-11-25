@@ -529,6 +529,13 @@ body.con-datos .hud-camara{ opacity:0; pointer-events:none; }
 .hist-capa{ position:absolute; inset:0; z-index:7; pointer-events:none; --hist-am:#f5c518; --hist-rojo:#ff3b30; }
 .hist-capa[hidden]{ display:none; }
 .hist-rotulos{ position:absolute; inset:0; overflow:hidden; }
+/* portada: la palabra del concepto, enorme y difuminada detrás de la colonia */
+.hist-fondo{
+  position:absolute; inset:0; display:grid; place-items:center; padding-left:calc(360px + 6vw); overflow:hidden; pointer-events:none; white-space:nowrap;
+  font:300 clamp(110px, 15vw, 380px)/1 var(--font-display); letter-spacing:-.05em; color:rgba(255,255,255,.14);
+  filter:blur(6px); opacity:0; transform:scale(1.04); transition:opacity 1.6s var(--ease-ui), transform 2.4s var(--ease-ui);
+}
+.hist-fondo.visible{ opacity:1; transform:none; }
 .hist-rotulo{ position:absolute; left:0; top:0; width:0; height:0; pointer-events:none; opacity:0; transition:opacity .5s var(--ease-ui); }
 .hist-rotulo.visible{ opacity:1; }
 .hist-rotulo .t{
@@ -597,6 +604,10 @@ body.con-datos .hud-camara{ opacity:0; pointer-events:none; }
 .hist-cifras dd{ margin:0 0 6px; font:400 22px/1 var(--font-display); color:var(--fg); }
 .hist-cifras dt{ font-size:10px; line-height:1.3; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
 .hist-cifras dt span{ display:block; margin-top:3px; font-size:9px; letter-spacing:.06em; color:rgba(154,154,154,.72); }
+.hist-leyenda{ display:flex; flex-wrap:wrap; gap:6px 14px; margin:14px 0 0; padding:0; list-style:none; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+.hist-leyenda li{ display:flex; align-items:center; gap:6px; }
+.hist-leyenda i{ width:14px; height:4px; border-radius:2px; box-shadow:0 0 6px currentColor; }
+.hist-rotulo--colorido::before{ background:var(--c) !important; box-shadow:0 0 10px var(--c) !important; }
 .hist-nota{ margin:16px 0 0; padding-left:10px; border-left:2px solid var(--hist-am); font-size:11.5px; line-height:1.5; color:rgba(255,255,255,.8); }
 .hist-fuente{ margin:18px 0 0; padding-top:11px; border-top:1px solid var(--trazo); font-size:9.5px; line-height:1.4; letter-spacing:.03em; color:rgba(154,154,154,.72); }
 
