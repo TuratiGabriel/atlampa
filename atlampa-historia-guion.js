@@ -14,7 +14,8 @@
    rotulosDe: [ids] → sólo esas marcas ponen sus textos
    tarjeta: kicker, titulo, texto, cifras [[valor, etiqueta, nota]], nota, fuente
    rotulos: { u, v, z, texto, sub, tipo: 'calle' | 'punto', lado: 'izq' (texto a la izquierda) }
-   fondo: texto grande y difuminado detrás de todo (la portada)
+   fondo: { texto, pos: 'esquina' | 'centro' | 'aro', blur, op, alto } · 'aro': la última letra es el aro del
+          proyecto en su lugar, y camara.encuadre: 'fondo' encuadra la palabra
    ============================================================ */
 
 export const MARCAS = {
@@ -292,16 +293,17 @@ export default [
   {
     id: 'circuito',
     titulo: 'Circuito',
-    camara: { encuadre: [-150, -120, 1850, 1250], az: 'norte', el: 89, aire: 1.02, lado: 0.26, dur: 2800 },
-    capas: { colonia: false, coches: false, limite: false },
-    marcas: ['asentamientos', 'balaceras', 'cultura', 'verdes', 'espuela'],
+    // la palabra escrita sobre la colonia; su «o» es el aro del proyecto, en su lugar (un guiño a lo que será)
+    camara: { encuadre: 'fondo', az: 'norte', el: 52, aire: 1.12, lado: 0.26, dur: 3000 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['asentamientos', 'cultura', 'espuela'],
     compacto: true,
-    fondo: { texto: 'circuito', pos: 'centro', blur: 0, op: 0.92, alto: 0.85 },
+    fondo: { texto: 'circuito', pos: 'aro', op: 0.9 },
     tarjeta: {
       kicker: 'Concepto · 2 / 3',
       titulo: 'Circuito',
       texto: '(circuitus, latín): rodear, recorrer, volver. El circuito se plantea como un dispositivo de conexión capaz de organizar relaciones entre espacios residuales, habitantes, producción y paisaje. Frente a una colonia fragmentada, reconecta lo que hoy está separado a partir de sus propios recursos.',
-      leyenda: [['#f5c518', 'asentamientos'], ['#ff3b30', 'violencia'], ['#c9a6ff', 'cultura'], ['#a8e063', 'áreas verdes'], ['#e8a25a', 'espuela']],
+      leyenda: [['#ff6f63', 'el aro: la «o» del circuito'], ['#e8a25a', 'espuela'], ['#f5c518', 'asentamientos'], ['#c9a6ff', 'cultura']],
       nota: 'Metabolismo urbano: agua, energía, materiales, personas y capital que entran, se transforman y vuelven a circular.',
       fuente: 'Lámina «circuito» (Actividad 02A)'
     },

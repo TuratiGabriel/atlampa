@@ -36,6 +36,9 @@ export async function crea(api) {
   Object.assign(ESTILOS.plano.papel, { ctxlejos: { gris: 0.025, arista: 0.11 } });
   Object.assign(ESTILOS.rayado.papel, { ctxlejos: { tono: 0.02, paso: 3.2, arista: 0.13 } });
   Object.assign(ESTILOS.clay.papel, { ctxlejos: { modo: 1, gris: 0.9, arista: 0.08 } });
+  Object.assign(ESTILOS.plano.papel, { ctxpredio: { gris: 0.07, arista: 0.95 } });
+  Object.assign(ESTILOS.rayado.papel, { ctxpredio: { tono: 0.08, paso: 2.4, arista: 0.95 } });
+  Object.assign(ESTILOS.clay.papel, { ctxpredio: { modo: 1, gris: 0.96, arista: 0.55 } });
   Object.assign(ESTILOS.plano.lineas, { ctxlejos: 0.1 });
   Object.assign(ESTILOS.rayado.lineas, { ctxlejos: 0.11 });
   Object.assign(ESTILOS.clay.lineas, { ctxlejos: 0.1 });
@@ -159,7 +162,15 @@ export async function crea(api) {
       }
     });
     ((MARCAS.existente && MARCAS.existente.masas) || []).forEach(x => prisma(m, api.rect(...x.planta), 0, x.alto));
-    pon(gCol, m, 'contexto', null, 25);
+    pon(gCol, m, 'ctxpredio', null, 25);
+    // el predio resaltado: su contorno (doble, con la banqueta) y un velo claro sobre el piso
+    const lp = new Lineas(), P = G.PRED;
+    lp.poli(P.map(q => W(q[0], q[1], 0.3)), true);
+    lp.poli(franjaLado(P.concat([P[0]]), -2.2).slice(0, -1).map(q => W(q[0], q[1], 0.3)), true);
+    ponLineas(gCol, lp, 'ctxresalta', 0xffffff);
+    const vp = new Malla(); tapa(vp, P, 0.08);
+    const velo = new THREE.Mesh(vp.geo(), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.07, depthWrite: false }));
+    velo.renderOrder = 2; gCol.add(velo);
     const tv = new Lineas();
     adentro(G.ESPUELA, S).forEach(t => [-0.72, 0.72].forEach(o => tv.poli(franjaLado(t, o).map(q => W(q[0], q[1], 0.06)))));
     ponLineas(gCol, tv, 'ctxtren', 0xffffff);
@@ -756,11 +767,63 @@ export async function crea(api) {
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
     return { tex, asp: w / h };
   }
+  // pos 'aro': la palabra se escribe sobre la colonia y su última letra es el aro del proyecto, en su
+  // lugar y a su tamaño (la «o» mide lo que el diámetro exterior del aro). Se calcula la escala con
+  // las medidas del glifo; el aro es una cinta coral con los flujos del circuito.
+  let fondoAro = null;
+  function disenoAro(t, az) {
+    const fam = getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() || 'sans-serif';
+    const cv = document.createElement('canvas'), x = cv.getContext('2d'), px = 300, pad = 40, f = '300 ' + px + 'px ' + fam;
+    x.font = f;
+    const base = t.slice(0, -1), wBase = x.measureText(base).width, mo = x.measureText(t.slice(-1)), ml = x.measureText('l');
+    const w = Math.ceil(wBase + mo.actualBoundingBoxRight) + 2 * pad, h = Math.ceil(px * 1.3) + 2 * pad, yb = pad + px;
+    cv.width = w; cv.height = h; x.font = f; x.fillStyle = '#ffffff'; x.fillText(base, pad, yb);
+    const ocx = pad + wBase + (mo.actualBoundingBoxRight - mo.actualBoundingBoxLeft) / 2, ocy = yb - (mo.actualBoundingBoxAscent - mo.actualBoundingBoxDescent) / 2;
+    const Hpx = mo.actualBoundingBoxAscent + mo.actualBoundingBoxDescent, stem = ml.actualBoundingBoxRight + ml.actualBoundingBoxLeft;
+    const A = G.ANILLO, k = 2 * A.re / Hpx, a = az * RAD;
+    const ex = new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), nw = new THREE.Vector3(Math.sin(a), 0, -Math.cos(a));
+    const centroO = V3(A.u, A.v, 0.4), c = centroO.clone().addScaledVector(ex, (w / 2 - ocx) * k).addScaledVector(nw, (ocy - h / 2) * k);
+    const W2 = w * k / 2, H2 = h * k / 2, esq = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => c.clone().addScaledVector(ex, i * W2).addScaledVector(nw, j * H2));
+    const us = esq.map(p => p.x + CEN[0]), vs = esq.map(p => -p.z + CEN[1]);
+    const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 8;
+    return { tex, c, ancho: w * k, alto: h * k, a, grosor: stem * k, caja: [Math.min(...us), Math.min(...vs), Math.max(...us), Math.max(...vs)] };
+  }
+  function ponAro(lay) {
+    if (!fondoAro) {
+      const A = G.ANILLO, g = new THREE.Group(), rm = A.re - lay.grosor / 2, circulo = [];
+      for (let i = 0; i <= 120; i++) { const t = i / 120 * Math.PI * 2; circulo.push([A.u + rm * Math.cos(t), A.v + rm * Math.sin(t)]); }
+      const m = matC(CIRCUITO, 0); m.depthTest = false;
+      const cin = new THREE.Mesh(cinta(circulo, lay.grosor, 0.5), m); cin.renderOrder = 10; g.add(cin);
+      const pl = pulsos([circulo], { colores: COLORES_FLUJOS, cada: 16, vel: 12, largo: 7, ancho: lay.grosor * 0.45, z: 0.7 });
+      pl.mat.depthTest = false; pl.obj.renderOrder = 11; g.add(pl.obj);
+      g.userData = { m, pl }; g.visible = false; gH.add(g);
+      fondoAro = g;
+    }
+    return fondoAro;
+  }
   function ponFondo(f, o) {
     const tok = ++fondoTok;
     const op = typeof f === 'object' && f ? f : { texto: f };
-    const t = op.texto, blur = op.blur == null ? 7 : op.blur, clave = t + '|' + blur;
-    if (!t || !o) { const de = matFondo.opacity; anima(700, k => { if (tok === fondoTok) matFondo.opacity = de * (1 - k); }, () => { if (tok === fondoTok) fondo3D.visible = false; }); return; }
+    const t = op.texto, blur = op.blur == null ? 7 : op.blur, clave = t + '|' + blur + '|' + (op.pos || '');
+    const aroDe = fondoAro && fondoAro.visible ? fondoAro.userData.m.opacity : 0;
+    if (!t || !o) {
+      const de = matFondo.opacity;
+      anima(700, k => { if (tok !== fondoTok) return; matFondo.opacity = de * (1 - k); if (fondoAro) { fondoAro.userData.m.opacity = aroDe * (1 - k); fondoAro.userData.pl.mat.opacity = aroDe * (1 - k); } },
+        () => { if (tok === fondoTok) { fondo3D.visible = false; if (fondoAro) fondoAro.visible = false; } });
+      return;
+    }
+    if (op.pos === 'aro') {
+      const lay = op._diseno || disenoAro(t, o.az);
+      if (fondoTexto !== clave) { if (matFondo.map) matFondo.map.dispose(); matFondo.map = lay.tex; matFondo.needsUpdate = true; fondoTexto = clave; }
+      matFondo.depthTest = false; fondo3D.renderOrder = 9;
+      fondo3D.position.copy(lay.c); fondo3D.scale.set(lay.ancho, 1, lay.alto); fondo3D.rotation.set(0, -lay.a, 0); fondo3D.visible = true;
+      const g = ponAro(lay); g.visible = true;
+      const de = matFondo.opacity, meta = op.op == null ? 0.9 : op.op;
+      anima(1600, k => { if (tok !== fondoTok) return; matFondo.opacity = de + (meta - de) * k; g.userData.m.opacity = aroDe + (0.95 - aroDe) * k; g.userData.pl.mat.opacity = aroDe + (0.95 - aroDe) * k; });
+      return;
+    }
+    matFondo.depthTest = true; fondo3D.renderOrder = 1;
+    if (fondoAro) fondoAro.visible = false;
     if (fondoTexto !== clave) { if (matFondo.map) matFondo.map.dispose(); const tx = texturaFondo(t, blur); matFondo.map = tx.tex; matFondo.needsUpdate = true; fondo3D.userData.asp = tx.asp; fondoTexto = clave; }
     // marco de la cámara de la slide: arriba a la izquierda de la pantalla, sobre el piso
     const a = o.az * RAD, e = o.el * RAD, ASP = trabajo.clientWidth / Math.max(1, trabajo.clientHeight);
@@ -906,6 +969,7 @@ export async function crea(api) {
     if (gAut.visible && !quieto.matches) mueveCarros(ms);
     if (gPer.visible && !quieto.matches) caminan(ms);
     Object.keys(MARCA).forEach(id => { if (MARCA[id].g.visible) MARCA[id].latido(ms, marcaK[id] || 0); });
+    if (fondoAro && fondoAro.visible && !quieto.matches) fondoAro.userData.pl.mueve(ms);
     if (volando && avisos.mueve) avisos.mueve();
     pide();
     requestAnimationFrame(latido);
@@ -984,6 +1048,10 @@ export async function crea(api) {
       } else { gCol.visible = false; sitioVisor(false); aplicaRevelado(0); }
       // vuelo
       volando = true;
+      if (s.fondo && s.fondo.pos === 'aro') {
+        s.fondo._diseno = disenoAro(s.fondo.texto, cs.az === 'norte' || cs.az == null ? AZ_NORTE : cs.az);
+        if (cs.encuadre === 'fondo') { const k = s.fondo._diseno.caja, m = 30; cs.encuadre = [k[0] - m, k[1] - m, k[2] + m, k[3] + m]; }
+      }
       const obj = objetivo(cs);
       ponFondo(s.fondo, obj);
       api.camaraA(obj, dur, () => {
