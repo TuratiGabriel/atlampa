@@ -95,19 +95,39 @@
   // como slide más adelante; ver PRESENTACION FINAL/CONTEXTO.md.
   historiaAviso.innerHTML = '';
   trabajo.appendChild(historiaAviso);
+  var HIST = null;   // la presentación (atlampa-historia.js), al entrar
   function estadoHistoria() {
+    var e = HIST && historiaActiva ? HIST.estado() : null;
     return { ok: true, storyMode: historiaActiva, storyStage: historiaActiva ? 'etapa1' : null,
-      storyStep: null, storyTransitioning: false, sceneReady: false, visibleElements: 0,
-      storyAvailableActions: historiaActiva ? ['exitStoryMode'] : [] };
+      storyStep: e ? e.slide : null, storySlide: e ? e.id : null, storySlides: HIST ? HIST.total : null,
+      storyTransitioning: !!(e && e.volando), sceneReady: !!(e && e.listo), visibleElements: 0,
+      storyAvailableActions: historiaActiva ? ['nextSlide', 'previousSlide', 'goToSlide', 'exitStoryMode'] : [] };
+  }
+  // la cámara la mueve la presentación: la página retoma su giro y su altura
+  function sincronizaHistoria() {
+    if (!dib || !dib.azimut) return;
+    az = azMeta = dib.azimut(); el = elMeta = dib.elevacion();
+    if (ponMini) ponMini(az);
+    escala();
+  }
+  function pasoHistoria(f) {
+    if (!historiaActiva || !HIST) return { ok: false, reason: historiaActiva ? 'not_ready' : 'story_mode_inactive' };
+    f(HIST);
+    return estadoHistoria();
   }
   function entrarHistoria() {
     if (historiaActiva) return { ok: true, alreadyActive: true, ...estadoHistoria() };
     if (!modoPresentacion) return { ok: false, reason: 'requires_presentation_mode' };
     if (!dib || !dib.historiaModo || yendo) return { ok: false, reason: 'not_ready' };
-    if (ESCENA !== 'general' || aislado || prendida('contexto')) return { ok: false, reason: 'requires_predio' };
+    if (ESCENA !== 'general' || aislado) return { ok: false, reason: 'requires_predio' };
     if (urbanRotationActive) stopUrbanRotation();
+    if (prendida('contexto')) ponContexto(false, true);   // la presentación trae su propia colonia
     cierraMenus(); cierraDatos(true); tooltip(null);
     historiaActiva = true;
+    dib.historia().then(function (h) {
+      HIST = h;
+      if (historiaActiva) h.entra({ mueve: function () { if (ponMini && dib.azimut) ponMini(dib.azimut()); }, fin: sincronizaHistoria });
+    }, function (e) { console.error('Modo historia', e); salirHistoria(); });
     document.body.classList.add('modo-historia');
     [].forEach.call(document.querySelectorAll('[data-modo-historia]'), function (b) { b.setAttribute('aria-pressed', 'true'); });
     return estadoHistoria();
@@ -115,6 +135,7 @@
   function salirHistoria() {
     if (!historiaActiva) return { ok: true, alreadyInactive: true, ...estadoHistoria() };
     if (dib && dib.historiaModo) dib.historiaModo(false);   // por si una slide encendió la preexistencia
+    if (HIST) HIST.sale({ fin: sincronizaHistoria });
     historiaActiva = false;
     document.body.classList.remove('modo-historia');
     [].forEach.call(document.querySelectorAll('[data-modo-historia]'), function (b) { b.setAttribute('aria-pressed', 'false'); });
@@ -135,7 +156,10 @@
     else if (!antes) ponModoPresentacion(false);
     return resultado;
   }
-  window.AtlampaHistoria = { enter: entrarHistoria, exit: salirHistoria, preview: previsualizaHistoria, getState: estadoHistoria };
+  window.AtlampaHistoria = { enter: entrarHistoria, exit: salirHistoria, preview: previsualizaHistoria, getState: estadoHistoria,
+    next: function () { return pasoHistoria(function (h) { h.siguiente(); }); },
+    previous: function () { return pasoHistoria(function (h) { h.anterior(); }); },
+    goTo: function (n) { return pasoHistoria(function (h) { h.ir(n); }); } };
   document.body.classList.toggle('modo-presentacion', modoPresentacion);
   function ponModoPresentacion(si) {
     if (urbanRotationActive) stopUrbanRotation();
@@ -988,7 +1012,15 @@
   document.addEventListener('keydown', function (ev) {
     if (ev.key === 'F9') { ev.preventDefault(); if (!ev.repeat) previsualizaHistoria(); return; }
     if (ev.key === 'F8') { ev.preventDefault(); if (!ev.repeat) ponModoPresentacion(!modoPresentacion); return; }
-    if (historiaActiva) { if (ev.key === 'Escape') { ev.preventDefault(); salirHistoria(); } return; }
+    if (historiaActiva) {
+      var kh = ev.key;
+      if (kh === 'Escape') { ev.preventDefault(); salirHistoria(); }
+      else if (HIST && /^(ArrowRight|ArrowDown|PageDown| |Enter)$/.test(kh)) { ev.preventDefault(); if (!ev.repeat) HIST.siguiente(); }
+      else if (HIST && /^(ArrowLeft|ArrowUp|PageUp|Backspace)$/.test(kh)) { ev.preventDefault(); if (!ev.repeat) HIST.anterior(); }
+      else if (HIST && kh === 'Home') { ev.preventDefault(); HIST.ir(0); }
+      else if (HIST && /^[1-9]$/.test(kh)) { ev.preventDefault(); HIST.ir(+kh - 1); }
+      return;
+    }
     if (ev.key !== 'Escape') return;
     if (urbanRotationActive) stopUrbanRotation();
     if (datosAbiertos) cierraDatos();
@@ -1366,6 +1398,7 @@
     if (!dib) return;   // el motor 3D todavía carga
     ev.preventDefault();
     if (yendo) return;
+    if (historiaActiva) sincronizaHistoria();
     var c = enCuadro(ev), d = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaY;
     acerca(Math.exp(-d * 0.0018), c[0], c[1]);
   }, { passive: false });
@@ -1375,6 +1408,7 @@
   zona.addEventListener('pointerdown', function (ev) {
     if (!dib) return;   // el motor 3D todavía carga
     if (yendo) return;
+    if (historiaActiva) { if (dib.historiaCorta) dib.historiaCorta(); sincronizaHistoria(); }
     dedos[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
     try { zona.setPointerCapture(ev.pointerId); } catch (e) { /* puntero que ya no existe */ }
     // como en Rhino: arrastrar (derecho o izquierdo) orbita; Shift o el botón central mueve
@@ -1408,7 +1442,7 @@
     pell = distancia();
     if (!Object.keys(dedos).length) { zona.classList.remove('arrastra', 'arrastra--mueve', 'arrastra--orbita'); mano = false; }
     // un clic (sin arrastrar) sobre un apartado lo abre
-    if (era && uno && recorrido < 5 && ev.type === 'pointerup' && ev.button === 0 && !yendo) {
+    if (era && uno && recorrido < 5 && ev.type === 'pointerup' && ev.button === 0 && !yendo && !historiaActiva) {
       if (detalleV4.etapa === 'piso') { var dep = dib.apartamentoEn(ev); if (dep) seleccionaDepartamentoV4(dep); return; }
       if (detalleV4.etapa === 'departamento') { var muro = dib.muroEn(ev); if (muro) seleccionaMuroV4(muro); return; }
       // dentro de un uso: picarle a una de sus partes la destaca (y quita los pisos de arriba)
@@ -1451,6 +1485,7 @@
   zona.addEventListener('keydown', function (ev) {
     if (!dib) return;   // el motor 3D todavía carga
     if (yendo) return;
+    if (historiaActiva) return;   // las atiende el teclado de la presentación
     var k = ev.key, hecho = true;
     if (/^Arrow/.test(k) && dib.pivote && !prendida('elevacion')) dib.pivote();   // gira sobre lo que está al centro
     if (k === 'ArrowLeft') orbita(15, 0);

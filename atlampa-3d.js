@@ -3229,6 +3229,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     renderer.render(escena, cam);
     dibujaSeccion();
     if (ext.pinta) ext.pinta(cam);
+    if (histPinta) histPinta(cam);
     if (conEsquema || !esqLimpio) dibujaEsquema();
     if (capas.sol) {
       const w = lienzo.clientWidth, h = lienzo.clientHeight;
@@ -3253,6 +3254,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const dentro = () => cam === camP && base.h <= H_INT + 1e-6;
   const EL_DENTRO = [-60, 85];
   function vista(x, az, el) {
+    histTok++;   // mover a mano corta el vuelo de una slide
     const fija = dentro() ? camP.position.clone() : null;
     const antes = !fija && eje && !elevacionAct ? marco() : null;
     if (az !== undefined) AZ = elevacionAct ? { norte: 180, sur: 0, este: 270, oeste: 90 }[fachadaAct] : ((az % 360) + 360) % 360;
@@ -3295,6 +3297,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     return true;
   }
   function acerca(f, fx, fy) {
+    histTok++;
     eje = null;
     if (fx === undefined) { fx = 0.5; fy = 0.5; }
     // al llegar al tope del zoom la cámara sigue de frente: lo que mira avanza con ella y se mete al interior
@@ -3319,6 +3322,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     ponCamara();
   }
   function mueve(dfx, dfy) {
+    histTok++;
     vueloTok++; eje = null;
     const d = direccion(), r = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize(), u = new THREE.Vector3().crossVectors(r, d).normalize();
     base.c.addScaledVector(r, -dfx * 2 * base.h * ASP).addScaledVector(u, dfy * 2 * base.h);
@@ -3800,6 +3804,41 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     camara: () => cam, X: () => X
   }) || {} : {};
 
+  /* ----- Modo historia (atlampa-historia.js): se carga al entrar -----
+     La presentación vuela la cámara entre estados {c (mundo), h, az, el}, con
+     la misma curva y el mismo «salto» que vuelaA; cualquier movimiento a mano
+     (vista, acerca, mueve) corta el vuelo. */
+  let HIST = null, histPinta = null, histTok = 0;
+  function camaraEstado() { return { c: [base.c.x, base.c.y, base.c.z], h: base.h, az: AZ, el: EL }; }
+  function camaraA(a, dur, listo) {
+    eje = null; vueloTok++;
+    const tok = ++histTok, de = { c: base.c.clone(), h: base.h, az: AZ, el: EL };
+    const c1 = new THREE.Vector3(a.c[0], a.c[1], a.c[2]), h1 = a.h, el1 = Math.max(EL_MIN, Math.min(EL_MAX, a.el));
+    const daz = ((((a.az - de.az) % 360) + 540) % 360) - 180;
+    dur = dur || 1600;
+    const salto = Math.min(0.55, de.c.distanceTo(c1) / (2.5 * Math.max(de.h, h1)));
+    const suave = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2, t0 = performance.now();
+    (function paso(ms) {
+      if (muerto || tok !== histTok) return;
+      const t = Math.min(1, Math.max(0, (ms - t0) / dur)), k = suave(t);
+      base = { c: de.c.clone().lerp(c1, k), h: de.h * Math.pow(h1 / de.h, k) * (1 + salto * Math.sin(Math.PI * k)) };
+      AZ = (((de.az + daz * k) % 360) + 360) % 360; EL = de.el + (el1 - de.el) * k;
+      ponCamara();
+      if (t < 1) requestAnimationFrame(paso); else if (listo) listo();
+    })(t0);
+  }
+  async function historia() {
+    if (!HIST) {
+      const mod = await import('./atlampa-historia.js' + (VER ? '?' + VER : ''));
+      HIST = await mod.crea({
+        THREE, G, W, CEN, rect, ccw, Malla, Lineas, tapa, tapaHueco, muros, prisma, pon, ponLineas, material, linea,
+        raizG, escena, trabajo, pide, aplicaEstilo, ESTILOS, dib: DIB.ctx,
+        camara: () => cam, camaraEstado, camaraA, alPintar: f => { histPinta = f; }
+      });
+    }
+    return HIST;
+  }
+
   // arranque
   tamano();
   visibles();
@@ -3808,6 +3847,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   return {
     vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, pivote, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura, elevacionModo, historiaModo,
+    historia, camaraEstado, camaraA, historiaCorta: () => { histTok++; },
     aisla, partes, ponParte, despiece, aislado: () => aisl ? aisl.ap : null, camara, corta,
     naveNorteEn, apartamentoEn: ev => etapaVivienda4 === 'piso' ? detalle4.apartmentAt(ev) : null,
     muroEn: ev => etapaVivienda4 === 'departamento' ? detalle4.wallAt(ev) : null,
