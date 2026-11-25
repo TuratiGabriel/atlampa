@@ -9,7 +9,7 @@
    ============================================================ */
 const VER = import.meta.url.split('?')[1] || '';
 const conV = f => f + (VER ? '?' + VER : '');
-const AMARILLO = 0xf5c518, ROJO = 0xff3b30;
+const AMARILLO = 0xf5c518, ROJO = 0xff3b30, LILA = 0xc9a6ff, VERDE = 0xa8e063, OCRE = 0xe8a25a, CIRCUITO = 0xff6f63;   // lila y verde: los de cultura y verde del visor
 
 function cargaScript(src) {
   return new Promise((ok, mal) => {
@@ -393,11 +393,248 @@ export async function crea(api) {
     } };
   }
 
+  /* ---------- 3b. Marcas de la segunda parte: cultura, verdes, espuela y el circuito ---------- */
+  const matC = (c, op) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide });
+  const linC = (c, op) => new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: op });
+  function grupoMarca(id) { const g = new THREE.Group(); g.name = 'marca-' + id; g.visible = false; gH.add(g); return g; }
+  // tira plana a lo largo de una polilínea; los triángulos van en orden, así que se puede «trazar» con drawRange
+  function cinta(pts, ancho, z) {
+    const iz = franjaLado(pts, -ancho / 2), de = franjaLado(pts, ancho / 2), p = [];
+    for (let i = 1; i < pts.length; i++) {
+      const a = W(iz[i - 1][0], iz[i - 1][1], z), b = W(de[i - 1][0], de[i - 1][1], z), c = W(iz[i][0], iz[i][1], z), d = W(de[i][0], de[i][1], z);
+      p.push(...a, ...b, ...c, ...b, ...d, ...c);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+    return g;
+  }
+  // partes de una polilínea dentro del rectángulo r
+  function adentro(pts, r) {
+    const tramos = []; let cur = [];
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], dx = b[0] - a[0], dy = b[1] - a[1];
+      let t0 = 0, t1 = 1, ok = true;
+      const P = [-dx, dx, -dy, dy], Qv = [a[0] - r.u0, r.u1 - a[0], a[1] - r.v0, r.v1 - a[1]];
+      for (let k = 0; k < 4; k++) {
+        if (P[k] === 0) { if (Qv[k] < 0) ok = false; continue; }
+        const t = Qv[k] / P[k];
+        if (P[k] < 0) { if (t > t1) ok = false; else if (t > t0) t0 = t; } else { if (t < t0) ok = false; else if (t < t1) t1 = t; }
+      }
+      if (!ok || t1 - t0 < 1e-9) { if (cur.length > 1) tramos.push(cur); cur = []; continue; }
+      if (!cur.length || t0 > 0) { if (cur.length > 1) tramos.push(cur); cur = [[a[0] + dx * t0, a[1] + dy * t0]]; }
+      cur.push([a[0] + dx * t1, a[1] + dy * t1]);
+      if (t1 < 1) { tramos.push(cur); cur = []; }
+    }
+    if (cur.length > 1) tramos.push(cur);
+    return tramos;
+  }
+  // partes de una polilínea dentro de la colonia (muestreo cada 3 m)
+  function enColonia(pts) {
+    const tramos = []; let cur = [];
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 3));
+      for (let k = i === 1 ? 0 : 1; k <= n; k++) {
+        const q = [a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n];
+        if (dentro(q, LIM)) cur.push(q); else { if (cur.length > 1) tramos.push(cur); cur = []; }
+      }
+    }
+    if (cur.length > 1) tramos.push(cur);
+    return tramos;
+  }
+  const largo = pts => { let l = 0; for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return l; };
+  // pulsos de luz que recorren polilíneas (un InstancedMesh de rectángulos planos)
+  const geoPulso = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  function pulsos(caminos, o) {
+    const items = [];
+    caminos.forEach(pts => {
+      const acc = [0];
+      for (let j = 1; j < pts.length; j++) acc.push(acc[j - 1] + Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]));
+      const L = acc[acc.length - 1]; if (L < 8) return;
+      const n = Math.max(1, Math.round(L / (o.cada || 80)));
+      for (let k = 0; k < n; k++) items.push({ pts, acc, L, s0: k * L / n });
+    });
+    const mat = new THREE.MeshBasicMaterial({ color: o.color, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+    const im = new THREE.InstancedMesh(geoPulso, mat, Math.max(1, items.length));
+    im.count = items.length; im.frustumCulled = false; im.renderOrder = 8;
+    const M4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), e3 = new THREE.Vector3(o.largo || 10, 1, o.ancho || 3);
+    function mueve(ms) {
+      const t = ms / 1000;
+      items.forEach((it, i) => {
+        let s = it.s0 + (o.vel || 14) * t; s = ((s % it.L) + it.L) % it.L;
+        let j = 1; while (j < it.acc.length - 1 && it.acc[j] < s) j++;
+        const a = it.pts[j - 1], b = it.pts[j], f = (s - it.acc[j - 1]) / ((it.acc[j] - it.acc[j - 1]) || 1);
+        const w = W(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, o.z || 0.6);
+        q.setFromAxisAngle(EJE, Math.atan2(b[1] - a[1], b[0] - a[0]));
+        M4.compose(pos.set(w[0], w[1], w[2]), q, e3); im.setMatrixAt(i, M4);
+      });
+      im.instanceMatrix.needsUpdate = true;
+    }
+    mueve(0);
+    return { obj: im, mat, mueve };
+  }
+  // ondas en el piso (como las de las balaceras), de un color
+  const geoOndaC = new THREE.RingGeometry(0.9, 1, 64).rotateX(-Math.PI / 2);
+  function ondas(g, u, v, color, r0, r1, fase) {
+    const os = [0, 0.5].map(() => { const o = new THREE.Mesh(geoOndaC, matC(color, 0)); o.position.copy(V3(u, v, 0.3)); o.renderOrder = 7; g.add(o); return o; });
+    return (ms, k) => os.forEach((o, i) => {
+      let f = ms / 2400 + (fase || 0) + i * 0.5; f -= Math.floor(f);
+      const rr = r0 + (r1 - r0) * f; o.scale.set(rr, 1, rr); o.material.opacity = 0.8 * (1 - f) * (1 - f) * k;
+    });
+  }
+  function caja3D(g, pol, alto, color, op) {
+    const sub = new THREE.Group(), m = new Malla(); prisma(m, pol, 0, alto);
+    const mA = matC(color, op), mL = linC(color, 1), cont = new Lineas();
+    cont.poli(pol.map(q => W(q[0], q[1], alto)), true); cont.poli(pol.map(q => W(q[0], q[1], 0.2)), true);
+    pol.forEach(q => cont.seg(W(q[0], q[1], 0.2), W(q[0], q[1], alto)));
+    [new THREE.Mesh(m.geo(), mA), new THREE.LineSegments(cont.geo(), mL)].forEach(o => { o.renderOrder = 6; sub.add(o); });
+    g.add(sub);
+    return { obj: sub, mats: [[mA, op], [mL, 1]], crece: true };
+  }
+
+  function armaCultura() {
+    const d = MARCAS.cultura, g = grupoMarca('cultura'), piezas = [], rotulos = [];
+    // el edificio de Casa Wabi: el que contiene el punto (si no hay, una caja de 28 × 22 m)
+    const ed = EDIF.find(e => dentro([d.u, d.v], e.q));
+    const pol = ed ? ed.q : [[d.u - 14, d.v - 11], [d.u + 14, d.v - 11], [d.u + 14, d.v + 11], [d.u - 14, d.v + 11]], alto = (ed ? ed.h : 8) + 0.4;
+    piezas.push(caja3D(g, pol, alto, LILA, 0.55));
+    const c = centro(pol), haz = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(c[0], c[1], alto), V3(c[0], c[1], alto + 48)]), linC(LILA, 0.9));
+    haz.renderOrder = 7; g.add(haz); piezas.push({ obj: haz, mats: [[haz.material, 0.9]], crece: true, retraso: 300 });
+    const onda = ondas(g, c[0], c[1], LILA, 10, 70, 0);
+    rotulos.push({ u: c[0], v: c[1], z: alto + 48, texto: d.texto, sub: d.sub, tipo: 'marca cultura', retraso: 600 });
+    (d.rotulos || []).forEach(x => rotulos.push(Object.assign({ tipo: 'calle', retraso: 900 }, x)));
+    MARCA.cultura = { g, piezas, rotulos, latido: (ms, k) => onda(ms, k) };
+  }
+
+  function armaVerdes() {
+    const d = MARCAS.verdes, g = grupoMarca('verdes'), piezas = [], rotulos = [], C = d.centro;
+    // suelo oscuro hasta donde llegan los parques (el modelo termina antes)
+    const disco = new THREE.Mesh(new THREE.CircleGeometry(d.radio + 500, 120).rotateX(-Math.PI / 2), matC(0x0c0c0c, 1));
+    disco.position.copy(V3(C[0], C[1], -0.12)); disco.renderOrder = 0; g.add(disco); piezas.push({ obj: disco, mats: [[disco.material, 1]] });
+    const mv = new Malla(), cont = new Lineas();
+    H.verdes.forEach(v => {
+      const q = pares(v.p), c = centro(q);
+      if (Math.hypot(c[0] - C[0], c[1] - C[1]) > d.radio + 450) return;
+      tapa(mv, q, 0.22); cont.poli(q.map(p => W(p[0], p[1], 0.24)), true);
+    });
+    const mV = matC(VERDE, 0.78), mVL = linC(VERDE, 0.95);
+    const par = new THREE.Mesh(mv.geo(), mV), parL = new THREE.LineSegments(cont.geo(), mVL);
+    par.renderOrder = 5; parL.renderOrder = 5; g.add(par, parL);
+    piezas.push({ obj: par, mats: [[mV, 0.78]], retraso: 200 }, { obj: parL, mats: [[mVL, 0.95]], retraso: 200 });
+    const la = new Lineas();
+    H.avenidas.forEach(f => fuera(pares(f), EXT).forEach(t => la.poli(t.map(q => W(q[0], q[1], 0.05)))));
+    const mAv = linC(0xffffff, 0.22), av = new THREE.LineSegments(la.geo(), mAv); g.add(av); piezas.push({ obj: av, mats: [[mAv, 0.22]] });
+    const circ = [];
+    for (let i = 0; i <= 160; i++) { const a = i / 160 * Math.PI * 2; circ.push(V3(C[0] + d.radio * Math.cos(a), C[1] + d.radio * Math.sin(a), 0.5)); }
+    const mCi = new THREE.LineDashedMaterial({ color: VERDE, dashSize: 34, gapSize: 20, transparent: true, opacity: 0.9 });
+    const ci = new THREE.Line(new THREE.BufferGeometry().setFromPoints(circ), mCi); ci.computeLineDistances(); ci.renderOrder = 6; g.add(ci);
+    piezas.push({ obj: ci, mats: [[mCi, 0.9]], retraso: 500 });
+    rotulos.push({ u: C[0], v: C[1] + d.radio, z: 1, texto: d.textoRadio || '1.5 km', tipo: 'calle', retraso: 800 });
+    (d.parques || []).forEach((x, i) => {
+      const v = H.verdes.find(y => y.n === x.nombre); if (!v) return;
+      const c = centro(pares(v.p));
+      rotulos.push({ u: c[0], v: c[1], z: 1, texto: x.texto || x.nombre, sub: x.sub, tipo: 'marca verde', lado: x.lado, retraso: 700 + i * 150 });
+    });
+    if (d.vacio) rotulos.push(Object.assign({ tipo: 'cifra', retraso: 400 }, d.vacio));
+    MARCA.verdes = { g, piezas, rotulos, latido() {} };
+  }
+
+  function armaEspuela() {
+    const d = MARCAS.espuela, g = grupoMarca('espuela'), piezas = [], rotulos = [];
+    const caminos = [G.ESPUELA.map(p => [p[0], p[1]])];
+    H.trenViejo.forEach(f => adentro(pares(f), EXT).forEach(t => { if (largo(t) > 30) caminos.push(t); }));
+    caminos.forEach((pts, i) => {
+      const geo = cinta(pts, 7, 0.34), m = matC(OCRE, 0.95), mesh = new THREE.Mesh(geo, m);
+      mesh.renderOrder = 6; g.add(mesh);
+      piezas.push({ obj: mesh, mats: [[m, 0.95]], traza: { g: geo, n: geo.attributes.position.count }, dur: 1800, retraso: i * 220 });
+    });
+    const pl = pulsos(caminos, { color: 0xfff0d0, cada: 120, vel: 26, largo: 26, ancho: 4.5, z: 0.5 });
+    g.add(pl.obj); piezas.push({ obj: pl.obj, mats: [[pl.mat, 0.95]], retraso: 1800 });
+    (d.rotulos || []).forEach((x, i) => rotulos.push(Object.assign({ tipo: 'marca espuela', retraso: 900 + i * 200 }, x)));
+    MARCA.espuela = { g, piezas, rotulos, latido: ms => pl.mueve(ms) };
+  }
+
+  function armaCircuitoProyecto() {
+    const d = MARCAS.circuitoProyecto, g = grupoMarca('circuitoProyecto'), piezas = [], rotulos = [], A = G.ANILLO;
+    const rm = (A.ri + A.re) / 2, anillo = [];
+    for (let i = 0; i <= 120; i++) { const a = i / 120 * Math.PI * 2; anillo.push([A.u + rm * Math.cos(a), A.v + rm * Math.sin(a)]); }
+    const geoA = cinta(anillo, A.re - A.ri + 0.8, A.z + 0.5), mA = matC(CIRCUITO, 0.85), mallaA = new THREE.Mesh(geoA, mA);
+    mallaA.renderOrder = 7; g.add(mallaA);
+    piezas.push({ obj: mallaA, mats: [[mA, 0.85]], traza: { g: geoA, n: geoA.attributes.position.count }, dur: 1600 });
+    const esp = adentro(G.ESPUELA, { u0: S.u0 - 2, u1: S.u1 + 2, v0: S.v0 - 2, v1: S.v1 + 2 });
+    esp.forEach(pts => {
+      const geo = cinta(pts, 3.4, 0.45), m = matC(CIRCUITO, 0.9), mesh = new THREE.Mesh(geo, m); mesh.renderOrder = 7; g.add(mesh);
+      piezas.push({ obj: mesh, mats: [[m, 0.9]], traza: { g: geo, n: geo.attributes.position.count }, dur: 1200, retraso: 900 });
+    });
+    const pA = pulsos([anillo], { color: 0xffffff, cada: 26, vel: 11, largo: 6, ancho: 2.2, z: A.z + 0.75 });
+    const pE = pulsos(esp, { color: 0xffffff, cada: 36, vel: 11, largo: 6, ancho: 2, z: 0.6 });
+    g.add(pA.obj, pE.obj);
+    piezas.push({ obj: pA.obj, mats: [[pA.mat, 0.9]], retraso: 1500 }, { obj: pE.obj, mats: [[pE.mat, 0.9]], retraso: 1900 });
+    (d.rotulos || []).forEach((x, i) => rotulos.push(Object.assign({ tipo: 'marca circuito', retraso: 1000 + i * 250 }, x)));
+    MARCA.circuitoProyecto = { g, piezas, rotulos, latido: ms => { pA.mueve(ms); pE.mueve(ms); } };
+  }
+
+  function armaCircuitoAtlampa() {
+    const d = MARCAS.circuito, g = grupoMarca('circuitoAtlampa'), piezas = [], rotulos = [];
+    const expande = lista => lista.flatMap(p => p === 'ESPUELA' ? G.ESPUELA.map(q => [q[0], q[1]]) : [p]);
+    const lazo = expande(d.principal);
+    lazo.push(lazo[0]);
+    const accL = [0]; for (let i = 1; i < lazo.length; i++) accL.push(accL[i - 1] + Math.hypot(lazo[i][0] - lazo[i - 1][0], lazo[i][1] - lazo[i - 1][1]));
+    const L = accL[accL.length - 1], DUR = d.dur || 3400;
+    // el momento en que el lazo pasa por p: ahí brota cada ramal
+    const cuando = p => {
+      let mejor = Infinity, s = 0;
+      for (let i = 1; i < lazo.length; i++) {
+        const a = lazo[i - 1], b = lazo[i], dx = b[0] - a[0], dy = b[1] - a[1], ll = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / ll)), dd = Math.hypot(a[0] + dx * t - p[0], a[1] + dy * t - p[1]);
+        if (dd < mejor) { mejor = dd; s = accL[i - 1] + Math.sqrt(ll) * t; }
+      }
+      return DUR * s / L;
+    };
+    const geoL = cinta(lazo, 13, 0.6), mL = matC(CIRCUITO, 0.92), mallaL = new THREE.Mesh(geoL, mL); mallaL.renderOrder = 7; g.add(mallaL);
+    piezas.push({ obj: mallaL, mats: [[mL, 0.92]], traza: { g: geoL, n: geoL.attributes.position.count }, dur: DUR });
+    const caminos = [lazo];
+    const ramal = (pts, ancho, extra) => {
+      const geo = cinta(pts, ancho, 0.55), m = matC(CIRCUITO, 0.85), mesh = new THREE.Mesh(geo, m); mesh.renderOrder = 7; g.add(mesh);
+      const dur = Math.max(500, largo(pts) / L * DUR * 1.4);
+      piezas.push({ obj: mesh, mats: [[m, 0.85]], traza: { g: geo, n: geo.attributes.position.count }, dur, retraso: cuando(pts[0]) + (extra || 0) });
+      caminos.push(pts);
+      return cuando(pts[0]) + dur;
+    };
+    (d.ramales || []).forEach(x => {
+      if (x.via === 'diagonal') {
+        const diag = H.trenViejo.map(f => pares(f)).sort((a, b) => largo(b) - largo(a)).find(f => Math.abs(f[0][0] - f[f.length - 1][0]) > 600 && Math.abs(f[0][1] - f[f.length - 1][1]) > 600);
+        if (diag) enColonia(diag).forEach(t => ramal(t, 8, 300));
+      } else ramal(x.pts, 8, 0);
+    });
+    // a los parques de fuera: líneas punteadas
+    (d.parques || []).forEach(x => {
+      const v = H.verdes.find(y => y.n === x.nombre); if (!v) return;
+      const c = centro(pares(v.p)), m = new THREE.LineDashedMaterial({ color: CIRCUITO, dashSize: 22, gapSize: 14, transparent: true, opacity: 0.95 });
+      const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(x.de[0], x.de[1], 0.7), V3(c[0], c[1], 0.7)]), m);
+      ln.computeLineDistances(); ln.renderOrder = 7; g.add(ln);
+      const t = cuando(x.de) + 300;
+      piezas.push({ obj: ln, mats: [[m, 0.9]], retraso: t });
+      rotulos.push({ u: c[0], v: c[1], z: 1, texto: x.texto || x.nombre, tipo: 'marca verde', retraso: t + 400 });
+      caminos.push([x.de, c]);
+    });
+    const latidos = [];
+    (d.nodos || []).forEach(n => {
+      const t = cuando([n.u, n.v]) + 200;
+      const ani = new THREE.Mesh(new THREE.RingGeometry(12, 17, 48).rotateX(-Math.PI / 2), matC(CIRCUITO, 0.95));
+      ani.position.copy(V3(n.u, n.v, 0.8)); ani.renderOrder = 8; g.add(ani);
+      piezas.push({ obj: ani, mats: [[ani.material, 0.95]], retraso: t });
+      latidos.push(ondas(g, n.u, n.v, CIRCUITO, 16, 60, (n.u * 0.013) % 1));
+      if (n.texto) rotulos.push({ u: n.u, v: n.v, z: 1, texto: n.texto, sub: n.sub, lado: n.lado, tipo: 'marca circuito', retraso: t + 300 });
+    });
+    const pl = pulsos(caminos, { color: 0xffffff, cada: 80, vel: 34, largo: 22, ancho: 5, z: 0.85 });
+    g.add(pl.obj); piezas.push({ obj: pl.obj, mats: [[pl.mat, 0.9]], retraso: DUR });
+    MARCA.circuitoAtlampa = { g, piezas, rotulos, latido: (ms, k) => { pl.mueve(ms); latidos.forEach(f => f(ms, k)); } };
+  }
+
   /* ---------- 4. HTML: tarjeta, rótulos, navegación ---------- */
   const capa = document.createElement('div'); capa.className = 'hist-capa'; capa.hidden = true;
   capa.innerHTML = '<div class="hist-rotulos"></div><aside class="hist-tarjeta" aria-live="polite"></aside>' +
     '<nav class="hist-nav" aria-label="Slides de la presentación"><button type="button" class="hist-nav-flecha" data-hist="anterior" aria-label="Slide anterior">‹ Anterior</button>' +
-    '<ol class="hist-nav-lista">' + GUION.map((s, i) => '<li><button type="button" data-hist-ir="' + i + '"><span>' + String(i + 1).padStart(2, '0') + '</span> ' + s.titulo + '</button></li>').join('') + '</ol>' +
+    '<ol class="hist-nav-lista">' + GUION.map((s, i) => '<li><button type="button" data-hist-ir="' + i + '" title="' + s.titulo + '"><span>' + String(i + 1).padStart(2, '0') + '</span><i class="tt"> ' + s.titulo + '</i></button></li>').join('') + '</ol>' +
     '<button type="button" class="hist-nav-flecha hist-nav-sigue" data-hist="siguiente" aria-label="Slide siguiente">Siguiente ›</button></nav>' +
     '<div class="hist-carga" role="status">Armando Atlampa…</div>';
   trabajo.appendChild(capa);
@@ -450,6 +687,7 @@ export async function crea(api) {
       const el = document.createElement('div');
       el.className = 'hist-rotulo ' + (r.tipo || 'punto').split(' ').concat(r.lado ? [r.lado] : []).map(t => 'hist-rotulo--' + t).join(' ');
       el.style.setProperty('--tiro-fase', (-(ROT.length * 0.43) % 1.3).toFixed(2) + 's');
+      if (r.color) el.style.setProperty('--c', r.color);
       el.innerHTML = (/balacera/.test(r.tipo || '') ? TIRO : '') + '<div class="t">' + (r.fecha ? '<b>' + esc(r.fecha) + '</b>' : '') + '<span>' + esc(r.texto) + '</span>' + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</div>';
       el.style.transitionDelay = ((retrasoBase || 0) + (r.retraso || 0)) + 'ms';
       capaRot.appendChild(el);
@@ -505,6 +743,7 @@ export async function crea(api) {
       const kk = Math.max(0, Math.min(1, k));
       p.mats.forEach(([m, op]) => { m.opacity = op * kk; });
       if (p.crece) p.obj.scale.set(1, Math.max(0.001, kk), 1);
+      if (p.traza && kk < 1) p.traza.g.setDrawRange(0, Infinity);
     });
   }
   function latido(ms) {
@@ -534,7 +773,8 @@ export async function crea(api) {
     armando = new Promise(ok => {
       const tandas = [armaSuelo, armaCalles, armaLimite];
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
-      tandas.push(armaAsentamientos, armaBalaceras, () => { mueveCarros(performance.now()); caminan(performance.now()); });
+      tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa,
+        () => { mueveCarros(performance.now()); caminan(performance.now()); });
       (function sigue() {
         tandas.shift()();
         if (tandas.length) { requestAnimationFrame(sigue); return; }
@@ -602,16 +842,25 @@ export async function crea(api) {
         if (tok !== irTok || !activo) return;
         if (!mismo) {
           ponRotulos(s.rotulos || [], 0);
-          (s.marcas || []).forEach(id => { const M = MARCA[id]; if (M) ponRotulos(M.rotulos, 0); });
+          (s.marcas || []).forEach(id => {
+            const M = MARCA[id]; if (!M || (s.rotulosDe && !s.rotulosDe.includes(id))) return;
+            // compacto: de las marcas sólo quedan las figuras (los tiradores), sin texto
+            ponRotulos(s.compacto ? M.rotulos.filter(x => /balacera/.test(x.tipo || '')).map(x => Object.assign({}, x, { texto: '', sub: '', fecha: '' })) : M.rotulos, 0);
+          });
         }
         (s.marcas || []).forEach(id => {
           const M = MARCA[id]; if (!M) return;
           if (marcaK[id] >= 1) return;
           M.g.visible = true;
-          M.piezas.forEach(p => anima(900, k => {
-            p.mats.forEach(([m, op]) => { m.opacity = op * k; });
-            if (p.crece) p.obj.scale.set(1, Math.max(0.001, k), 1);
-          }, null, p.retraso || 0));
+          M.piezas.forEach(p => {
+            if (p.traza) { p.traza.g.setDrawRange(0, 0); p.mats.forEach(([m, op]) => { m.opacity = op; }); }
+            else p.mats.forEach(([m]) => { m.opacity = 0; });
+            anima(p.dur || 900, (k, l) => {
+              if (p.traza) p.traza.g.setDrawRange(0, Math.ceil(p.traza.n * l / 3) * 3);
+              else p.mats.forEach(([m, op]) => { m.opacity = op * k; });
+              if (p.crece) p.obj.scale.set(1, Math.max(0.001, k), 1);
+            }, null, p.retraso || 0);
+          });
           marcaK[id] = 1;
         });
       }, mismo ? 0 : dur * 0.8);

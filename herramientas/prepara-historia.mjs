@@ -1,13 +1,17 @@
 // Datos del Modo historia (etapa 1 de la presentación final): toda la colonia
 // Atlampa desde OpenStreetMap, en las coordenadas del visor.
 //
-//   node herramientas/prepara-historia.mjs <osm.json>
+//   node herramientas/prepara-historia.mjs <osm.json> [verdes.json]
 //
 // <osm.json> es la respuesta de Overpass a esta consulta (2026-11-24):
 //   [out:json][timeout:240];rel(16820531);out geom;
 //   (way["building"](19.4515,-99.1665,19.4665,-99.1445);rel["building"](...););out geom;
 //   way["highway"](...);out geom;  way["railway"](...);out geom;
 // (16820531 = límite administrativo "Atlampa", admin_level 10.)
+// [verdes.json] (2026-11-24): parques y avenidas en 1.9 km alrededor del predio:
+//   (way["leisure"~"^(park|garden|playground)$"](around:1900,19.4582,-99.1589);
+//    relation["leisure"~"^(park|garden)$"](around:...); way["landuse"~"^(grass|recreation_ground|village_green)$"](around:...););out geom;
+//   way["highway"~"^(motorway|trunk|primary|secondary)$"](around:...);out geom;
 //
 // Paso latitud/longitud → visor: proyección local en metros y una semejanza
 // (giro, escala y traslado) ajustada por ICP contra los edificios del
@@ -147,13 +151,38 @@ osm.elements.forEach(e => {
   (t.railway === 'rail' ? tren : trenViejo).push(q);
 });
 
+// --- áreas verdes y avenidas alrededor (para la slide de áreas verdes)
+const verdes = [], avenidas = [];
+if (process.argv[3]) {
+  const ov = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+  const dentroLim = p => { let k = false; for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i++) { const a = anillo[i], b = anillo[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) k = !k; } return k; };
+  ov.elements.forEach(e => {
+    const t = e.tags || {};
+    if (t.highway && e.geometry) { avenidas.push(plano(e.geometry.map(g => V(g.lat, g.lon)))); return; }
+    const clase = t.leisure || t.landuse;
+    if (!clase) return;
+    let geo = e.geometry;
+    if (e.type === 'relation' && e.members) { const m = e.members.find(x => x.role === 'outer' && x.geometry); geo = m && m.geometry; }
+    if (!geo || geo.length < 4) return;
+    let q = geo.map(g => V(g.lat, g.lon));
+    if (Math.hypot(q[0][0] - q[q.length - 1][0], q[0][1] - q[q.length - 1][1]) < 0.01) q = q.slice(0, -1);
+    const a = Math.abs(area(q));
+    // jardines privados y pastos chicos fuera; plazas y parques, sí
+    if ((clase === 'garden' && (a < 800 || t['garden:type'] === 'residential' || t.access === 'private')) || (clase === 'grass' && a < 300)) return;
+    const c = centro(q);
+    verdes.push({ n: t.name || '', c: clase, a: Math.round(a), dentro: dentroLim(c), p: plano(area(q) < 0 ? q.slice().reverse() : q) });
+  });
+  console.log('verdes %d (%d dentro de la colonia: %s), avenidas %d', verdes.length, verdes.filter(v => v.dentro).length,
+    verdes.filter(v => v.dentro).map(v => (v.n || v.c) + ' ' + v.a + ' m²').join(', '), avenidas.length);
+}
+
 // --- puntos por coordenada geográfica (para el guion): se exporta la función inversa también
 const salida = {
   fuente: 'OpenStreetMap (© colaboradores, ODbL), Overpass 2026-11-24; relación 16820531',
   ajuste: { giro: r2(T.th / RAD * 1000) / 1000, escala: T.s, rms: r2(mejor.rms), pares: mejor.n, T: [T.s, T.c, T.n, T.tx, T.ty], LAT0, LON0 },
   limite: plano(anillo),
   edificios, estimadas,
-  calles, tren, trenViejo
+  calles, tren, trenViejo, verdes, avenidas
 };
 const js = '/* Datos del Modo historia (etapa 1). Generado por herramientas/prepara-historia.mjs: no editar a mano.\n' +
   '   Colonia Atlampa completa: ' + salida.fuente + '.\n' +

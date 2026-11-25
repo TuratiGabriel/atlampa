@@ -8,7 +8,10 @@
            el        elevación (89 = cenital) · aire: holgura · dur: ms
            lado      fracción del ancho que tapa la tarjeta (se centra en el resto)
    capas:  colonia (edificios y calles de toda Atlampa), coches, limite
-   marcas: 'asentamientos' | 'balaceras' (ver MARCAS abajo; en las balaceras, lado: 'izq' | 'der' pone el texto a un lado de los tiradores)
+   marcas: 'asentamientos' | 'balaceras' | 'cultura' | 'verdes' | 'espuela' | 'circuitoProyecto' | 'circuitoAtlampa'
+           (ver MARCAS abajo; en las balaceras, lado: 'izq' | 'der' pone el texto a un lado de los tiradores)
+   compacto: true → de las marcas sólo quedan las figuras, sin sus textos (la slide de factores)
+   rotulosDe: [ids] → sólo esas marcas ponen sus textos
    tarjeta: kicker, titulo, texto, cifras [[valor, etiqueta, nota]], nota, fuente
    rotulos: { u, v, z, texto, sub, tipo: 'calle' | 'punto', lado: 'izq' (texto a la izquierda) }
    ============================================================ */
@@ -35,7 +38,67 @@ export const MARCAS = {
     { u: 942, v: 643, fecha: 'feb 2023', texto: 'Nopal y Pino', sub: 'hombre asesinado en una vecindad', lado: 'der' },
     { u: 1212, v: 554, fecha: 'ago 2025', texto: 'Plaza Juárez', sub: 'Nopal y Oyamel · asesinato', lado: 'izq' },
     { u: 797, v: 675, fecha: 'ene 2026', texto: 'Ciprés, junto al puente', sub: 'ataque desde una moto · aprox.', lado: 'izq' }
-  ]
+  ],
+  // Casa Wabi Sabino: Sabino 336 (casawabi.org), una cuadra al sur del predio (booklet pp. 9 y 13).
+  // Se resalta el edificio que contiene el punto (lado oriente de Sabino, números pares).
+  cultura: { u: 588, v: 238, texto: 'Casa Wabi', sub: 'Sabino 336 · único espacio de arte' },
+  // Booklet p. 50: ningún parque dentro de la colonia; parques a menos de 1.5 km (OSM).
+  verdes: {
+    centro: [503.6, 405], radio: 1500, textoRadio: '1.5 km del predio',
+    vacio: { u: 870, v: 600, z: 2, texto: '0 m²', sub: 'de área verde dentro de la colonia' },
+    parques: [
+      { nombre: 'Alameda de Santa Maria La Ribera', texto: 'Alameda de Santa María' },
+      { nombre: 'Parque Revolución', texto: 'Parque Revolución' },
+      { nombre: 'Parque Ciprés', texto: 'Parque Ciprés' },
+      { nombre: 'Parque Sándalo', texto: 'Parque Sándalo' },
+      { nombre: 'Parque Buenavista', texto: 'Parque Buenavista', lado: 'izq' },
+      { nombre: 'Bajo Puente Nonoalco Tlatelolco', texto: 'Bajo Puente Nonoalco' }
+    ]
+  },
+  // La espuela del visor (Crisantema → Cedro → Heliotropo → predio) y las vías en desuso de OSM.
+  espuela: {
+    rotulos: [
+      { u: 760, v: 121, z: 2, texto: 'Crisantema', sub: 'la vía corre por la calle' },
+      { u: 331, v: 255, z: 2, texto: 'Cedro', sub: 'sube hacia el predio', lado: 'izq' },
+      { u: 470, v: 405, z: 3, texto: 'Heliotropo', sub: 'cruza el predio' },
+      { u: 779, v: 681, z: 2, texto: 'Vía diagonal', sub: 'en desuso' }
+    ]
+  },
+  // Concepto (lámina «circuito»): los circuitos del proyecto…
+  circuitoProyecto: {
+    rotulos: [
+      { u: 553, v: 409, z: 12, texto: 'El aro', sub: '≈ 270 m · rodear y volver' },
+      { u: 452, v: 405, z: 2, texto: 'La espuela', sub: 'cruza el predio', lado: 'izq' }
+    ]
+  },
+  // …y el de Atlampa: sale del predio, sigue la espuela y conecta lo presentado.
+  // principal: lazo cerrado ('ESPUELA' = el trazo de la espuela del visor); ramales y parques brotan
+  // cuando el lazo pasa por su punto de partida.
+  circuito: {
+    dur: 3600,
+    principal: [[563, 405], [563, 497], [944, 500], [944, 120], [795, 120], [563, 119], 'ESPUELA'],
+    ramales: [
+      { pts: [[563, 119], [563, 238], [588, 238]] },          // Casa Wabi
+      { pts: [[795, 120], [793, 282]] },                     // Ciprés 280
+      { pts: [[944, 500], [942, 643], [1212, 554]] },        // Nopal y Pino → Plaza Juárez
+      { pts: [[797, 503], [797, 675]] },                     // Ciprés, junto al puente
+      { pts: [[331, 330], [331, 400], [80, 400]] },          // Heliotropo
+      { via: 'diagonal' }                                    // la vía diagonal en desuso
+    ],
+    parques: [
+      { de: [877, 120], nombre: 'Alameda de Santa Maria La Ribera', texto: 'Alameda de Santa María' },
+      { de: [797, 675], nombre: 'Parque Ciprés' },
+      { de: [80, 400], nombre: 'Parque Revolución' },
+      { de: [1212, 554], nombre: 'Parque Sándalo' }
+    ],
+    nodos: [
+      { u: 588, v: 238, texto: 'Casa Wabi' },
+      { u: 447, v: 120, texto: 'Las Vías', lado: 'izq' },
+      { u: 800, v: 120 },
+      { u: 968, v: 127, texto: 'Fresno 409' },
+      { u: 793, v: 282 }, { u: 942, v: 643 }, { u: 1212, v: 554 }, { u: 797, v: 675 }, { u: 80, v: 400 }
+    ]
+  }
 };
 
 export default [
@@ -105,6 +168,126 @@ export default [
       ],
       nota: '«…no sé a quién le fueron a echar de balazos acá a la esquina…» — vecina de Atlampa',
       fuente: 'Booklet pp. 71–72 · TV Azteca, 27-ago-2022, 13-feb-2023 y 23-ago-2025 · Posta, 19-ene-2026'
+    },
+    rotulos: []
+  },
+  {
+    id: 'cultura',
+    titulo: 'Cultura',
+    camara: { encuadre: [400, 140, 760, 520], az: 'norte', el: 42, aire: 1.15, lado: 0.26, dur: 2600 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['cultura'],
+    tarjeta: {
+      kicker: 'Problemática · Arte y cultura',
+      titulo: 'Un solo espacio de arte',
+      texto: 'En toda la colonia, el único establecimiento dedicado al arte y la cultura es Casa Wabi Sabino: exhibe y difunde arte contemporáneo a una cuadra al sur del predio. Para 15,130 habitantes no hay otro lugar de arte, exposición o convivencia cultural.',
+      cifras: [
+        ['1', 'espacio de arte en la colonia', 'Casa Wabi Sabino'],
+        ['15,130', 'habitantes', 'Censo 2020'],
+        ['1 cuadra', 'del predio', 'Sabino 336'],
+        ['5,000 m²', 'de arte y cultura', 'en nuestro programa']
+      ],
+      nota: 'Su cercanía abre la posibilidad de un corredor cultural entre Casa Wabi y el proyecto.',
+      fuente: 'Booklet pp. 9 y 13 · casawabi.org'
+    },
+    rotulos: [{ u: 503.6, v: 405, z: 34, texto: 'Predio', tipo: 'punto' }]
+  },
+  {
+    id: 'verdes',
+    titulo: 'Áreas verdes',
+    camara: { encuadre: [-1060, -1160, 2070, 1970], az: 'norte', el: 89, aire: 1.0, lado: 0.26, dur: 2800 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['verdes'],
+    tarjeta: {
+      kicker: 'Problemática · Medio ambiente',
+      titulo: 'Sin áreas verdes',
+      texto: 'Atlampa no tiene una sola área verde dentro de la colonia. Hay parques a menos de 1.5 km, pero ninguno adentro. La superficie está casi toda pavimentada entre vialidades de alto flujo: isla de calor, cero infiltración y escurrimiento directo al drenaje.',
+      cifras: [
+        ['0 m²', 'de área verde por habitante', 'dentro de la colonia'],
+        ['6 m²', 'promedio de la CDMX', 'por habitante'],
+        ['9 m²', 'mínimo de la OMS', 'por habitante'],
+        ['1 – 3 °C', 'más por isla de calor', '']
+      ],
+      fuente: 'Booklet pp. 24, 31 y 50 · OpenStreetMap (parques)'
+    },
+    rotulos: []
+  },
+  {
+    id: 'espuela',
+    titulo: 'Espuela',
+    camara: { encuadre: [60, 30, 1360, 1180], az: 'norte', el: 52, aire: 1.06, lado: 0.26, dur: 2800 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['espuela'],
+    tarjeta: {
+      kicker: 'Patrimonio · Memoria ferroviaria',
+      titulo: 'La espuela',
+      texto: 'La antigua espuela ferroviaria daba servicio a la zona industrial: corría por Crisantema, subía por Cedro y cruzaba el predio por Heliotropo hasta Sabino. Hoy está en desuso, pero conserva la memoria productiva de Atlampa. Es una reliquia que hay que mantener y volver eje del proyecto.',
+      cifras: [
+        ['≈ 3 km', 'de vías en desuso', 'dentro de la colonia'],
+        ['5', 'naves de ladrillo protegidas', 'en el predio · nivel 3'],
+        ['1905', 'fábrica La Maravilla', 'patrimonio industrial vecino'],
+        ['4', 'sectores', 'que dejó el tren suburbano']
+      ],
+      fuente: 'Booklet pp. 8, 12, 15, 47 y 67 · OpenStreetMap (railway=abandoned)'
+    },
+    rotulos: []
+  },
+  {
+    id: 'factores',
+    titulo: 'Factores',
+    camara: { encuadre: [-150, -120, 1850, 1250], az: 'norte', el: 62, aire: 1.04, lado: 0.26, dur: 2800 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['asentamientos', 'balaceras', 'cultura', 'verdes', 'espuela'],
+    compacto: true,
+    tarjeta: {
+      kicker: 'Concepto · 1 / 3',
+      titulo: 'Una colonia fragmentada',
+      texto: 'Asentamientos irregulares, violencia, un solo espacio de arte, ninguna área verde y una espuela en desuso. En Atlampa muchos flujos se han debilitado: la industria se desplaza, el suelo queda subutilizado y la espuela conserva la memoria de un movimiento que ya no ocurre.',
+      fuente: 'Lámina «circuito» · Booklet de análisis'
+    },
+    rotulos: [
+      { u: 640, v: 120, z: 6, texto: 'Asentamientos', tipo: 'factor', color: '#f5c518' },
+      { u: 1000, v: 600, z: 6, texto: 'Violencia', tipo: 'factor', color: '#ff3b30' },
+      { u: 588, v: 238, z: 40, texto: 'Un solo espacio de arte', tipo: 'factor', color: '#c9a6ff' },
+      { u: 1300, v: 880, z: 2, texto: 'Sin áreas verdes', tipo: 'factor', color: '#a8e063' },
+      { u: 331, v: 255, z: 2, texto: 'Espuela en desuso', tipo: 'factor', color: '#e8a25a' }
+    ]
+  },
+  {
+    id: 'circuito',
+    titulo: 'Circuito',
+    camara: { encuadre: [420, 320, 600, 500], az: 'norte', el: 38, aire: 1.3, lado: 0.26, dur: 2800 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['circuitoProyecto'],
+    tarjeta: {
+      kicker: 'Concepto · 2 / 3',
+      titulo: 'Circuito',
+      texto: '(circuitus, latín): rodear, recorrer, volver. Dentro del proyecto ya hay circuitos: el aro rodea el conjunto y la espuela lo atraviesa. Son recorridos que conectan y regresan a su origen, como los flujos de la ciudad: agua, energía, materiales, personas y capital.',
+      cifras: [
+        ['≈ 270 m', 'de recorrido en el aro', ''],
+        ['+10 m', 'altura del aro', '']
+      ],
+      fuente: 'Lámina «circuito» (Actividad 02A)'
+    },
+    rotulos: []
+  },
+  {
+    id: 'concepto',
+    titulo: 'Atlampa en circuito',
+    camara: { encuadre: [-500, -540, 1700, 1460], az: 'norte', el: 58, aire: 1.02, lado: 0.26, dur: 3000 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['circuitoProyecto', 'circuitoAtlampa', 'espuela', 'verdes'],
+    rotulosDe: ['circuitoAtlampa'],
+    tarjeta: {
+      kicker: 'Concepto · 3 / 3',
+      titulo: 'Atlampa en circuito',
+      texto: 'Así como hay circuitos dentro del proyecto, el concepto busca influir en toda Atlampa. El circuito sale del predio, retoma la espuela y conecta lo fragmentado: Las Vías, Casa Wabi, los puntos de violencia y los parques cercanos. Convierte los vacíos y las estructuras existentes en oportunidades.',
+      cifras: [
+        ['≈ 3 km', 'de espuela', 'columna del circuito'],
+        ['3', 'flujos que reactiva', 'social · productivo · ecológico']
+      ],
+      nota: 'Un sistema capaz de recorrer, conectar y transformar el territorio a partir de sus propios recursos.',
+      fuente: 'Lámina «circuito» (Actividad 02A)'
     },
     rotulos: []
   }
