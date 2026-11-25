@@ -139,6 +139,31 @@ export async function crea(api) {
       return [p[0] - dy / l * o, p[1] + dx / l * o];
     });
   }
+  // El predio como está hoy (levantamiento de Luis, handoff/LEVANTAMIENTO_PREEXISTENCIA.md): las dos
+  // naves orientales de Contexto.3dm, completas y con cubierta a dos aguas, y las masas occidentales
+  // aproximadas desde Earth (MARCAS.existente). En la etapa 1 el proyecto no aparece.
+  function armaExistente() {
+    const piso = new Malla(); tapa(piso, api.rect(G.PB.u0, G.PB.v0, G.PB.u1, G.PB.v1), 0.02);
+    pon(gCol, piso, 'ctxsuelo', null, false);
+    const m = new Malla();
+    G.NAVES.forEach(nv => {
+      const paso = (nv.u1 - nv.u0) / nv.n;
+      for (let j = 0; j < nv.n; j++) {
+        const u0 = nv.u0 + j * paso, u1 = u0 + paso, um = (u0 + u1) / 2, v0 = nv.v0, v1 = nv.v1, a = nv.alero, c = nv.cumbre;
+        const altura = u => a + (c - a) * Math.max(0, 1 - Math.abs(u - um) / (paso / 2));
+        api.muros(m, api.rect(u0, v0, u1, v1), 0, 0, altura);
+        m.tri(W(u0, v0, a), W(um, v0, c), W(u1, v0, a));
+        m.tri(W(u1, v1, a), W(um, v1, c), W(u0, v1, a));
+        m.quad(W(u0, v0, a), W(u0, v1, a), W(um, v1, c), W(um, v0, c));
+        m.quad(W(um, v0, c), W(um, v1, c), W(u1, v1, a), W(u1, v0, a));
+      }
+    });
+    ((MARCAS.existente && MARCAS.existente.masas) || []).forEach(x => prisma(m, api.rect(...x.planta), 0, x.alto));
+    pon(gCol, m, 'contexto', null, 25);
+    const tv = new Lineas();
+    adentro(G.ESPUELA, S).forEach(t => [-0.72, 0.72].forEach(o => tv.poli(franjaLado(t, o).map(q => W(q[0], q[1], 0.06)))));
+    ponLineas(gCol, tv, 'ctxtren', 0xffffff);
+  }
   const EDIF = D.edificios.map(f => ({ h: f[0], q: pares(f, 1) })).concat(H.edificios.map(f => ({ h: f[0], q: pares(f, 1) })));
   function armaEdificios(i0, i1) {
     const cerca = new Malla(), lejos = new Malla();
@@ -719,33 +744,42 @@ export async function crea(api) {
   const fondo3D = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), matFondo);
   fondo3D.renderOrder = 1; fondo3D.visible = false; gH.add(fondo3D);
   let fondoTexto = null, fondoTok = 0;
-  function texturaFondo(t) {
+  function texturaFondo(t, blur) {
     const fam = getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() || 'sans-serif';
     const cv = document.createElement('canvas'), x = cv.getContext('2d'), px = 260, pad = 60;
     x.font = '300 ' + px + 'px ' + fam;
     const w = Math.ceil(x.measureText(t).width) + 2 * pad, h = Math.ceil(px * 1.25) + 2 * pad;
     cv.width = w; cv.height = h;
     x.font = '300 ' + px + 'px ' + fam; x.textBaseline = 'middle'; x.fillStyle = '#ffffff';
-    x.filter = 'blur(7px)';
+    x.filter = blur ? 'blur(' + blur + 'px)' : 'none';
     x.fillText(t, pad, h / 2);
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
     return { tex, asp: w / h };
   }
-  function ponFondo(t, o) {
+  function ponFondo(f, o) {
     const tok = ++fondoTok;
+    const op = typeof f === 'object' && f ? f : { texto: f };
+    const t = op.texto, blur = op.blur == null ? 7 : op.blur, clave = t + '|' + blur;
     if (!t || !o) { const de = matFondo.opacity; anima(700, k => { if (tok === fondoTok) matFondo.opacity = de * (1 - k); }, () => { if (tok === fondoTok) fondo3D.visible = false; }); return; }
-    if (fondoTexto !== t) { if (matFondo.map) matFondo.map.dispose(); const tx = texturaFondo(t); matFondo.map = tx.tex; matFondo.needsUpdate = true; fondo3D.userData.asp = tx.asp; fondoTexto = t; }
+    if (fondoTexto !== clave) { if (matFondo.map) matFondo.map.dispose(); const tx = texturaFondo(t, blur); matFondo.map = tx.tex; matFondo.needsUpdate = true; fondo3D.userData.asp = tx.asp; fondoTexto = clave; }
     // marco de la cámara de la slide: arriba a la izquierda de la pantalla, sobre el piso
     const a = o.az * RAD, e = o.el * RAD, ASP = trabajo.clientWidth / Math.max(1, trabajo.clientHeight);
     const d = new THREE.Vector3(Math.sin(a) * Math.cos(e), -Math.sin(e), -Math.cos(a) * Math.cos(e));
     const r = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize(), up = new THREE.Vector3().crossVectors(r, d).normalize();
-    const alto = o.h * 0.82, ancho = alto * fondo3D.userData.asp;
-    const c = new THREE.Vector3(o.c[0], o.c[1], o.c[2]).addScaledVector(r, -o.h * ASP * 0.97 + ancho / 2).addScaledVector(up, o.h * 0.97 - alto / 2 * Math.sin(e));
+    let alto = o.h * (op.alto || 0.82), ancho = alto * fondo3D.userData.asp;
+    const c = new THREE.Vector3(o.c[0], o.c[1], o.c[2]);
+    if (op.pos === 'centro') {
+      // al centro de lo que deja libre la tarjeta, sin pasarse del ancho
+      const lado = Math.min(0.45, Math.max(0, (Math.min(360, trabajo.clientWidth - 64) + 64) / trabajo.clientWidth)), libre = o.h * ASP * 2 * (1 - lado) * 0.92;
+      if (ancho > libre) { ancho = libre; alto = ancho / fondo3D.userData.asp; }
+      c.addScaledVector(r, lado * o.h * ASP);
+    } else c.addScaledVector(r, -o.h * ASP * 0.97 + ancho / 2).addScaledVector(up, o.h * 0.97 - alto / 2 * Math.sin(e));
     const t0 = -c.y / d.y; c.addScaledVector(d, t0); c.y = 0.35;   // al piso, a lo largo de la vista
     fondo3D.position.copy(c); fondo3D.scale.set(ancho, 1, alto); fondo3D.rotation.set(0, -a, 0);
     fondo3D.visible = true;
     const de = matFondo.opacity;
-    anima(1600, k => { if (tok === fondoTok) matFondo.opacity = de + (0.26 - de) * k; });
+    const meta = op.op == null ? 0.26 : op.op;
+    anima(1600, k => { if (tok === fondoTok) matFondo.opacity = de + (meta - de) * k; });
   }
   const capaRot = capa.querySelector('.hist-rotulos'), tarjeta = capa.querySelector('.hist-tarjeta'), cargaEl = capa.querySelector('.hist-carga');
   // el visor captura el puntero al arrastrar: en los botones y la tarjeta, el clic es de la presentación
@@ -838,7 +872,7 @@ export async function crea(api) {
   }
   let activo = false, corre = false, avisos = {}, volando = false;
   const DC = api.dib, dibAntes = {};
-  let revelado = 0, marcaK = {};   // revelado: 0…1 del dibujo de la colonia; marcaK: id → 0…1
+  let revelado = 0, marcaK = {}, capasAct = {};   // revelado: 0…1 del dibujo de la colonia; marcaK: id → 0…1
   function aplicaRevelado(x) {
     revelado = x;
     const lin = Math.max(0, Math.min(1, (x - 0.02) / 0.6)), rel = Math.max(0, Math.min(1, (x - 0.3) / 0.7));
@@ -846,7 +880,7 @@ export async function crea(api) {
     matLim.opacity = 0.85 * Math.max(0, (x - 0.55) / 0.45);
     matVelo.opacity = 0.5 * Math.max(0, (x - 0.6) / 0.4);
     opCarros.value = Math.max(0, (x - 0.75) / 0.25);
-    gAut.visible = x > 0.75; gPer.visible = x > 0.75;
+    gAut.visible = gPer.visible = x > 0.75 && capasAct.coches !== false;
   }
   function aplicaMarca(id, k) {
     const M = MARCA[id]; if (!M) return;
@@ -884,7 +918,7 @@ export async function crea(api) {
     if (listo) return Promise.resolve();
     if (armando) return armando;
     armando = new Promise(ok => {
-      const tandas = [armaSuelo, armaCalles, armaLimite];
+      const tandas = [armaSuelo, armaCalles, armaExistente, armaLimite];
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
       tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa, armaMercado,
         () => { mueveCarros(performance.now()); caminan(performance.now()); });
@@ -940,8 +974,14 @@ export async function crea(api) {
       });
       // la colonia se dibuja desde el predio hacia afuera mientras la cámara se aleja
       const capas = s.capas || {};
-      gCol.visible = capas.colonia !== false; gLim.visible = capas.limite !== false;
-      if (capas.colonia !== false && revelado < 1) { const de = revelado; anima(dur * 0.95, (k, l) => aplicaRevelado(de + (1 - de) * l)); }
+      capasAct = capas; gLim.visible = capas.limite !== false;
+      if (capas.colonia !== false) {
+        gCol.visible = true; sitioVisor(true);
+        if (revelado < 1) { const de = revelado; anima(dur * 0.95, (k, l) => aplicaRevelado(de + (1 - de) * l)); } else aplicaRevelado(revelado);
+      } else if (revelado > 0) {
+        const de = revelado;
+        anima(dur * 0.7, (k, l) => aplicaRevelado(de * (1 - l)), () => { if (tok === irTok) { gCol.visible = false; sitioVisor(false); } });
+      } else { gCol.visible = false; sitioVisor(false); aplicaRevelado(0); }
       // vuelo
       volando = true;
       const obj = objetivo(cs);
@@ -988,12 +1028,19 @@ export async function crea(api) {
   function estado() { return { slide: idx, total: GUION.length, id: idx >= 0 ? GUION[idx].id : null, titulo: idx >= 0 ? GUION[idx].titulo : null, listo, volando }; }
 
   /* ---------- 9. Entrar / salir ---------- */
+  // lo del visor que se queda en la etapa 1: el sitio (calles y banquetas), su arbolado y los nombres
+  const VISOR_SITIO = ['sitio', 'arboles-banqueta', 'postes-banqueta', 'nombres'], NO_TOCAR = new Set(['historia', 'contexto', 'flujos'].concat(VISOR_SITIO));
+  let visAntes = null;
+  function sitioVisor(si) { if (visAntes) visAntes.forEach(([o, v]) => { if (VISOR_SITIO.includes(o.name)) o.visible = si && v; }); }
   let camAntes = null;
   function entra(av) {
     if (activo) return estado();
     avisos = av || {};
     activo = true;
     camAntes = api.camaraEstado();
+    visAntes = raizG.children.map(o => [o, o.visible]);
+    raizG.children.forEach(o => { if (!NO_TOCAR.has(o.name)) o.visible = false; });
+    capasAct = {};
     if (DC) {
       dibAntes.uDib = DC.uDib.value.clone(); dibAntes.uDibO = DC.uDibO.value.clone(); dibAntes.uDibV = DC.uDibV.value.clone();
       const rmax = Math.max(...[[EXT.u0, EXT.v0], [EXT.u1, EXT.v0], [EXT.u0, EXT.v1], [EXT.u1, EXT.v1]].map(q => Math.hypot(q[0] - CEN[0], q[1] - CEN[1])));
@@ -1015,6 +1062,7 @@ export async function crea(api) {
     quitaTarjeta(); quitaRotulos(); ponFondo(null); fondo3D.visible = false; matFondo.opacity = 0;
     activo = false;
     gH.visible = false; capa.hidden = true; document.body.classList.remove('hist-activo');
+    if (visAntes) { visAntes.forEach(([o, v]) => { o.visible = v; }); visAntes = null; }
     Object.keys(MARCA).forEach(id => aplicaMarca(id, 0));
     if (DC && dibAntes.uDib) { DC.uDib.value.copy(dibAntes.uDib); DC.uDibO.value.copy(dibAntes.uDibO); DC.uDibV.value.copy(dibAntes.uDibV); }
     if (camAntes) api.camaraA(camAntes, quieto.matches ? 1 : 1400, () => { if (av && av.fin) av.fin(); });

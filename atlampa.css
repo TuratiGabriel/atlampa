@@ -577,7 +577,7 @@ body.con-datos .hud-camara{ opacity:0; pointer-events:none; }
 .hist-rotulo--tenue::before{ background:transparent; border:1px solid var(--hist-am); box-shadow:none; }
 
 .hist-tarjeta{
-  position:absolute; left:var(--gutter); top:50%; transform:translateY(-50%);
+  position:absolute; left:var(--gutter); top:0; bottom:0; margin:auto 0; height:fit-content;
   width:min(360px, calc(100vw - 2 * var(--gutter))); max-height:calc(100% - 140px); overflow:auto; pointer-events:auto;
   padding:26px 24px 22px; border:1px solid rgba(255,255,255,.34); border-radius:3px;
   background:rgba(5,5,5,.88); box-shadow:0 18px 70px rgba(0,0,0,.5); color:var(--fg);

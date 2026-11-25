@@ -18,6 +18,14 @@
    ============================================================ */
 
 export const MARCAS = {
+  // El predio hoy: además de las naves de G.NAVES, las masas occidentales que Luis estimó desde Earth
+  // (handoff/LEVANTAMIENTO_PREEXISTENCIA.md; alturas aproximadas).
+  existente: {
+    masas: [
+      { planta: [449, 418.5, 522, 487], alto: 6.2 },
+      { planta: [449, 323.5, 503.5, 395.5], alto: 6.0 }
+    ]
+  },
   // Booklet p. 68: franjas sobre el derecho de vía de la antigua espuela
   // (Crisantema, "Las Vías"), georreferidas con el límite de la colonia.
   asentamientos: {
@@ -133,7 +141,6 @@ export default [
   {
     id: 'atlampa',
     titulo: 'Atlampa',
-    fondo: 'circuito',   // la palabra del concepto, grande y difuminada detrás (portada)
     camara: { encuadre: 'colonia', az: 'norte', el: 89, aire: 1.06, lado: 0.26, dur: 3200 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: [],
@@ -155,7 +162,7 @@ export default [
       { u: 333, v: 971, texto: 'Circuito Interior', tipo: 'calle' },
       { u: 1002, v: 507, texto: 'Eulalia Guzmán · Eje 2 Nte', tipo: 'calle' },
       { u: 1197, v: 259, texto: 'Tren Suburbano', tipo: 'calle' },
-      { u: 503.6, v: 405, z: 34, texto: 'Predio', sub: '17,180 m²', tipo: 'punto' }
+      { u: 503.6, v: 405, z: 12, texto: 'Predio', sub: '17,180 m² · hoy', tipo: 'punto' }
     ]
   },
   {
@@ -219,7 +226,7 @@ export default [
       nota: 'Su cercanía abre la posibilidad de un corredor cultural entre Casa Wabi y el proyecto.',
       fuente: 'Booklet pp. 9 y 13 · casawabi.org'
     },
-    rotulos: [{ u: 503.6, v: 405, z: 34, texto: 'Predio', tipo: 'punto' }]
+    rotulos: [{ u: 503.6, v: 405, z: 12, texto: 'Predio', tipo: 'punto' }]
   },
   {
     id: 'verdes',
@@ -285,19 +292,17 @@ export default [
   {
     id: 'circuito',
     titulo: 'Circuito',
-    camara: { encuadre: [420, 320, 600, 500], az: 'norte', el: 38, aire: 1.3, lado: 0.26, dur: 2800 },
-    capas: { colonia: true, coches: true, limite: true },
-    marcas: ['circuitoProyecto'],
+    camara: { encuadre: [-150, -120, 1850, 1250], az: 'norte', el: 89, aire: 1.02, lado: 0.26, dur: 2800 },
+    capas: { colonia: false, coches: false, limite: false },
+    marcas: ['asentamientos', 'balaceras', 'cultura', 'verdes', 'espuela'],
+    compacto: true,
+    fondo: { texto: 'circuito', pos: 'centro', blur: 0, op: 0.92, alto: 0.85 },
     tarjeta: {
       kicker: 'Concepto · 2 / 3',
       titulo: 'Circuito',
-      texto: '(circuitus, latín): rodear, recorrer, volver. El circuito es un dispositivo de conexión entre espacios residuales, habitantes, producción y paisaje. En el proyecto, el aro une la vivienda, el mercado, la microindustria y la cultura, y la espuela lo atraviesa: por ellos los flujos entran, se transforman y vuelven a circular.',
-      cifras: [
-        ['≈ 270 m', 'de aro, a +10 m', 'une los cuatro usos'],
-        ['4', 'usos en el circuito', 'vivienda · mercado · industria · cultura']
-      ],
-      leyenda: [['#8fd0ff', 'agua'], ['#ffd34d', 'energía'], ['#d2d4d8', 'materiales'], ['#ffffff', 'personas'], ['#7dffb0', 'capital']],
-      nota: 'Metabolismo urbano: la ciudad como un conjunto de flujos que entran, se transforman y vuelven a circular.',
+      texto: '(circuitus, latín): rodear, recorrer, volver. El circuito se plantea como un dispositivo de conexión capaz de organizar relaciones entre espacios residuales, habitantes, producción y paisaje. Frente a una colonia fragmentada, reconecta lo que hoy está separado a partir de sus propios recursos.',
+      leyenda: [['#f5c518', 'asentamientos'], ['#ff3b30', 'violencia'], ['#c9a6ff', 'cultura'], ['#a8e063', 'áreas verdes'], ['#e8a25a', 'espuela']],
+      nota: 'Metabolismo urbano: agua, energía, materiales, personas y capital que entran, se transforman y vuelven a circular.',
       fuente: 'Lámina «circuito» (Actividad 02A)'
     },
     rotulos: []
@@ -307,7 +312,7 @@ export default [
     titulo: 'Atlampa en circuito',
     camara: { encuadre: [-500, -540, 1700, 1460], az: 'norte', el: 58, aire: 1.02, lado: 0.26, dur: 3000 },
     capas: { colonia: true, coches: true, limite: true },
-    marcas: ['circuitoProyecto', 'circuitoAtlampa', 'espuela', 'verdes', 'mercado'],
+    marcas: ['circuitoAtlampa', 'espuela', 'verdes', 'mercado'],
     rotulosDe: ['circuitoAtlampa', 'mercado'],
     tarjeta: {
       kicker: 'Concepto · 3 / 3',
