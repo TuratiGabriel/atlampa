@@ -294,7 +294,7 @@ export default [
     id: 'circuito',
     titulo: 'Circuito',
     // la palabra escrita sobre la colonia; su «o» es el aro del proyecto, en su lugar (un guiño a lo que será)
-    camara: { encuadre: 'fondo', az: 'norte', el: 52, aire: 1.12, lado: 0.26, dur: 3000 },
+    camara: { encuadre: 'fondo', az: 'norte', el: 40, aire: 1.1, lado: 0.26, dur: 3000 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['asentamientos', 'cultura', 'espuela'],
     compacto: true,
@@ -303,7 +303,7 @@ export default [
       kicker: 'Concepto · 2 / 3',
       titulo: 'Circuito',
       texto: '(circuitus, latín): rodear, recorrer, volver. El circuito se plantea como un dispositivo de conexión capaz de organizar relaciones entre espacios residuales, habitantes, producción y paisaje. Frente a una colonia fragmentada, reconecta lo que hoy está separado a partir de sus propios recursos.',
-      leyenda: [['#ff6f63', 'el aro: la «o» del circuito'], ['#e8a25a', 'espuela'], ['#f5c518', 'asentamientos'], ['#c9a6ff', 'cultura']],
+      leyenda: [['#ff6f63', 'la «o»: el aro del proyecto'], ['#e8a25a', 'espuela'], ['#f5c518', 'asentamientos'], ['#c9a6ff', 'cultura']],
       nota: 'Metabolismo urbano: agua, energía, materiales, personas y capital que entran, se transforman y vuelven a circular.',
       fuente: 'Lámina «circuito» (Actividad 02A)'
     },

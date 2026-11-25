@@ -145,9 +145,7 @@ export async function crea(api) {
   // El predio como está hoy (levantamiento de Luis, handoff/LEVANTAMIENTO_PREEXISTENCIA.md): las dos
   // naves orientales de Contexto.3dm, completas y con cubierta a dos aguas, y las masas occidentales
   // aproximadas desde Earth (MARCAS.existente). En la etapa 1 el proyecto no aparece.
-  function armaExistente() {
-    const piso = new Malla(); tapa(piso, api.rect(G.PB.u0, G.PB.v0, G.PB.u1, G.PB.v1), 0.02);
-    pon(gCol, piso, 'ctxsuelo', null, false);
+  function mallaExistente() {
     const m = new Malla();
     G.NAVES.forEach(nv => {
       const paso = (nv.u1 - nv.u0) / nv.n;
@@ -162,7 +160,12 @@ export async function crea(api) {
       }
     });
     ((MARCAS.existente && MARCAS.existente.masas) || []).forEach(x => prisma(m, api.rect(...x.planta), 0, x.alto));
-    pon(gCol, m, 'ctxpredio', null, 25);
+    return m;
+  }
+  function armaExistente() {
+    const piso = new Malla(); tapa(piso, api.rect(G.PB.u0, G.PB.v0, G.PB.u1, G.PB.v1), 0.02);
+    pon(gCol, piso, 'ctxsuelo', null, false);
+    pon(gCol, mallaExistente(), 'ctxpredio', null, 25);
     // el predio resaltado: su contorno (doble, con la banqueta) y un velo claro sobre el piso
     const lp = new Lineas(), P = G.PRED;
     lp.poli(P.map(q => W(q[0], q[1], 0.3)), true);
@@ -778,6 +781,7 @@ export async function crea(api) {
     const base = t.slice(0, -1), wBase = x.measureText(base).width, mo = x.measureText(t.slice(-1)), ml = x.measureText('l');
     const w = Math.ceil(wBase + mo.actualBoundingBoxRight) + 2 * pad, h = Math.ceil(px * 1.3) + 2 * pad, yb = pad + px;
     cv.width = w; cv.height = h; x.font = f; x.fillStyle = '#ffffff'; x.fillText(base, pad, yb);
+    x.fillStyle = '#ff6f63'; x.fillText(t.slice(-1), pad + wBase, yb);   // la «o»: el aro
     const ocx = pad + wBase + (mo.actualBoundingBoxRight - mo.actualBoundingBoxLeft) / 2, ocy = yb - (mo.actualBoundingBoxAscent - mo.actualBoundingBoxDescent) / 2;
     const Hpx = mo.actualBoundingBoxAscent + mo.actualBoundingBoxDescent, stem = ml.actualBoundingBoxRight + ml.actualBoundingBoxLeft;
     const A = G.ANILLO, k = 2 * A.re / Hpx, a = az * RAD;
@@ -786,17 +790,36 @@ export async function crea(api) {
     const W2 = w * k / 2, H2 = h * k / 2, esq = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => c.clone().addScaledVector(ex, i * W2).addScaledVector(nw, j * H2));
     const us = esq.map(p => p.x + CEN[0]), vs = esq.map(p => -p.z + CEN[1]);
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 8;
-    return { tex, c, ancho: w * k, alto: h * k, a, grosor: stem * k, caja: [Math.min(...us), Math.min(...vs), Math.max(...us), Math.max(...vs)] };
+    return { tex, c, ex, nw, ancho: w * k, alto: h * k, a, grosor: stem * k, caja: [Math.min(...us), Math.min(...vs), Math.max(...us), Math.max(...vs)] };
   }
-  function ponAro(lay) {
-    if (!fondoAro) {
-      const A = G.ANILLO, g = new THREE.Group(), rm = A.re - lay.grosor / 2, circulo = [];
-      for (let i = 0; i <= 120; i++) { const t = i / 120 * Math.PI * 2; circulo.push([A.u + rm * Math.cos(t), A.v + rm * Math.sin(t)]); }
-      const m = matC(CIRCUITO, 0); m.depthTest = false;
-      const cin = new THREE.Mesh(cinta(circulo, lay.grosor, 0.5), m); cin.renderOrder = 10; g.add(cin);
-      const pl = pulsos([circulo], { colores: COLORES_FLUJOS, cada: 16, vel: 12, largo: 7, ancho: lay.grosor * 0.45, z: 0.7 });
-      pl.mat.depthTest = false; pl.obj.renderOrder = 11; g.add(pl.obj);
-      g.userData = { m, pl }; g.visible = false; gH.add(g);
+  // la palabra impresa sobre la volumetría: una proyección desde arriba sobre el piso y sobre copias
+  // de los edificios que caen debajo (techos y muros), así que se dobla con ellos
+  const matImpresa = new THREE.ShaderMaterial({
+    uniforms: { uMapa: { value: null }, uO: { value: new THREE.Vector3() }, uEx: { value: new THREE.Vector3() }, uNw: { value: new THREE.Vector3() }, uAncho: { value: 1 }, uAlto: { value: 1 }, uOp: { value: 0 } },
+    vertexShader: /* glsl */`varying vec3 vW;
+      void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: /* glsl */`uniform sampler2D uMapa; uniform vec3 uO; uniform vec3 uEx; uniform vec3 uNw; uniform float uAncho; uniform float uAlto; uniform float uOp; varying vec3 vW;
+      void main() {
+        vec3 d = vW - uO; vec2 uv = vec2(dot(d, uEx) / uAncho + 0.5, dot(d, uNw) / uAlto + 0.5);
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) discard;
+        vec4 c = texture2D(uMapa, uv); if (c.a < 0.03) discard;
+        gl_FragColor = vec4(c.rgb, c.a * uOp);
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8
+  });
+  function ponImpresa(lay) {
+    const U = matImpresa.uniforms;
+    if (U.uMapa.value && U.uMapa.value !== lay.tex) U.uMapa.value.dispose();
+    U.uMapa.value = lay.tex; U.uO.value.copy(lay.c); U.uEx.value.copy(lay.ex); U.uNw.value.copy(lay.nw); U.uAncho.value = lay.ancho; U.uAlto.value = lay.alto;
+    const clave = lay.caja.map(Math.round).join(',');
+    if (!fondoAro || fondoAro.userData.clave !== clave) {
+      if (fondoAro) { fondoAro.children.forEach(o => o.geometry.dispose()); gH.remove(fondoAro); }
+      const g = new THREE.Group(), k = lay.caja, m = 12;
+      const piso = new Malla(); tapa(piso, api.rect(k[0] - m, k[1] - m, k[2] + m, k[3] + m), 0.25);
+      const ed = new Malla();
+      EDIF.forEach(e => { if (e.q.some(p => p[0] > k[0] - m && p[0] < k[2] + m && p[1] > k[1] - m && p[1] < k[3] + m)) prisma(ed, e.q, 0, e.h); });
+      [piso, ed, mallaExistente()].forEach(x => { if (!x.p.length) return; const o = new THREE.Mesh(x.geo(), matImpresa); o.renderOrder = 12; o.frustumCulled = false; g.add(o); });
+      g.userData = { clave }; g.visible = false; gH.add(g);
       fondoAro = g;
     }
     return fondoAro;
@@ -805,21 +828,19 @@ export async function crea(api) {
     const tok = ++fondoTok;
     const op = typeof f === 'object' && f ? f : { texto: f };
     const t = op.texto, blur = op.blur == null ? 7 : op.blur, clave = t + '|' + blur + '|' + (op.pos || '');
-    const aroDe = fondoAro && fondoAro.visible ? fondoAro.userData.m.opacity : 0;
+    const aroDe = fondoAro && fondoAro.visible ? matImpresa.uniforms.uOp.value : 0;
     if (!t || !o) {
       const de = matFondo.opacity;
-      anima(700, k => { if (tok !== fondoTok) return; matFondo.opacity = de * (1 - k); if (fondoAro) { fondoAro.userData.m.opacity = aroDe * (1 - k); fondoAro.userData.pl.mat.opacity = aroDe * (1 - k); } },
+      anima(700, k => { if (tok !== fondoTok) return; matFondo.opacity = de * (1 - k); matImpresa.uniforms.uOp.value = aroDe * (1 - k); },
         () => { if (tok === fondoTok) { fondo3D.visible = false; if (fondoAro) fondoAro.visible = false; } });
       return;
     }
     if (op.pos === 'aro') {
       const lay = op._diseno || disenoAro(t, o.az);
-      if (fondoTexto !== clave) { if (matFondo.map) matFondo.map.dispose(); matFondo.map = lay.tex; matFondo.needsUpdate = true; fondoTexto = clave; }
-      matFondo.depthTest = false; fondo3D.renderOrder = 9;
-      fondo3D.position.copy(lay.c); fondo3D.scale.set(lay.ancho, 1, lay.alto); fondo3D.rotation.set(0, -lay.a, 0); fondo3D.visible = true;
-      const g = ponAro(lay); g.visible = true;
-      const de = matFondo.opacity, meta = op.op == null ? 0.9 : op.op;
-      anima(1600, k => { if (tok !== fondoTok) return; matFondo.opacity = de + (meta - de) * k; g.userData.m.opacity = aroDe + (0.95 - aroDe) * k; g.userData.pl.mat.opacity = aroDe + (0.95 - aroDe) * k; });
+      fondo3D.visible = false; fondoTexto = null;
+      const g = ponImpresa(lay); g.visible = true;
+      const meta = op.op == null ? 0.92 : op.op;
+      anima(1600, k => { if (tok === fondoTok) matImpresa.uniforms.uOp.value = aroDe + (meta - aroDe) * k; });
       return;
     }
     matFondo.depthTest = true; fondo3D.renderOrder = 1;
@@ -969,7 +990,6 @@ export async function crea(api) {
     if (gAut.visible && !quieto.matches) mueveCarros(ms);
     if (gPer.visible && !quieto.matches) caminan(ms);
     Object.keys(MARCA).forEach(id => { if (MARCA[id].g.visible) MARCA[id].latido(ms, marcaK[id] || 0); });
-    if (fondoAro && fondoAro.visible && !quieto.matches) fondoAro.userData.pl.mueve(ms);
     if (volando && avisos.mueve) avisos.mueve();
     pide();
     requestAnimationFrame(latido);
