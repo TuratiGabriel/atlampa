@@ -41,7 +41,10 @@ export const MARCAS = {
   ],
   // Casa Wabi Sabino: Sabino 336 (casawabi.org), una cuadra al sur del predio (booklet pp. 9 y 13).
   // Se resalta el edificio que contiene el punto (lado oriente de Sabino, números pares).
-  cultura: { u: 588, v: 238, texto: 'Casa Wabi', sub: 'Sabino 336 · único espacio de arte' },
+  // Coordenada de Mapstr (19.4564979, -99.1586551) → (551.6, 223.7): lado poniente de Sabino. El edificio
+  // (Alberto Kalach, compartido con el Studio Bosco Sodi) no está en Contexto.3dm ni en OSM: planta estimada
+  // de 24 m de frente por 36 de fondo, algo más alta que lo de alrededor.
+  cultura: { u: 552, v: 224, planta: [[518, 214], [554, 214], [554, 238], [518, 238]], alto: 13, texto: 'Casa Wabi', sub: 'Sabino 336 · único espacio de arte' },
   // Booklet p. 50: ningún parque dentro de la colonia; parques a menos de 1.5 km (OSM).
   verdes: {
     centro: [503.6, 405], radio: 1500, textoRadio: '1.5 km del predio',
@@ -78,7 +81,7 @@ export const MARCAS = {
     dur: 3600,
     principal: [[563, 405], [563, 497], [944, 500], [944, 120], [795, 120], [563, 119], 'ESPUELA'],
     ramales: [
-      { pts: [[563, 119], [563, 238], [588, 238]] },          // Casa Wabi
+      { pts: [[563, 119], [563, 226], [554, 226]] },          // Casa Wabi
       { pts: [[795, 120], [793, 282]] },                     // Ciprés 280
       { pts: [[944, 500], [942, 643], [1212, 554]] },        // Nopal y Pino → Plaza Juárez
       { pts: [[797, 503], [797, 675]] },                     // Ciprés, junto al puente
@@ -92,11 +95,21 @@ export const MARCAS = {
       { de: [1212, 554], nombre: 'Parque Sándalo' }
     ],
     nodos: [
-      { u: 588, v: 238, texto: 'Casa Wabi' },
+      { u: 550, v: 226, texto: 'Casa Wabi' },
       { u: 447, v: 120, texto: 'Las Vías', lado: 'izq' },
       { u: 800, v: 120 },
       { u: 968, v: 127, texto: 'Fresno 409' },
       { u: 793, v: 282 }, { u: 942, v: 643 }, { u: 1212, v: 554 }, { u: 797, v: 675 }, { u: 80, v: 400 }
+    ]
+  },
+  // Ejemplo del concepto: los fines de semana el mercado del proyecto sale por la espuela
+  // (desde Heliotropo, entre las naves, hasta Crisantema y Pino) como un mercado sobre ruedas.
+  mercado: {
+    recorrido: ['ESPUELA<', [563, 119], [795, 120], [944, 120]],
+    paso: 3.8, separacion: 4.6, gentePor: 4.5, dur: 4600,
+    rotulos: [
+      { u: 545, v: 405, z: 4, texto: 'Mercado del proyecto', sub: 'sale por la espuela', lado: 'izq' },
+      { u: 760, v: 120, z: 4, texto: 'Mercado sobre ruedas', sub: 'sábado y domingo' }
     ]
   }
 };
@@ -240,7 +253,7 @@ export default [
     marcas: ['asentamientos', 'balaceras', 'cultura', 'verdes', 'espuela'],
     compacto: true,
     tarjeta: {
-      kicker: 'Concepto · 1 / 3',
+      kicker: 'Concepto · 1 / 4',
       titulo: 'Una colonia fragmentada',
       texto: 'Asentamientos irregulares, violencia, un solo espacio de arte, ninguna área verde y una espuela en desuso. En Atlampa muchos flujos se han debilitado: la industria se desplaza, el suelo queda subutilizado y la espuela conserva la memoria de un movimiento que ya no ocurre.',
       fuente: 'Lámina «circuito» · Booklet de análisis'
@@ -248,7 +261,7 @@ export default [
     rotulos: [
       { u: 640, v: 120, z: 6, texto: 'Asentamientos', tipo: 'factor', color: '#f5c518' },
       { u: 1000, v: 600, z: 6, texto: 'Violencia', tipo: 'factor', color: '#ff3b30' },
-      { u: 588, v: 238, z: 40, texto: 'Un solo espacio de arte', tipo: 'factor', color: '#c9a6ff' },
+      { u: 536, v: 226, z: 40, texto: 'Un solo espacio de arte', tipo: 'factor', color: '#c9a6ff' },
       { u: 1300, v: 880, z: 2, texto: 'Sin áreas verdes', tipo: 'factor', color: '#a8e063' },
       { u: 331, v: 255, z: 2, texto: 'Espuela en desuso', tipo: 'factor', color: '#e8a25a' }
     ]
@@ -260,7 +273,7 @@ export default [
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['circuitoProyecto'],
     tarjeta: {
-      kicker: 'Concepto · 2 / 3',
+      kicker: 'Concepto · 2 / 4',
       titulo: 'Circuito',
       texto: '(circuitus, latín): rodear, recorrer, volver. Dentro del proyecto ya hay circuitos: el aro rodea el conjunto y la espuela lo atraviesa. Son recorridos que conectan y regresan a su origen, como los flujos de la ciudad: agua, energía, materiales, personas y capital.',
       cifras: [
@@ -279,7 +292,7 @@ export default [
     marcas: ['circuitoProyecto', 'circuitoAtlampa', 'espuela', 'verdes'],
     rotulosDe: ['circuitoAtlampa'],
     tarjeta: {
-      kicker: 'Concepto · 3 / 3',
+      kicker: 'Concepto · 3 / 4',
       titulo: 'Atlampa en circuito',
       texto: 'Así como hay circuitos dentro del proyecto, el concepto busca influir en toda Atlampa. El circuito sale del predio, retoma la espuela y conecta lo fragmentado: Las Vías, Casa Wabi, los puntos de violencia y los parques cercanos. Convierte los vacíos y las estructuras existentes en oportunidades.',
       cifras: [
@@ -288,6 +301,28 @@ export default [
       ],
       nota: 'Un sistema capaz de recorrer, conectar y transformar el territorio a partir de sus propios recursos.',
       fuente: 'Lámina «circuito» (Actividad 02A)'
+    },
+    rotulos: []
+  },
+  {
+    id: 'mercado',
+    titulo: 'Mercado',
+    camara: { encuadre: [320, 70, 700, 430], az: 15, el: 32, aire: 1.05, lado: 0.26, dur: 3000 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['circuitoProyecto', 'espuela', 'mercado'],
+    rotulosDe: ['mercado'],
+    tarjeta: {
+      kicker: 'Concepto · 4 / 4 · Un ejemplo',
+      titulo: 'Mercado sobre ruedas',
+      texto: 'Así llega el concepto a la colonia: los fines de semana, el mercado del proyecto sale de las naves y se extiende por la espuela como un mercado sobre ruedas. La vía en desuso vuelve a mover gente, comercio y convivencia, y la actividad del proyecto impacta directamente sobre Atlampa.',
+      cifras: [
+        ['≈ {mercadoKm} km', 'de mercado', 'sobre la espuela'],
+        ['≈ {puestos}', 'puestos', 'a los dos lados de la vía'],
+        ['Sáb · Dom', 'el mercado sale', 'entre semana, en las naves'],
+        ['0', 'calles cerradas', 'va sobre la vía']
+      ],
+      nota: 'Es uno de los ejemplos de cómo el circuito reactiva lo social, lo productivo y lo ecológico.',
+      fuente: 'Concepto del equipo · lámina «circuito»'
     },
     rotulos: []
   }

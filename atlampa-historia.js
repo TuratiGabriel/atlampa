@@ -291,13 +291,14 @@ export async function crea(api) {
   PM.malla.geometry.instanceCount = PERS.length;
   gPer.add(PM.malla);
   const derecha = new THREE.Vector3();
-  function caminan(ms) {
+  const caminan = ms => mueveGente(PERS, PM, ms);
+  function mueveGente(PERS, PM, ms) {
     const t = ms / 1000;
     derecha.setFromMatrixColumn(api.camara().matrixWorld, 0);
     // tamaño: PX_PERSONA en pantalla de lejos, el real de cerca
     const { mpp, px } = pxPersona(), k = Math.max(1, px * mpp / FIG.alto);
-    if (Math.abs(k - (caminan.k || 0)) > 0.01) {
-      caminan.k = k;
+    if (Math.abs(k - (PM.k || 0)) > 0.01) {
+      PM.k = k;
       for (let i = 0; i < PERS.length; i++) PM.aEsc.setXY(i, FIG.ancho * PERS[i].esc * k, FIG.alto * PERS[i].esc * k);
       PM.aEsc.needsUpdate = true;
     }
@@ -440,6 +441,8 @@ export async function crea(api) {
     if (cur.length > 1) tramos.push(cur);
     return tramos;
   }
+  // recorridos del guion: 'ESPUELA' es el trazo de la espuela del visor; 'ESPUELA<', al revés
+  const expande = lista => lista.flatMap(p => p === 'ESPUELA' ? G.ESPUELA.map(q => [q[0], q[1]]) : p === 'ESPUELA<' ? G.ESPUELA.map(q => [q[0], q[1]]).reverse() : [p]);
   const largo = pts => { let l = 0; for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return l; };
   // pulsos de luz que recorren polilíneas (un InstancedMesh de rectángulos planos)
   const geoPulso = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
@@ -493,8 +496,8 @@ export async function crea(api) {
   function armaCultura() {
     const d = MARCAS.cultura, g = grupoMarca('cultura'), piezas = [], rotulos = [];
     // el edificio de Casa Wabi: el que contiene el punto (si no hay, una caja de 28 × 22 m)
-    const ed = EDIF.find(e => dentro([d.u, d.v], e.q));
-    const pol = ed ? ed.q : [[d.u - 14, d.v - 11], [d.u + 14, d.v - 11], [d.u + 14, d.v + 11], [d.u - 14, d.v + 11]], alto = (ed ? ed.h : 8) + 0.4;
+    const ed = d.planta ? null : EDIF.find(e => dentro([d.u, d.v], e.q));
+    const pol = d.planta || (ed ? ed.q : [[d.u - 14, d.v - 11], [d.u + 14, d.v - 11], [d.u + 14, d.v + 11], [d.u - 14, d.v + 11]]), alto = d.alto || ((ed ? ed.h : 8) + 0.4);
     piezas.push(caja3D(g, pol, alto, LILA, 0.55));
     const c = centro(pol), haz = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(c[0], c[1], alto), V3(c[0], c[1], alto + 48)]), linC(LILA, 0.9));
     haz.renderOrder = 7; g.add(haz); piezas.push({ obj: haz, mats: [[haz.material, 0.9]], crece: true, retraso: 300 });
@@ -574,7 +577,6 @@ export async function crea(api) {
 
   function armaCircuitoAtlampa() {
     const d = MARCAS.circuito, g = grupoMarca('circuitoAtlampa'), piezas = [], rotulos = [];
-    const expande = lista => lista.flatMap(p => p === 'ESPUELA' ? G.ESPUELA.map(q => [q[0], q[1]]) : [p]);
     const lazo = expande(d.principal);
     lazo.push(lazo[0]);
     const accL = [0]; for (let i = 1; i < lazo.length; i++) accL.push(accL[i - 1] + Math.hypot(lazo[i][0] - lazo[i - 1][0], lazo[i][1] - lazo[i - 1][1]));
@@ -630,6 +632,71 @@ export async function crea(api) {
     MARCA.circuitoAtlampa = { g, piezas, rotulos, latido: (ms, k) => { pl.mueve(ms); latidos.forEach(f => f(ms, k)); } };
   }
 
+  /* El mercado sobre ruedas: los fines de semana, el mercado del proyecto sale por la espuela.
+     Puestos a los dos lados de la vía (toldo de color y mostrador), que se abren en ola desde
+     el predio, y gente que camina por el pasillo de en medio. */
+  function armaMercado() {
+    const d = MARCAS.mercado, g = grupoMarca('mercado'), piezas = [], rotulos = [];
+    const pts = expande(d.recorrido), acc = [0];
+    for (let i = 1; i < pts.length; i++) acc.push(acc[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const L = acc[acc.length - 1], DUR = d.dur || 4200;
+    const en = s => {
+      let j = 1; while (j < acc.length - 1 && acc[j] < s) j++;
+      const a = pts[j - 1], b = pts[j], f = (s - acc[j - 1]) / ((acc[j] - acc[j - 1]) || 1), l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, (b[0] - a[0]) / l, (b[1] - a[1]) / l];
+    };
+    const COLORES = (d.colores || ['#ff5cb0', '#8a98ff', '#f2c14e', '#f4f1ea', '#5ad1c6']).map(c => new THREE.Color(c));
+    const puestos = [];
+    for (let s = d.inicio || 8; s < L - 3; s += d.paso || 3.8) [-1, 1].forEach((lado, k) => {
+      const r0 = en(s), sep = d.separacion || 4.6;
+      puestos.push({ u: r0[0] - r0[3] * lado * sep, v: r0[1] + r0[2] * lado * sep, a: Math.atan2(r0[3], r0[2]), s, c: COLORES[Math.floor((s * 7.31 + k * 3) % COLORES.length)] });
+    });
+    const N = Math.max(1, puestos.length);
+    CALCULADOS.puestos = Math.round(puestos.length / 10) * 10; CALCULADOS.mercadoKm = (L / 1000).toFixed(1);
+    const toldo = new THREE.InstancedMesh(new THREE.BoxGeometry(3.1, 0.28, 2.5), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }), N);
+    const mostr = new THREE.InstancedMesh(new THREE.BoxGeometry(2.8, 0.95, 1.1), new THREE.MeshBasicMaterial({ color: 0x3a3a3a, transparent: true, opacity: 0 }), N);
+    [toldo, mostr].forEach(m => { m.frustumCulled = false; m.renderOrder = 7; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); g.add(m); });
+    puestos.forEach((p, i) => toldo.setColorAt(i, p.c));
+    if (toldo.instanceColor) toldo.instanceColor.needsUpdate = true;
+    const M4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), e3 = new THREE.Vector3();
+    let t0 = null;
+    function abre(ms) {
+      const t = t0 == null ? 0 : ms - t0;
+      let todos = true;
+      puestos.forEach((p, i) => {
+        const k = Math.max(0, Math.min(1, (t - DUR * p.s / L) / 450)), e = k < 1 ? k * (1 + 0.25 * Math.sin(k * Math.PI)) : 1;
+        if (k < 1) todos = false;
+        q.setFromAxisAngle(EJE, p.a);
+        const w1 = W(p.u, p.v, 2.45 * Math.max(0.001, e)), w2 = W(p.u, p.v, 0.48 * Math.max(0.001, e));
+        M4.compose(pos.set(w1[0], w1[1], w1[2]), q, e3.set(Math.max(0.001, e), 1, Math.max(0.001, e))); toldo.setMatrixAt(i, M4);
+        M4.compose(pos.set(w2[0], w2[1], w2[2]), q, e3.set(1, Math.max(0.001, e), 1)); mostr.setMatrixAt(i, M4);
+      });
+      toldo.instanceMatrix.needsUpdate = true; mostr.instanceMatrix.needsUpdate = true;
+      return todos;
+    }
+    abre(0);
+    piezas.push({ obj: toldo, mats: [[toldo.material, 1]] }, { obj: mostr, mats: [[mostr.material, 0.95]] });
+    // la gente del mercado: el mismo pictograma, caminando despacio por el pasillo
+    const GENTE = [];
+    const nG = Math.round(L / (d.gentePor || 5));
+    for (let k = 0; k < nG; k++) GENTE.push({ p: pts, acc, L, lado: (azarP() - 0.5) * 4.4, s0: azarP() * L * 2, vel: (0.5 + 0.6 * azarP()) * 2 * (azarP() < 0.5 ? 1 : -1),
+      tile: FIG.camina[Math.floor(azarP() * FIG.camina.length)], esc: 0.9 + 0.2 * azarP() });
+    const matG = api.matAtlas(FIG.tex, FIG.N, FIG.POSES, DC_), GM = api.mallaAtlas(Math.max(1, GENTE.length), matG);
+    GENTE.forEach((x, i) => { GM.aEsc.setXY(i, FIG.ancho * x.esc, FIG.alto * x.esc); GM.aTile.setX(i, x.tile); });
+    GM.malla.geometry.instanceCount = GENTE.length; GM.malla.renderOrder = 8; g.add(GM.malla);
+    const opG = matG.uniforms.uOpacidad;
+    let listoAbre = false;
+    (d.rotulos || []).forEach((x, i) => rotulos.push(Object.assign({ tipo: 'marca mercado', retraso: 1200 + i * 300 }, x)));
+    MARCA.mercado = { g, piezas, rotulos,
+      entra() { t0 = performance.now(); listoAbre = false; opG.value = 0; },
+      latido(ms, k) {
+        if (!listoAbre) listoAbre = abre(performance.now());
+        const t = t0 == null ? 0 : performance.now() - t0;
+        opG.value = Math.max(0, Math.min(1, (t - DUR * 0.4) / 900)) * k;
+        if (opG.value > 0 && !quieto.matches) mueveGente(GENTE, GM, ms);
+      } };
+  }
+
   /* ---------- 4. HTML: tarjeta, rótulos, navegación ---------- */
   const capa = document.createElement('div'); capa.className = 'hist-capa'; capa.hidden = true;
   capa.innerHTML = '<div class="hist-rotulos"></div><aside class="hist-tarjeta" aria-live="polite"></aside>' +
@@ -650,8 +717,11 @@ export async function crea(api) {
     else if (b.getAttribute('data-hist') === 'siguiente') siguiente(); else anterior();
   });
   const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const CALCULADOS = {};   // cifras que salen del modelo, para la tarjeta: {puestos}, {mercadoKm}
+  const conDatos = x => typeof x === 'string' ? x.replace(/\{(\w+)\}/g, (m, k) => CALCULADOS[k] != null ? CALCULADOS[k] : m) : x;
   function htmlTarjeta(s, i) {
-    const t = s.tarjeta || {};
+    const t0 = s.tarjeta || {}, t = {};
+    Object.keys(t0).forEach(k => { t[k] = Array.isArray(t0[k]) ? t0[k].map(c => c.map(conDatos)) : conDatos(t0[k]); });
     return '<p class="hist-kicker">' + esc(t.kicker) + '<span>' + String(i + 1).padStart(2, '0') + ' / ' + String(GUION.length).padStart(2, '0') + '</span></p>' +
       '<h2 class="hist-titulo">' + esc(t.titulo) + '</h2>' +
       (t.texto ? '<p class="hist-texto">' + esc(t.texto) + '</p>' : '') +
@@ -773,7 +843,7 @@ export async function crea(api) {
     armando = new Promise(ok => {
       const tandas = [armaSuelo, armaCalles, armaLimite];
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
-      tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa,
+      tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa, armaMercado,
         () => { mueveCarros(performance.now()); caminan(performance.now()); });
       (function sigue() {
         tandas.shift()();
@@ -852,6 +922,7 @@ export async function crea(api) {
           const M = MARCA[id]; if (!M) return;
           if (marcaK[id] >= 1) return;
           M.g.visible = true;
+          if (M.entra) M.entra();
           M.piezas.forEach(p => {
             if (p.traza) { p.traza.g.setDrawRange(0, 0); p.mats.forEach(([m, op]) => { m.opacity = op; }); }
             else p.mats.forEach(([m]) => { m.opacity = 0; });
