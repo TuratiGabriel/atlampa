@@ -441,8 +441,11 @@ export async function crea(api) {
     if (cur.length > 1) tramos.push(cur);
     return tramos;
   }
-  // recorridos del guion: 'ESPUELA' es el trazo de la espuela del visor; 'ESPUELA<', al revés
-  const expande = lista => lista.flatMap(p => p === 'ESPUELA' ? G.ESPUELA.map(q => [q[0], q[1]]) : p === 'ESPUELA<' ? G.ESPUELA.map(q => [q[0], q[1]]).reverse() : [p]);
+  // recorridos del guion: 'ESPUELA' es el trazo de la espuela del visor ('ESPUELA<', al revés) y
+  // 'CIERRE', el tramo con que la espuela original cerraba al oriente del predio (MARCAS.espuela.cierre)
+  const CIERRE = (MARCAS.espuela && MARCAS.espuela.cierre) || [];
+  const expande = lista => lista.flatMap(p => p === 'ESPUELA' ? G.ESPUELA.map(q => [q[0], q[1]]) : p === 'ESPUELA<' ? G.ESPUELA.map(q => [q[0], q[1]]).reverse() :
+    p === 'CIERRE' ? CIERRE.map(q => [q[0], q[1]]) : p === 'CIERRE<' ? CIERRE.map(q => [q[0], q[1]]).reverse() : [p]);
   const largo = pts => { let l = 0; for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return l; };
   // pulsos de luz que recorren polilíneas (un InstancedMesh de rectángulos planos)
   const geoPulso = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
@@ -543,6 +546,7 @@ export async function crea(api) {
   function armaEspuela() {
     const d = MARCAS.espuela, g = grupoMarca('espuela'), piezas = [], rotulos = [];
     const caminos = [G.ESPUELA.map(p => [p[0], p[1]])];
+    if (CIERRE.length > 1) caminos.push(CIERRE.map(p => [p[0], p[1]]));
     H.trenViejo.forEach(f => adentro(pares(f), EXT).forEach(t => { if (largo(t) > 30) caminos.push(t); }));
     caminos.forEach((pts, i) => {
       const geo = cinta(pts, 7, 0.34), m = matC(OCRE, 0.95), mesh = new THREE.Mesh(geo, m);

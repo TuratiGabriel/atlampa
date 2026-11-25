@@ -59,12 +59,18 @@ export const MARCAS = {
     ]
   },
   // La espuela del visor (Crisantema → Cedro → Heliotropo → predio) y las vías en desuso de OSM.
+  // cierre: el trazo original al oriente del predio (dibujo de Diego, 2026-11-24): sigue por Heliotropo,
+  // baja en espejo de Cedro (curvas de r 74 m) y vuelve a la vía de Crisantema en u ≈ 790.
   espuela: {
+    cierre: [[552, 405], [640, 405], [790, 405], [804.4, 403.6], [818.3, 399.4], [831.1, 392.5], [842.3, 383.3], [851.5, 372.1], [858.4, 359.3],
+      [862.6, 345.4], [864, 331], [864, 260], [864, 195], [862.6, 180.6], [858.4, 166.7], [851.5, 153.9], [842.3, 142.7], [831.1, 133.5],
+      [818.3, 126.6], [804.4, 122.4], [790, 121]],
     rotulos: [
       { u: 760, v: 121, z: 2, texto: 'Crisantema', sub: 'la vía corre por la calle' },
       { u: 331, v: 255, z: 2, texto: 'Cedro', sub: 'sube hacia el predio', lado: 'izq' },
       { u: 470, v: 405, z: 3, texto: 'Heliotropo', sub: 'cruza el predio' },
-      { u: 779, v: 681, z: 2, texto: 'Vía diagonal', sub: 'en desuso' }
+      { u: 779, v: 681, z: 2, texto: 'Vía diagonal', sub: 'en desuso' },
+      { u: 864, v: 262, z: 2, texto: 'Cierre de la espuela', sub: 'trazo original' }
     ]
   },
   // Concepto (lámina «circuito»): los circuitos del proyecto…
@@ -79,12 +85,13 @@ export const MARCAS = {
   // cuando el lazo pasa por su punto de partida.
   circuito: {
     dur: 3600,
-    principal: [[563, 405], [563, 497], [944, 500], [944, 120], [795, 120], [563, 119], 'ESPUELA'],
+    principal: ['CIERRE', [761, 121], [563, 119], 'ESPUELA'],   // la espuela cerrada, desde el predio
     ramales: [
       { pts: [[563, 119], [563, 226], [554, 226]] },          // Casa Wabi
-      { pts: [[795, 120], [793, 282]] },                     // Ciprés 280
-      { pts: [[944, 500], [942, 643], [1212, 554]] },        // Nopal y Pino → Plaza Juárez
-      { pts: [[797, 503], [797, 675]] },                     // Ciprés, junto al puente
+      { pts: [[795, 121], [793, 282]] },                     // Ciprés 280
+      { pts: [[790, 121], [944, 120], [968, 127]] },         // Crisantema → Fresno 409
+      { pts: [[679, 405], [679, 500], [942, 500], [942, 643], [1212, 554]] },   // Naranjo → Eulalia → Nopal y Pino → Plaza Juárez
+      { pts: [[797, 500], [797, 675]] },                     // Ciprés, junto al puente
       { pts: [[331, 330], [331, 400], [80, 400]] },          // Heliotropo
       { via: 'diagonal' }                                    // la vía diagonal en desuso
     ],
@@ -105,11 +112,11 @@ export const MARCAS = {
   // Ejemplo del concepto: los fines de semana el mercado del proyecto sale por la espuela
   // (desde Heliotropo, entre las naves, hasta Crisantema y Pino) como un mercado sobre ruedas.
   mercado: {
-    recorrido: ['ESPUELA<', [563, 119], [795, 120], [944, 120]],
+    recorrido: ['CIERRE', [761, 121], [563, 119], 'ESPUELA'],   // toda la espuela cerrada, desde el predio
     paso: 3.8, separacion: 4.6, gentePor: 4.5, dur: 4600,
     rotulos: [
       { u: 545, v: 405, z: 4, texto: 'Mercado del proyecto', sub: 'sale por la espuela', lado: 'izq' },
-      { u: 760, v: 120, z: 4, texto: 'Mercado sobre ruedas', sub: 'sábado y domingo' }
+      { u: 700, v: 121, z: 4, texto: 'Mercado sobre ruedas', sub: 'sábado y domingo' }
     ]
   }
 };
@@ -234,9 +241,9 @@ export default [
     tarjeta: {
       kicker: 'Patrimonio · Memoria ferroviaria',
       titulo: 'La espuela',
-      texto: 'La antigua espuela ferroviaria daba servicio a la zona industrial: corría por Crisantema, subía por Cedro y cruzaba el predio por Heliotropo hasta Sabino. Hoy está en desuso, pero conserva la memoria productiva de Atlampa. Es una reliquia que hay que mantener y volver eje del proyecto.',
+      texto: 'La antigua espuela ferroviaria daba servicio a la zona industrial y formaba un circuito: corría por Crisantema, subía por Cedro, cruzaba el predio por Heliotropo y bajaba de nuevo al oriente hasta cerrar. Hoy está en desuso, pero conserva la memoria productiva de Atlampa. Es una reliquia que hay que mantener y volver eje del proyecto.',
       cifras: [
-        ['≈ 3 km', 'de vías en desuso', 'dentro de la colonia'],
+        ['≈ 3.7 km', 'de vías y trazo original', 'dentro de la colonia'],
         ['5', 'naves de ladrillo protegidas', 'en el predio · nivel 3'],
         ['1905', 'fábrica La Maravilla', 'patrimonio industrial vecino'],
         ['4', 'sectores', 'que dejó el tren suburbano']
@@ -296,7 +303,7 @@ export default [
       titulo: 'Atlampa en circuito',
       texto: 'Así como hay circuitos dentro del proyecto, el concepto busca influir en toda Atlampa. El circuito sale del predio, retoma la espuela y conecta lo fragmentado: Las Vías, Casa Wabi, los puntos de violencia y los parques cercanos. Convierte los vacíos y las estructuras existentes en oportunidades.',
       cifras: [
-        ['≈ 3 km', 'de espuela', 'columna del circuito'],
+        ['≈ 1.5 km', 'de espuela cerrada', 'columna del circuito'],
         ['3', 'flujos que reactiva', 'social · productivo · ecológico']
       ],
       nota: 'Un sistema capaz de recorrer, conectar y transformar el territorio a partir de sus propios recursos.',
@@ -307,7 +314,7 @@ export default [
   {
     id: 'mercado',
     titulo: 'Mercado',
-    camara: { encuadre: [320, 70, 700, 430], az: 15, el: 32, aire: 1.05, lado: 0.26, dur: 3000 },
+    camara: { encuadre: [330, 90, 880, 430], az: 8, el: 34, aire: 1.04, lado: 0.26, dur: 3000 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['circuitoProyecto', 'espuela', 'mercado'],
     rotulosDe: ['mercado'],
