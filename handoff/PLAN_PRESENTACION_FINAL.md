@@ -1,5 +1,7 @@
 # Presentación final Atlampa · plan de producción
 
+**Estado vigente al 25 de noviembre:** consultar primero [CONTINUIDAD_ETAPA3.md](CONTINUIDAD_ETAPA3.md). Las descripciones de gestos y pendientes de etapa 2 más abajo son antecedentes del plan original; Luis ya probó y dio por funcional esa etapa.
+
 Estado: plan en definición, 24 de noviembre de 2026. Presentación final **miércoles 2 de diciembre, 16:00 CDMX**; duración total prevista **10–15 minutos** y ensayos lunes 30 de noviembre y martes 1 de diciembre. Rama de trabajo `interfaz-ux`. Los gestos físicos, tiempos y trayectorias concretas se cerrarán con los videos de Luis. Este documento no autoriza implementar todos los bloques de una vez.
 
 ## Objetivo escénico
@@ -17,12 +19,18 @@ La exposición pasa de una proyección convencional sobre toda Atlampa a un mueb
 | B0 · predio existente | El mueble abre la preexistencia blanca; un encuadre amplio de Atlampa seguido de acercamiento es una opción a evaluar por rendimiento y lectura | Propuesta: «Jarvis, despliega el proyecto de Atlampa» inicia apertura y acercamiento | Predio preexistente listo para narrar, sin mostrar primero la propuesta |
 | B1 · conservar | Las cinco naves grandes que se conservan se iluminan más: dos al noreste y tres al sureste | Cue por precisar | Cinco naves destacadas; lo demás aún visible |
 | B2 · retirar | En una sola acción se eliminan todas las construcciones que no continúan; quedan las cinco naves y las vías originales | Primer gesto nuevo, metáfora de tirar a la basura | Predio despejado salvo conservados; acción reversible para ensayo |
-| B3–B7 · programa | Cajas simples con color de uso en orden fijo: Mercado, Arte y Cultura, Industria, Vivienda, Aro | El mismo gesto repetido produce cinco avances, uno por caja; pose física pendiente de video | Cinco cajas en posiciones definitivas, sin detalle arquitectónico |
+| B3–B7 · programa | Volúmenes LOD100 con color de uso en orden fijo: Mercado, Arte y Cultura, Industria, Vivienda (dos cajas), Aro (dona) | Por cada uso: juntar ambas manos crea el volumen de abajo hacia arriba; después una pinza de una mano lo coloca en su posición. Los desplazamientos amplios son actuación, no señales | Cinco usos en posiciones definitivas, sin detalle arquitectónico |
 | C0 · elección | El público elige cualquiera de los cinco usos | Pregunta de presentadores | Cinco cajas disponibles y ninguna construcción detallada iniciada |
 | C1–C5 · construcción | «Jarvis, construye [uso]» transforma solo la caja elegida en el proyecto real; una orden por cada uso que el público escoja | Voz obligatoria y gestos de apoyo por definir | Conjunto de usos construidos aumenta en uno; los restantes siguen como cajas |
 | C6 · cierre | Cámara sigue el día a día de una persona que vive en el proyecto | Cue final por definir | Recorrido de conclusión legible y salida controlada |
 
 La etapa 3 se modelará como un conjunto de usos ya construidos, no como cinco órdenes fijos. `buildUse(uso)` solo se permite para una caja disponible; una repetición no duplica geometría. Al terminar una animación, la escena queda quieta mientras los presentadores hablan. Las órdenes de voz, gestos y botones de respaldo llamarán a las mismas acciones del visor. Habrá pausa, reanudación, retroceso de ensayo y recuperación de escena sin recargar toda la presentación. La geometría actual ya agrupa las cinco naves conservadas como `G.NAVES[0]` con tres crujías al sureste y `G.NAVES[1]` con dos al noreste.
+
+**Aclaración del árbol de decisiones del 24 de noviembre:** el nodo rotulado «Reinicio» en cada rama de uso significa **«Volver a la vista general»**. Cierra la exploración de ese uso, lo deja construido y habilita la siguiente elección del público; no deshace el uso ni reinicia toda la presentación. Los presentadores evitarán pedir por voz un uso ya desarrollado. Los cinco usos deberán terminar construidos antes de «Jarvis, muestra la vida de un habitante del proyecto». Los gestos nuevos y animaciones particulares de cada rama se definirán conforme Luis entregue sus detalles.
+
+**Regla de gestos por estado:** el árbol es una lista de permisos, no solo una guía visual. Un gesto que no aparezca en el estado activo no se reconoce ni modifica la escena, aunque ese mismo movimiento tenga otro significado en un estado posterior. En B0, antes de colorear, solo se admite la salpicadura; en B1, después de colorear y antes de retirar, solo el puño que inicia el descarte; durante las animaciones no se admite otro gesto. En B2, después del descarte, no se habilitan gestos BIM mientras se define el gesto de colocar cajas. Esto sustituye el permiso anterior de giro/zoom en la preexistencia para estos estados. La salida manual o por voz de Historia permanece como recuperación operativa. Luis podrá ampliar los permisos de una etapa más adelante; cada ampliación deberá quedar explícita en el árbol y en el contrato del visor/Jarvis.
+
+**Contrato de B3–B7:** se repite la pareja `crear → colocar` exactamente cinco veces en el orden fijo. En espera de crear, solo se reconoce la convergencia de ambas manos; en espera de colocar, solo la pinza existente de una mano. Una pose sostenida no cuenta dos veces ni adelanta al siguiente uso. Vivienda crea y coloca sus dos cajas como una unidad de programa; Aro usa anillo volumétrico. Cada pieza tiene huella y altura aproximadas del proyecto real, color de uso y ningún detalle de fachada.
 
 Tiempo escénico provisional para caber en 10–15 minutos: etapa 1, 2–3 minutos; etapa 2, 3–4 minutos; elección y cinco transformaciones, 4–6 minutos; cierre, 1 minuto. Luis ajustará los tiempos al grabar videos y ensayar texto. Ninguna animación avanzará por sí sola al siguiente estado narrativo mientras el equipo esté hablando.
 
@@ -30,7 +38,7 @@ Tiempo escénico provisional para caber en 10–15 minutos: etapa 1, 2–3 minut
 
 - **A→B:** el apagón falso no interrumpe el equipo del mueble; la orden real muestra preexistencia y llega a un encuadre estable. Hay disparador manual si la voz falla.
 - **B1/B2:** exactamente las cinco naves se destacan; un gesto confirmado retira el resto una sola vez y conserva vías. Repetir el gesto no elimina más elementos.
-- **B3–B7:** cada gesto liberado coloca una caja, siempre en el orden acordado. Una pose sostenida no adelanta varias cajas; el sexto intento no cambia la escena.
+- **B3–B7:** cada uso requiere dos disparos distintos: manos juntas para crecer desde el suelo y pinza para colocar. Siempre se sigue el orden acordado; una pose sostenida no adelanta otra fase ni otro uso. Vivienda conserva dos cajas, Aro conserva el hueco de la dona y un sexto intento no cambia la escena.
 - **C1–C5:** cualquiera de los cinco usos puede ser la primera elección. Cada animación cambia solo su caja, conserva las demás y termina en estado estable. Probar cinco primeras elecciones y varias secuencias completas con órdenes diferentes.
 - **C6:** recorrido final legible a distancia de proyección; salida y recuperación de escena verificadas.
 - **Sistema:** voz, cámara y controles manuales llegan al mismo estado observable; error, pausa o doble orden no duplican geometría. Registrar versión y copia que arranca sin red externa.

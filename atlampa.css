@@ -98,6 +98,17 @@ body.modo-presentacion .ad-ayuda,
 body.modo-presentacion .ad-etiqueta{ display:none !important; }
 /* Historia conserva los controles de cámara para recorrer la preexistencia. */
 body.modo-presentacion.modo-historia .hud-camara{ display:flex !important; }
+.ad-historia-controles[hidden]{ display:none !important; }
+.ad-historia-controles{ position:fixed; z-index:25; left:var(--gutter); bottom:22px; display:grid; gap:7px; max-width:min(590px,calc(100vw - 32px)); padding:10px; color:var(--fg); background:rgba(8,9,11,.93); border:1px solid rgba(255,255,255,.32); border-radius:8px; font:13px var(--font-display); }
+.ad-historia-navegacion{ display:flex; align-items:center; gap:10px; }
+.ad-historia-navegacion span{ min-width:190px; flex:1; text-align:center; }
+.ad-historia-usos{ display:flex; flex-wrap:wrap; gap:5px; }
+.ad-historia-controles button{ padding:6px 9px; color:var(--fg); background:#171a20; border:1px solid rgba(255,255,255,.32); border-radius:5px; cursor:pointer; font:inherit; }
+.ad-historia-navegacion button{ min-width:38px; font-size:20px; line-height:1; }
+.ad-historia-controles button:disabled{ opacity:.4; cursor:default; }
+.ad-historia-controles button[aria-pressed="true"]{ border-color:#fff; color:#fff; }
+.ad-historia-controles button:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+body.modo-presentacion .ad-historia-controles{ display:none !important; }
 .ad-context-toggle{ display:none; padding:7px 10px; min-height:28px; color:var(--muted); background:rgba(8,9,11,.94); border:1px solid rgba(255,255,255,.25); border-radius:6px; font:13px var(--font-display); white-space:nowrap; }
 body.modo-historia .ad-context-toggle{ display:block; }
 .ad-context-toggle[aria-pressed="true"]{ color:var(--fg); border-color:var(--fg); }

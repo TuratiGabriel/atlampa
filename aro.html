@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="es">
 <head>
+<style>html{background:#08090b}html.jarvis-story-loading body{visibility:hidden!important}</style>
+<script>if(new URLSearchParams(location.search).has('jarvis_kiosk'))document.documentElement.classList.add('jarvis-story-loading');</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlampa · Aro</title>
-<link rel="stylesheet" href="atlampa.css?v=20261124-story-splash-open">
-<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261124-story-splash-open">
+<link rel="stylesheet" href="atlampa.css?v=20261125-story-manual-controls4">
+<link rel="stylesheet" href="atlampa-3d-ctx.css?v=20261125-story-manual-controls4">
 <!-- Three.js 0.170.0 y los complementos que se usan van en lib/ (sin CDN): el sitio funciona sin internet -->
 <script type="importmap">{"imports": {"three": "./lib/three-0.170.0.module.min.js", "three/addons/": "./lib/three-0.170.0-addons/"}}</script>
 </head>
@@ -194,6 +196,21 @@
     </ul>
   </aside>
 
+  <div class="ad-historia-controles" data-historia-controles role="group" aria-label="Controles de Modo historia" hidden>
+    <div class="ad-historia-navegacion">
+      <button type="button" data-historia-anterior aria-label="Paso anterior" aria-keyshortcuts="ArrowLeft">←</button>
+      <span data-historia-estado aria-live="polite">Preexistencia</span>
+      <button type="button" data-historia-siguiente aria-label="Paso siguiente" aria-keyshortcuts="ArrowRight">→</button>
+    </div>
+    <div class="ad-historia-usos" role="group" aria-label="Construir usos">
+      <button type="button" data-historia-construye="vivienda" title="VV">Vivienda</button>
+      <button type="button" data-historia-construye="comercio" title="CM">Comercio</button>
+      <button type="button" data-historia-construye="industria" title="IN">Industria</button>
+      <button type="button" data-historia-construye="cultura" title="AC">Arte y cultura</button>
+      <button type="button" data-historia-construye="aro" title="AR">Aro</button>
+      <button type="button" data-historia-construye="paisaje" title="PS">Paisaje</button>
+    </div>
+  </div>
   <div class="hud-camara">
     <button class="ad-context-toggle" type="button" data-historia-contexto aria-pressed="false" title="Mostrar u ocultar contexto urbano">Contexto urbano</button>
     <div class="ad-mini-fachadas" data-fachadas>
@@ -212,17 +229,17 @@
 
   <p class="ad-ayuda">Arrastrar (derecho o izquierdo): orbitar · Shift + arrastrar o botón central: mover · rueda: zoom al cursor · clic en una parte: entrar · doble clic: aislarla (en el vacío: encuadre)</p>
 </main>
-<script src="atlampa-datos.js?v=20261124-story-splash-open"></script>
-<script src="atlampa-modulos.js?v=20261124-story-splash-open"></script>
-<script src="atlampa-estacionamiento.js?v=20261124-story-splash-open"></script>
-<script src="atlampa-paisaje.js?v=20261124-story-splash-open"></script>
-<script src="atlampa-mercado.js?v=20261124-story-splash-open"></script>
-<script src="atlampa-estructura.js?v=20261124-story-splash-open"></script>
-<script src="atlampa-industria.js?v=20261124-story-splash-open"></script>
-<script src="atlampa-infraestructura.js?v=20261124-story-splash-open"></script>
-<script src="atlampa-revit.js?v=20261124-story-splash-open"></script>
-<script src="vivienda4-sur.js?v=20261124-story-splash-open"></script>
-<script src="atlampa-geo.js?v=20261124-story-splash-open"></script>
-<script src="atlampa-pagina.js?v=20261124-story-splash-open"></script>
+<script src="atlampa-datos.js?v=20261125-story-manual-controls4"></script>
+<script src="atlampa-modulos.js?v=20261125-story-manual-controls4"></script>
+<script src="atlampa-estacionamiento.js?v=20261125-story-manual-controls4"></script>
+<script src="atlampa-paisaje.js?v=20261125-story-manual-controls4"></script>
+<script src="atlampa-mercado.js?v=20261125-story-manual-controls4"></script>
+<script src="atlampa-estructura.js?v=20261125-story-manual-controls4"></script>
+<script src="atlampa-industria.js?v=20261125-story-manual-controls4"></script>
+<script src="atlampa-infraestructura.js?v=20261125-story-manual-controls4"></script>
+<script src="atlampa-revit.js?v=20261125-story-manual-controls4"></script>
+<script src="vivienda4-sur.js?v=20261125-story-manual-controls4"></script>
+<script src="atlampa-geo.js?v=20261125-story-manual-controls4"></script>
+<script src="atlampa-pagina.js?v=20261125-story-manual-controls4"></script>
 </body>
 </html>

@@ -84,29 +84,120 @@
   function guarda(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
   function lee(k, borra) { try { var v = sessionStorage.getItem(k); if (borra) sessionStorage.removeItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   var modoPresentacion = lee('atlampa-modo-presentacion') === true;
+  var kioscoJarvis = new URLSearchParams(location.search).has('jarvis_kiosk');
   var historiaActiva = false;
   var historiaPresentacionAnterior = null;
   var historiaNavesIluminadas = false, historiaSalpicando = false;
+  var historiaDescartado = false, historiaDescartando = false;
+  var historiaProgramaOrden = ['comercio', 'cultura', 'industria', 'vivienda', 'aro'];
+  var historiaProgramaIndice = 0, historiaProgramaFase = 'create', historiaProgramaOcupado = false, historiaRestaurando = false;
+  var historiaUsoSeleccionado = null;
+  var historiaViviendaConstruyendo = false, historiaViviendaConstruida = false;
+  var historiaComercioConstruyendo = false, historiaComercioConstruido = false;
+  var historiaIndustriaConstruyendo = false, historiaIndustriaConstruida = false;
+  var historiaCulturaConstruyendo = false, historiaCulturaConstruida = false;
+  var historiaAroConstruyendo = false, historiaAroConstruido = false;
+  var historiaPaisajeVisible = false;
+  var historiaPasos = [], historiaRehacer = [], historiaReproduciendo = false, historiaPanelTimer = null;
+  var historiaViviendaCiclo = 0;
   var historiaApertura = false, historiaFaseApertura = null, historiaErrorApertura = null;
   var historiaAperturaToken = 0, historiaEspera = null;
+  function historiaTransicion() { return historiaApertura || historiaSalpicando || historiaDescartando || historiaProgramaOcupado || historiaRestaurando || historiaViviendaConstruyendo || historiaComercioConstruyendo || historiaIndustriaConstruyendo || historiaCulturaConstruyendo || historiaAroConstruyendo; }
+  function usosConstruidosHistoria() { return historiaProgramaOrden.filter(uso =>
+    uso === 'vivienda' ? historiaViviendaConstruida : uso === 'comercio' ? historiaComercioConstruido :
+    uso === 'industria' ? historiaIndustriaConstruida : uso === 'cultura' ? historiaCulturaConstruida : uso === 'aro' ? historiaAroConstruido : false); }
+  function estadoConstruccionHistoria() {
+    if (historiaViviendaConstruyendo || historiaComercioConstruyendo || historiaIndustriaConstruyendo || historiaCulturaConstruyendo || historiaAroConstruyendo) return 'building';
+    if (historiaUsoSeleccionado === 'vivienda' && historiaViviendaConstruida ||
+        historiaUsoSeleccionado === 'comercio' && historiaComercioConstruido ||
+        historiaUsoSeleccionado === 'industria' && historiaIndustriaConstruida ||
+        historiaUsoSeleccionado === 'cultura' && historiaCulturaConstruida ||
+        historiaUsoSeleccionado === 'aro' && historiaAroConstruido) return 'built';
+    return historiaUsoSeleccionado ? 'pending_design' : null;
+  }
+  function pasoHistoria() {
+    if (!historiaActiva) return null;
+    if (historiaDescartando) return 'B2';
+    if (!historiaDescartado) return historiaNavesIluminadas ? 'B1' : 'B0';
+    if (historiaProgramaFase === 'complete' || historiaProgramaFase === 'restoring') return 'B8';
+    if (historiaProgramaFase === 'full_scale') return 'B9';
+    return 'B' + (historiaProgramaIndice + 3);
+  }
+  function usoHistoria() { return historiaProgramaOrden[historiaProgramaIndice] || null; }
+  function etapaHistoria() {
+    if (!historiaActiva) return null;
+    if (!historiaDescartado) return 'schematic_preexistence';
+    if (historiaProgramaFase === 'complete' || historiaProgramaFase === 'restoring') return 'program_complete';
+    if (historiaProgramaFase === 'full_scale') return 'program_full_scale';
+    return historiaProgramaIndice || historiaProgramaFase !== 'create' ? 'program_assembly' : 'site_cleared';
+  }
+  // Únicos gestos narrativos permitidos en el tramo actual del árbol.
+  function gestosHistoria() {
+    if (!historiaActiva || historiaTransicion()) return [];
+    var construidos = usosConstruidosHistoria().length > 0;
+    if (historiaProgramaFase === 'full_scale' && historiaViviendaConstruida && aislado === 'vivienda') {
+      var comunes = ['orbit', 'pan', 'zoom', 'returnToStoryOverview'];
+      var detalle = { vivienda: ['setFloorSeparation', 'selectFloor'], piso: ['selectApartment', 'pickApartment'],
+        departamento: ['selectWall', 'pickWall'], muro: ['setLateralSeparation', 'explodeWall'], capas: [] };
+      return comunes.concat(detalle[detalleV4.etapa] || []);
+    }
+    if (historiaProgramaFase === 'full_scale' && construidos)
+      return ['orbit', 'pan', 'zoom', 'returnToStoryOverview'];
+    if (historiaDescartado) {
+      if (historiaProgramaFase === 'create' && usoHistoria()) return ['createNextProgramVolume'];
+      if (historiaProgramaFase === 'place') return ['placeCurrentProgramVolume'];
+      if (historiaProgramaFase === 'complete') return ['restoreStoryScale'];
+      return [];
+    }
+    return historiaNavesIluminadas ? ['discardExistingBuildings'] : ['highlightConservedNaves'];
+  }
   function accionesHistoria() {
     if (!historiaActiva) return [];
-    if (historiaApertura || historiaSalpicando) return ['exitStoryMode'];
-    var acciones = prendida('contexto') ? ['orbit', 'zoom', 'setUrbanContext', 'exitStoryMode'] :
-      ['orbit', 'pan', 'zoom', 'setUrbanContext', 'exitStoryMode'];
-    if (!historiaNavesIluminadas) acciones.push('highlightConservedNaves');
-    return acciones;
+    if (historiaFaseApertura === 'ready_to_reveal') return ['revealStoryForJarvis', 'exitStoryMode'];
+    if (historiaProgramaFase === 'full_scale' && !historiaTransicion()) {
+      if (aislado === 'vivienda') return gestosHistoria().concat('exitStoryMode',
+        usosConstruidosHistoria().length === 5 && !historiaPaisajeVisible ? ['addStoryLandscape'] : []);
+      return Array.from(new Set(['selectStoryUse', 'returnToStoryOverview', 'exitStoryMode'].concat(gestosHistoria(),
+        historiaUsoSeleccionado === 'vivienda' && !historiaViviendaConstruida ? ['buildStoryHousing'] :
+        historiaUsoSeleccionado === 'comercio' && !historiaComercioConstruido ? ['buildStoryCommerce'] :
+        historiaUsoSeleccionado === 'industria' && !historiaIndustriaConstruida ? ['buildStoryIndustry'] :
+        historiaUsoSeleccionado === 'cultura' && !historiaCulturaConstruida ? ['buildStoryCulture'] :
+        historiaUsoSeleccionado === 'aro' && !historiaAroConstruido ? ['buildStoryRing'] : [],
+        usosConstruidosHistoria().length === 5 && !historiaPaisajeVisible ? ['addStoryLandscape'] : [])));
+    }
+    return gestosHistoria().concat('exitStoryMode');
   }
   function estadoHistoria() {
-    return { ok: true, storyMode: historiaActiva, storyStage: historiaActiva ? 'schematic_preexistence' : null,
-      storyStep: null, storyTransitioning: historiaApertura || historiaSalpicando,
+    return { ok: true, storyMode: historiaActiva,
+      storyStage: etapaHistoria(),
+      storyStep: pasoHistoria(),
+      storyProgramUse: historiaActiva && historiaDescartado ? usoHistoria() : null,
+      storyProgramPhase: historiaActiva && historiaDescartado ? historiaProgramaFase : null,
+      storyProgramPlacedCount: historiaProgramaIndice,
+      storyScaleRestored: historiaProgramaFase === 'full_scale',
+      storySelectedUse: historiaUsoSeleccionado,
+      storyBuildStatus: estadoConstruccionHistoria(),
+      storyHousingBuilt: historiaViviendaConstruida, storyCommerceBuilt: historiaComercioConstruido,
+      storyIndustryBuilt: historiaIndustriaConstruida,
+      storyCultureBuilt: historiaCulturaConstruida,
+      storyRingBuilt: historiaAroConstruido,
+      storyLandscapeVisible: historiaPaisajeVisible,
+      storyBuiltUses: usosConstruidosHistoria(),
+      storyHousingBuildPhase: dib && dib.historiaViviendaEstado ? dib.historiaViviendaEstado().phase : null,
+      storyCommerceBuildPhase: dib && dib.historiaComercioEstado ? dib.historiaComercioEstado().phase : null,
+      storyIndustryBuildPhase: dib && dib.historiaIndustriaEstado ? dib.historiaIndustriaEstado().phase : null,
+      storyCultureBuildPhase: dib && dib.historiaCulturaEstado ? dib.historiaCulturaEstado().phase : null,
+      storyRingBuildPhase: dib && dib.historiaAroEstado ? dib.historiaAroEstado().phase : null,
+      storyHousingIsolated: historiaActiva && aislado === 'vivienda',
+      storyAvailableUses: historiaProgramaFase === 'full_scale' ? historiaProgramaOrden.slice() : [],
+      storyTransitioning: historiaTransicion(),
       storyOpeningPhase: historiaFaseApertura, storyOpeningError: historiaErrorApertura,
-      conservedNavesHighlighted: historiaNavesIluminadas, conservedNavesCount: 5,
-      sceneReady: false, visibleElements: historiaActiva ? 4 : 0, storyAvailableActions: accionesHistoria() };
+      conservedNavesHighlighted: historiaNavesIluminadas, conservedNavesCount: 5, storyDiscarded: historiaDescartado,
+      sceneReady: false, visibleElements: historiaActiva ? 4 : 0,
+      storyAvailableActions: accionesHistoria(), storyGestureActions: gestosHistoria() };
   }
   function entrarHistoria() {
     if (historiaActiva) return { ok: true, alreadyActive: true, ...estadoHistoria() };
-    if (!modoPresentacion) return { ok: false, reason: 'requires_presentation_mode' };
     if (!dib || !dib.historiaModo || yendo) return { ok: false, reason: 'not_ready' };
     if (ESCENA !== 'general' || aislado) return { ok: false, reason: 'requires_predio' };
     if (urbanRotationActive) stopUrbanRotation();
@@ -114,8 +205,21 @@
     dib.historiaModo(true);
     historiaActiva = true;
     historiaNavesIluminadas = historiaSalpicando = false;
+    historiaDescartado = historiaDescartando = false;
+    historiaProgramaIndice = 0; historiaProgramaFase = 'create'; historiaProgramaOcupado = historiaRestaurando = false;
+    historiaUsoSeleccionado = null;
+    historiaViviendaConstruyendo = historiaViviendaConstruida = false;
+    historiaComercioConstruyendo = historiaComercioConstruido = false;
+    historiaIndustriaConstruyendo = historiaIndustriaConstruida = false;
+    historiaCulturaConstruyendo = historiaCulturaConstruida = false;
+    historiaAroConstruyendo = historiaAroConstruido = false;
+    historiaPaisajeVisible = false;
+    historiaPasos = []; historiaRehacer = [];
+    ++historiaViviendaCiclo;
     historiaErrorApertura = null;
     document.body.classList.add('modo-historia');
+    if (!historiaPanelTimer) historiaPanelTimer = setInterval(actualizaPanelHistoria, 250);
+    actualizaPanelHistoria();
     [].forEach.call(document.querySelectorAll('[data-modo-historia]'), function (b) { b.setAttribute('aria-pressed', 'true'); });
     return estadoHistoria();
   }
@@ -125,19 +229,33 @@
     if (historiaEspera) clearTimeout(historiaEspera);
     historiaEspera = null;
     if (historiaApertura) { tramos = []; tramo = null; ponContexto(false, true); }
-    historiaApertura = historiaSalpicando = false;
+    historiaApertura = historiaSalpicando = historiaDescartando = historiaProgramaOcupado = historiaRestaurando = false;
     historiaFaseApertura = historiaErrorApertura = null;
+    if (aislado === 'vivienda') saleAislado();
     if (dib && dib.historiaModo) dib.historiaModo(false);
     historiaActiva = false;
-    historiaNavesIluminadas = false;
+    historiaNavesIluminadas = historiaDescartado = false;
+    historiaProgramaIndice = 0; historiaProgramaFase = 'create';
+    historiaUsoSeleccionado = null;
+    historiaViviendaConstruyendo = historiaViviendaConstruida = false;
+    historiaComercioConstruyendo = historiaComercioConstruido = false;
+    historiaIndustriaConstruyendo = historiaIndustriaConstruida = false;
+    historiaCulturaConstruyendo = historiaCulturaConstruida = false;
+    historiaAroConstruyendo = historiaAroConstruido = false;
+    historiaPaisajeVisible = false;
+    historiaPasos = []; historiaRehacer = [];
+    if (historiaPanelTimer) { clearInterval(historiaPanelTimer); historiaPanelTimer = null; }
+    ++historiaViviendaCiclo;
     document.body.classList.remove('modo-historia');
+    actualizaPanelHistoria();
     [].forEach.call(document.querySelectorAll('[data-modo-historia]'), function (b) { b.setAttribute('aria-pressed', 'false'); });
     historiaPresentacionAnterior = null;
     return estadoHistoria();
   }
-  // Única entrada de la puesta en escena: el visor abierto directamente sigue
-  // mostrando el proyecto. Jarvis llama este método después de abrirlo.
+  // El kiosco prepara la escena oculta; revelar inicia los tres segundos de
+  // Contexto urbano. Abrir el visor fuera del kiosco sigue mostrando proyecto.
   function abrirHistoriaJarvis() {
+    if (!kioscoJarvis) return { ok: false, reason: 'not_jarvis_kiosk' };
     if (historiaActiva) return { ok: true, alreadyActive: true, ...estadoHistoria() };
     if (!controlListo()) return { ok: false, reason: 'not_ready' };
     if (ESCENA !== 'general' || aislado) return { ok: false, reason: 'requires_predio' };
@@ -146,38 +264,65 @@
     var resultado = entrarHistoria();
     if (!resultado.ok) { if (!antes) ponModoPresentacion(false); return resultado; }
     historiaPresentacionAnterior = antes;
-    historiaApertura = true; historiaFaseApertura = 'expanding_context'; historiaErrorApertura = null;
-    var token = ++historiaAperturaToken, inicio = performance.now(), inicioCierre = null;
-    if (!prendida('contexto')) ponContexto(true);
+    historiaApertura = true; historiaFaseApertura = 'preparing_context'; historiaErrorApertura = null;
+    var token = ++historiaAperturaToken, inicio = performance.now();
+    // Sin recorrido de sitio a ciudad: la primera imagen revelada ya tendrá
+    // la preexistencia y el contexto completo en el encuadre amplio.
+    marca(boton('contexto'), true);
+    dib.preparaContexto(function () {
+      if (token !== historiaAperturaToken || !historiaActiva) return;
+      x = 1; tramos = []; tramo = null;
+      var encuadre = dib.fijaContextoHistoria(); escala();
+      if (!encuadre.wide) {
+        historiaFaseApertura = 'preparation_failed'; historiaErrorApertura = 'wide_context_unavailable';
+        return;
+      }
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        if (token === historiaAperturaToken && historiaActiva && historiaFaseApertura === 'preparing_context')
+          historiaFaseApertura = 'ready_to_reveal';
+      }); });
+    });
     function esperaContexto() {
       if (token !== historiaAperturaToken || !historiaActiva) return;
-      if (x >= 0.999 && !tramo && !tramos.length && dib.contextoListo()) {
-        historiaFaseApertura = 'holding_context';
-        historiaEspera = setTimeout(function () {
-          historiaEspera = null;
-          if (token !== historiaAperturaToken || !historiaActiva) return;
-          historiaFaseApertura = 'closing_to_site';
-          inicioCierre = performance.now();
-          ponContexto(false);
-          esperaPredio();
-        }, 3000);
-      } else if (performance.now() - inicio > 15000) {
-        historiaApertura = false; historiaFaseApertura = 'idle'; historiaErrorApertura = 'urban_context_timeout';
-        ponContexto(false, true);
+      if (historiaFaseApertura === 'ready_to_reveal') return;
+      if (performance.now() - inicio > 15000) {
+        historiaFaseApertura = 'preparation_failed'; historiaErrorApertura = 'urban_context_timeout';
       } else requestAnimationFrame(esperaContexto);
     }
-    function esperaPredio() {
-      if (token !== historiaAperturaToken || !historiaActiva) return;
-      if (x <= 0.001 && !tramo && !tramos.length) {
-        historiaApertura = false; historiaFaseApertura = 'idle';
-      } else if (performance.now() - inicioCierre > 8000) {
-        tramos = []; tramo = null;
-        ponContexto(false, true);
-        historiaApertura = false; historiaFaseApertura = 'idle';
-        historiaErrorApertura = 'closeup_timeout';
-      } else requestAnimationFrame(esperaPredio);
-    }
     requestAnimationFrame(esperaContexto);
+    return { ...estadoHistoria(), pending: true, requiresReveal: true, contextHoldMs: 3000 };
+  }
+  function revelaHistoriaJarvis() {
+    if (!kioscoJarvis || !historiaActiva) return { ok: false, reason: 'not_jarvis_story' };
+    if (historiaFaseApertura === 'holding_context' || historiaFaseApertura === 'closing_to_site' || historiaFaseApertura === 'idle')
+      return { ok: true, alreadyRevealed: true, ...estadoHistoria() };
+    if (historiaFaseApertura !== 'ready_to_reveal' || historiaErrorApertura)
+      return { ok: false, reason: historiaErrorApertura || 'context_not_ready' };
+    if (x < 0.999 || !dib.contextoListo()) return { ok: false, reason: 'context_not_ready' };
+    // El estado de la página puede decir x=1 mientras un vuelo 3D anterior
+    // conserva una cámara cercana. Fijamos y dibujamos el encuadre justo antes
+    // de retirar la máscara; solo entonces empieza la espera de tres segundos.
+    if (!dib.fijaContextoHistoria().wide) return { ok: false, reason: 'wide_context_unavailable' };
+    var token = historiaAperturaToken;
+    document.documentElement.classList.remove('jarvis-story-loading');
+    historiaFaseApertura = 'holding_context';
+    historiaEspera = setTimeout(function () {
+      historiaEspera = null;
+      if (token !== historiaAperturaToken || !historiaActiva) return;
+      historiaFaseApertura = 'closing_to_site';
+      var inicioCierre = performance.now();
+      ponContexto(false);
+      function esperaPredio() {
+        if (token !== historiaAperturaToken || !historiaActiva) return;
+        if (x <= 0.001 && !tramo && !tramos.length) {
+          historiaApertura = false; historiaFaseApertura = 'idle';
+        } else if (performance.now() - inicioCierre > 8000) {
+          tramos = []; tramo = null; ponContexto(false, true);
+          historiaApertura = false; historiaFaseApertura = 'idle'; historiaErrorApertura = 'closeup_timeout';
+        } else requestAnimationFrame(esperaPredio);
+      }
+      esperaPredio();
+    }, 3000);
     return { ...estadoHistoria(), pending: true, contextHoldMs: 3000 };
   }
   function resaltaNavesHistoria() {
@@ -193,6 +338,213 @@
     if (!resultado.ok) historiaSalpicando = false;
     return resultado;
   }
+  function descartaExistenciaHistoria() {
+    if (!historiaActiva) return { ok: false, reason: 'story_mode_required' };
+    if (historiaDescartado) return { ok: true, alreadyDiscarded: true };
+    if (historiaDescartando) return { ok: true, pending: true, alreadyInProgress: true };
+    if (!historiaNavesIluminadas) return { ok: false, reason: 'conserved_naves_required' };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (!dib || !dib.historiaDescartaEdificios) return { ok: false, reason: 'not_ready' };
+    historiaDescartando = true;
+    var resultado = dib.historiaDescartaEdificios(function () {
+      historiaDescartando = false;
+      if (historiaActiva) historiaDescartado = true;
+    });
+    if (!resultado.ok) historiaDescartando = false;
+    return resultado;
+  }
+  function creaSiguienteProgramaHistoria() {
+    if (!historiaActiva || !historiaDescartado) return { ok: false, reason: 'site_not_cleared' };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (historiaProgramaFase !== 'create' || !usoHistoria()) return { ok: false, reason: 'program_create_not_available' };
+    historiaProgramaOcupado = true; historiaProgramaFase = 'creating';
+    var resultado = dib.historiaCreaPrograma(function (r) {
+      historiaProgramaOcupado = false;
+      if (historiaActiva) historiaProgramaFase = 'place';
+    });
+    if (!resultado.ok) { historiaProgramaOcupado = false; historiaProgramaFase = 'create'; }
+    return resultado;
+  }
+  function colocaProgramaHistoria() {
+    if (!historiaActiva || !historiaDescartado) return { ok: false, reason: 'site_not_cleared' };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (historiaProgramaFase !== 'place') return { ok: false, reason: 'program_place_not_available' };
+    historiaProgramaOcupado = true; historiaProgramaFase = 'placing';
+    var resultado = dib.historiaColocaPrograma(function (r) {
+      historiaProgramaOcupado = false;
+      if (historiaActiva) {
+        historiaProgramaIndice = r.placedCount;
+        historiaProgramaFase = usoHistoria() ? 'create' : 'complete';
+      }
+    });
+    if (!resultado.ok) { historiaProgramaOcupado = false; historiaProgramaFase = 'place'; }
+    return resultado;
+  }
+  function restauraEscalaHistoria() {
+    if (!historiaActiva || !historiaDescartado || historiaProgramaFase !== 'complete')
+      return { ok: false, reason: 'program_not_complete' };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    historiaRestaurando = true; historiaProgramaFase = 'restoring';
+    var resultado = dib.historiaRestauraEscala(function () {
+      historiaRestaurando = false;
+      if (historiaActiva) historiaProgramaFase = 'full_scale';
+    });
+    if (!resultado.ok) { historiaRestaurando = false; historiaProgramaFase = 'complete'; }
+    return resultado;
+  }
+  function normalizaUsoHistoria(uso) {
+    var nombre = String(uso || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
+    return ({ mercado: 'comercio', comercio: 'comercio', 'arte y cultura': 'cultura', cultura: 'cultura',
+      industria: 'industria', vivienda: 'vivienda', aro: 'aro' })[nombre] || null;
+  }
+  function seleccionaUsoHistoria(uso) {
+    if (!historiaActiva || historiaProgramaFase !== 'full_scale')
+      return { ok: false, reason: 'story_full_scale_required' };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (aislado === 'vivienda') return { ok: false, reason: 'return_to_overview_first' };
+    var canonico = normalizaUsoHistoria(uso);
+    if (!canonico) return { ok: false, reason: 'unknown_use' };
+    if (!dib || !dib.historiaSeleccionaUso) return { ok: false, reason: 'not_ready' };
+    var resultado = dib.historiaSeleccionaUso(canonico);
+    if (resultado.ok) {
+      historiaUsoSeleccionado = canonico;
+      if (canonico === 'vivienda' && historiaViviendaConstruida) {
+        aislar('vivienda');
+        if (aislado === 'vivienda') dib.historiaDetalleVivienda(true);
+        resultado.buildStatus = 'built';
+      }
+      if (canonico === 'comercio' && historiaComercioConstruido) resultado.buildStatus = 'built';
+      if (canonico === 'industria' && historiaIndustriaConstruida) resultado.buildStatus = 'built';
+      if (canonico === 'cultura' && historiaCulturaConstruida) resultado.buildStatus = 'built';
+      if (canonico === 'aro' && historiaAroConstruido) resultado.buildStatus = 'built';
+    }
+    return resultado;
+  }
+  function vuelveVistaGeneralHistoria() {
+    if (!historiaActiva || historiaProgramaFase !== 'full_scale')
+      return { ok: false, reason: 'story_full_scale_required' };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (!dib || !dib.historiaVistaGeneral) return { ok: false, reason: 'not_ready' };
+    if (aislado === 'vivienda') {
+      saleAislado();
+      var restaurado = dib.historiaDetalleVivienda(false);
+      if (!restaurado.ok) return restaurado;
+    }
+    var resultado = dib.historiaVistaGeneral();
+    if (resultado.ok) {
+      historiaUsoSeleccionado = null;
+      dib.reencuadra(); escala(); zona.classList.remove('con-zoom');
+    }
+    return resultado;
+  }
+  function construyeViviendaHistoria() {
+    if (!historiaActiva || historiaProgramaFase !== 'full_scale' || historiaUsoSeleccionado !== 'vivienda')
+      return { ok: false, reason: 'housing_selection_required' };
+    if (historiaViviendaConstruida) return { ok: true, alreadyBuilt: true, use: 'vivienda', buildStatus: 'built' };
+    if (historiaViviendaConstruyendo) return { ok: true, pending: true, alreadyInProgress: true };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (!dib || !dib.historiaConstruyeVivienda) return { ok: false, reason: 'not_ready' };
+    historiaViviendaConstruyendo = true;
+    var ciclo = historiaViviendaCiclo;
+    var resultado = dib.historiaConstruyeVivienda(function () {
+      if (!historiaActiva || ciclo !== historiaViviendaCiclo) return;
+      historiaViviendaConstruida = true;
+      aislar('vivienda');
+      if (aislado === 'vivienda') dib.historiaDetalleVivienda(true);
+      // El encuadre de aislamiento termina de asentarse antes de abrir el árbol.
+      setTimeout(function () { if (ciclo === historiaViviendaCiclo) historiaViviendaConstruyendo = false; }, 1800);
+    });
+    if (!resultado.ok) historiaViviendaConstruyendo = false;
+    return resultado.ok ? { ...resultado, durationMs: 31800, buildStatus: 'building' } : resultado;
+  }
+  function construyeComercioHistoria() {
+    if (!historiaActiva || historiaProgramaFase !== 'full_scale' || historiaUsoSeleccionado !== 'comercio')
+      return { ok: false, reason: 'commerce_selection_required' };
+    if (historiaComercioConstruido) return { ok: true, alreadyBuilt: true, use: 'comercio', buildStatus: 'built' };
+    if (historiaComercioConstruyendo) return { ok: true, pending: true, alreadyInProgress: true };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (!dib || !dib.historiaConstruyeComercio) return { ok: false, reason: 'not_ready' };
+    historiaComercioConstruyendo = true;
+    var ciclo = historiaViviendaCiclo;
+    var resultado = dib.historiaConstruyeComercio(function () {
+      if (historiaActiva && ciclo === historiaViviendaCiclo) {
+        historiaComercioConstruyendo = false;
+        historiaComercioConstruido = true;
+      }
+    });
+    if (!resultado.ok) historiaComercioConstruyendo = false;
+    return resultado.ok ? { ...resultado, buildStatus: 'building' } : resultado;
+  }
+  function construyeIndustriaHistoria() {
+    if (!historiaActiva || historiaProgramaFase !== 'full_scale' || historiaUsoSeleccionado !== 'industria')
+      return { ok: false, reason: 'industry_selection_required' };
+    if (historiaIndustriaConstruida) return { ok: true, alreadyBuilt: true, use: 'industria', buildStatus: 'built' };
+    if (historiaIndustriaConstruyendo) return { ok: true, pending: true, alreadyInProgress: true };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (!dib || !dib.historiaConstruyeIndustria) return { ok: false, reason: 'not_ready' };
+    historiaIndustriaConstruyendo = true;
+    var ciclo = historiaViviendaCiclo;
+    var resultado = dib.historiaConstruyeIndustria(function () {
+      if (historiaActiva && ciclo === historiaViviendaCiclo) {
+        historiaIndustriaConstruyendo = false;
+        historiaIndustriaConstruida = true;
+      }
+    });
+    if (!resultado.ok) historiaIndustriaConstruyendo = false;
+    return resultado.ok ? { ...resultado, buildStatus: 'building' } : resultado;
+  }
+  function construyeCulturaHistoria() {
+    if (!historiaActiva || historiaProgramaFase !== 'full_scale' || historiaUsoSeleccionado !== 'cultura')
+      return { ok: false, reason: 'culture_selection_required' };
+    if (historiaCulturaConstruida) return { ok: true, alreadyBuilt: true, use: 'cultura', buildStatus: 'built' };
+    if (historiaCulturaConstruyendo) return { ok: true, pending: true, alreadyInProgress: true };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (!dib || !dib.historiaConstruyeCultura) return { ok: false, reason: 'not_ready' };
+    historiaCulturaConstruyendo = true;
+    var ciclo = historiaViviendaCiclo;
+    var resultado = dib.historiaConstruyeCultura(function () {
+      if (historiaActiva && ciclo === historiaViviendaCiclo) {
+        historiaCulturaConstruyendo = false;
+        historiaCulturaConstruida = true;
+      }
+    });
+    if (!resultado.ok) historiaCulturaConstruyendo = false;
+    return resultado.ok ? { ...resultado, buildStatus: 'building' } : resultado;
+  }
+  function construyeAroHistoria() {
+    if (!historiaActiva || historiaProgramaFase !== 'full_scale' || historiaUsoSeleccionado !== 'aro')
+      return { ok: false, reason: 'ring_selection_required' };
+    if (historiaAroConstruido) return { ok: true, alreadyBuilt: true, use: 'aro', buildStatus: 'built' };
+    if (historiaAroConstruyendo) return { ok: true, pending: true, alreadyInProgress: true };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (!dib || !dib.historiaConstruyeAro) return { ok: false, reason: 'not_ready' };
+    historiaAroConstruyendo = true;
+    var ciclo = historiaViviendaCiclo;
+    var resultado = dib.historiaConstruyeAro(function () {
+      if (historiaActiva && ciclo === historiaViviendaCiclo) {
+        historiaAroConstruyendo = false;
+        historiaAroConstruido = true;
+      }
+    });
+    if (!resultado.ok) historiaAroConstruyendo = false;
+    return resultado.ok ? { ...resultado, buildStatus: 'building' } : resultado;
+  }
+  function agregaPaisajeHistoria() {
+    if (!historiaActiva || historiaProgramaFase !== 'full_scale')
+      return { ok: false, reason: 'story_full_scale_required' };
+    if (historiaPaisajeVisible) return { ok: true, alreadyVisible: true, visible: true };
+    if (historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    if (usosConstruidosHistoria().length !== 5)
+      return { ok: false, reason: 'all_five_uses_required', builtUses: usosConstruidosHistoria() };
+    if (!dib || !dib.historiaAgregaPaisaje) return { ok: false, reason: 'not_ready' };
+    if (aislado === 'vivienda') {
+      var vista = vuelveVistaGeneralHistoria();
+      if (!vista.ok) return vista;
+    }
+    var resultado = dib.historiaAgregaPaisaje();
+    if (resultado.ok) historiaPaisajeVisible = true;
+    return resultado;
+  }
   function previsualizaHistoria() {
     if (historiaActiva) {
       var antes = historiaPresentacionAnterior;
@@ -201,17 +553,14 @@
       return estadoHistoria();
     }
     var antes = modoPresentacion;
-    if (!antes) ponModoPresentacion(true);
     var resultado = entrarHistoria();
     if (resultado.ok) historiaPresentacionAnterior = antes;
-    else if (!antes) ponModoPresentacion(false);
     return resultado;
   }
   window.AtlampaHistoria = { enter: entrarHistoria, exit: salirHistoria, preview: previsualizaHistoria, getState: estadoHistoria };
   document.body.classList.toggle('modo-presentacion', modoPresentacion);
   function ponModoPresentacion(si) {
     if (urbanRotationActive) stopUrbanRotation();
-    if (!si && historiaActiva) salirHistoria();
     modoPresentacion = !!si;
     if (modoPresentacion) { cierraMenus(); cierraDatos(true); tooltip(null); }
     document.body.classList.toggle('modo-presentacion', modoPresentacion);
@@ -1058,10 +1407,27 @@
     ponCorte(s.getAttribute('data-corte-eje'), Number(s.value) / 100);
   });
   // Esc: cierra el menú; aislado, sale
+  var historiaTeclas = '', historiaTeclasHora = 0;
   document.addEventListener('keydown', function (ev) {
     if (ev.key === 'F9') { ev.preventDefault(); if (!ev.repeat) previsualizaHistoria(); return; }
     if (ev.key === 'F8') { ev.preventDefault(); if (!ev.repeat) ponModoPresentacion(!modoPresentacion); return; }
-    if (historiaActiva) { if (ev.key === 'Escape') { ev.preventDefault(); salirHistoria(); } return; }
+    if (historiaActiva) {
+      if (ev.key === 'Escape') { ev.preventDefault(); salirHistoria(); return; }
+      if (ev.ctrlKey || ev.altKey || ev.metaKey || ev.repeat || ev.target.closest('input, textarea, [contenteditable="true"]')) return;
+      if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') {
+        ev.preventDefault();
+        if (ev.key === 'ArrowRight') pasoSiguienteHistoria(); else pasoAnteriorHistoria();
+        return;
+      }
+      if (/^[a-z]$/i.test(ev.key)) {
+        var ahora = performance.now();
+        historiaTeclas = (ahora - historiaTeclasHora < 850 ? historiaTeclas : '') + ev.key.toUpperCase();
+        historiaTeclas = historiaTeclas.slice(-2); historiaTeclasHora = ahora;
+        var uso = { VV: 'vivienda', CM: 'comercio', IN: 'industria', AC: 'cultura', AR: 'aro', PS: 'paisaje' }[historiaTeclas];
+        if (uso) { ev.preventDefault(); historiaTeclas = ''; construyeUsoManual(uso); }
+      }
+      return;
+    }
     if (ev.key !== 'Escape') return;
     if (urbanRotationActive) stopUrbanRotation();
     if (datosAbiertos) cierraDatos();
@@ -1069,12 +1435,15 @@
     else if (aislado && !yendo) saleAislado();
   });
   document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-modo-historia], [data-historia-contexto], [data-modo-presentacion], [data-capa], [data-fachada], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte], [data-v4-separa], [data-v4-piso], [data-v4-depto], [data-v4-muro], [data-v4-explota], [data-v4-reinicia], [data-uso-separa], [data-uso-piso], [data-uso-zona], [data-ver-piso], [data-subuso]');
+    var b = ev.target.closest('[data-modo-historia], [data-historia-contexto], [data-historia-anterior], [data-historia-siguiente], [data-historia-construye], [data-modo-presentacion], [data-capa], [data-fachada], [data-resalta], [data-sotano], [data-zoom], [data-ir], [data-estilo], [data-oculta], [data-inspecciona], [data-aisla], [data-aisla-sale], [data-parte-oculta], [data-parte-mueve], [data-despiece], [data-corte-reset], [data-corte-invierte], [data-v4-separa], [data-v4-piso], [data-v4-depto], [data-v4-muro], [data-v4-explota], [data-v4-reinicia], [data-uso-separa], [data-uso-piso], [data-uso-zona], [data-ver-piso], [data-subuso]');
     if (!b) return;
     if (urbanRotationActive) stopUrbanRotation();
     if (b.hasAttribute('data-modo-historia')) { previsualizaHistoria(); return; }
     if (b.hasAttribute('data-modo-presentacion')) { ponModoPresentacion(!modoPresentacion); return; }
-    if (historiaActiva && (historiaApertura || historiaSalpicando)) return;
+    if (b.hasAttribute('data-historia-anterior')) { pasoAnteriorHistoria(); return; }
+    if (b.hasAttribute('data-historia-siguiente')) { pasoSiguienteHistoria(); return; }
+    if (b.hasAttribute('data-historia-construye')) { construyeUsoManual(b.getAttribute('data-historia-construye')); return; }
+    if (historiaActiva && historiaTransicion()) return;
     if (b.hasAttribute('data-historia-contexto')) { if (historiaActiva) ponContexto(!prendida('contexto')); return; }
     if (historiaActiva && !b.hasAttribute('data-zoom')) return;
     if (!dib) return;
@@ -1288,8 +1657,21 @@
     ready: controlListo,
     enterStoryMode: entrarHistoria,
     openStoryForJarvis: abrirHistoriaJarvis,
+    revealStoryForJarvis: revelaHistoriaJarvis,
     exitStoryMode: salirHistoria,
     highlightConservedNaves: resaltaNavesHistoria,
+    discardExistingBuildings: descartaExistenciaHistoria,
+    createNextProgramVolume: creaSiguienteProgramaHistoria,
+    placeCurrentProgramVolume: colocaProgramaHistoria,
+    restoreStoryScale: restauraEscalaHistoria,
+    selectStoryUse: seleccionaUsoHistoria,
+    returnToStoryOverview: vuelveVistaGeneralHistoria,
+    buildStoryHousing: construyeViviendaHistoria,
+    buildStoryCommerce: construyeComercioHistoria,
+    buildStoryIndustry: construyeIndustriaHistoria,
+    buildStoryCulture: construyeCulturaHistoria,
+    buildStoryRing: construyeAroHistoria,
+    addStoryLandscape: agregaPaisajeHistoria,
     isolateUse: function (ap) {
       if (!controlListo()) return { ok: false, reason: 'not_ready' };
       if (!['vivienda', 'comercio', 'cultura', 'industria', 'aro'].includes(ap))
@@ -1395,9 +1777,29 @@
       return r.ok ? { ok: true, progress: 1, stage: 'capas', layers: r.layers } : r;
     },
     getAvailableActions: function () {
-      if (historiaActiva) return { ok: true, stage: 'story_schematic_preexistence', storyMode: true, sceneReady: false,
-        storyTransitioning: historiaApertura || historiaSalpicando,
-        conservedNavesHighlighted: historiaNavesIluminadas, actions: accionesHistoria() };
+      if (historiaActiva) return { ok: true, stage: etapaHistoria(),
+        storyMode: true, sceneReady: false, storyTransitioning: historiaTransicion(),
+        conservedNavesHighlighted: historiaNavesIluminadas, storyDiscarded: historiaDescartado,
+        storyStep: pasoHistoria(), storyProgramUse: historiaActiva && historiaDescartado ? usoHistoria() : null,
+        storyProgramPhase: historiaActiva && historiaDescartado ? historiaProgramaFase : null,
+        storyProgramPlacedCount: historiaProgramaIndice,
+        storyScaleRestored: historiaProgramaFase === 'full_scale',
+        storySelectedUse: historiaUsoSeleccionado,
+        storyBuildStatus: estadoConstruccionHistoria(),
+        storyHousingBuilt: historiaViviendaConstruida, storyCommerceBuilt: historiaComercioConstruido,
+        storyIndustryBuilt: historiaIndustriaConstruida,
+        storyCultureBuilt: historiaCulturaConstruida,
+        storyRingBuilt: historiaAroConstruido,
+        storyLandscapeVisible: historiaPaisajeVisible,
+        storyBuiltUses: usosConstruidosHistoria(),
+        storyHousingBuildPhase: dib && dib.historiaViviendaEstado ? dib.historiaViviendaEstado().phase : null,
+        storyCommerceBuildPhase: dib && dib.historiaComercioEstado ? dib.historiaComercioEstado().phase : null,
+        storyIndustryBuildPhase: dib && dib.historiaIndustriaEstado ? dib.historiaIndustriaEstado().phase : null,
+        storyCultureBuildPhase: dib && dib.historiaCulturaEstado ? dib.historiaCulturaEstado().phase : null,
+        storyRingBuildPhase: dib && dib.historiaAroEstado ? dib.historiaAroEstado().phase : null,
+        storyHousingIsolated: aislado === 'vivienda',
+        storyAvailableUses: historiaProgramaFase === 'full_scale' ? historiaProgramaOrden.slice() : [],
+        actions: accionesHistoria(), gestureActions: gestosHistoria() };
       var comunes = ['orbit', 'pan', 'zoom'];
       if (prendida('contexto')) return { ok: true, stage: 'contexto',
         actions: ['orbit', 'zoom', 'openStoryForJarvis', 'resetDetail', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation'] };
@@ -1416,10 +1818,32 @@
     },
     getState: function () {
       return { ok: true, ready: controlListo(), scene: ESCENA, isolated: aislado,
-        storyMode: historiaActiva, storyStage: historiaActiva ? 'schematic_preexistence' : null, storyStep: null,
-        storyTransitioning: historiaApertura || historiaSalpicando, storyOpeningPhase: historiaFaseApertura,
+        storyMode: historiaActiva,
+        storyStage: etapaHistoria(),
+        storyStep: pasoHistoria(),
+        storyProgramUse: historiaActiva && historiaDescartado ? usoHistoria() : null,
+        storyProgramPhase: historiaActiva && historiaDescartado ? historiaProgramaFase : null,
+        storyProgramPlacedCount: historiaProgramaIndice,
+        storyScaleRestored: historiaProgramaFase === 'full_scale',
+        storySelectedUse: historiaUsoSeleccionado,
+        storyBuildStatus: estadoConstruccionHistoria(),
+        storyHousingBuilt: historiaViviendaConstruida, storyCommerceBuilt: historiaComercioConstruido,
+        storyIndustryBuilt: historiaIndustriaConstruida,
+        storyCultureBuilt: historiaCulturaConstruida,
+        storyRingBuilt: historiaAroConstruido,
+        storyLandscapeVisible: historiaPaisajeVisible,
+        storyBuiltUses: usosConstruidosHistoria(),
+        storyHousingBuildPhase: dib && dib.historiaViviendaEstado ? dib.historiaViviendaEstado().phase : null,
+        storyCommerceBuildPhase: dib && dib.historiaComercioEstado ? dib.historiaComercioEstado().phase : null,
+        storyIndustryBuildPhase: dib && dib.historiaIndustriaEstado ? dib.historiaIndustriaEstado().phase : null,
+        storyCultureBuildPhase: dib && dib.historiaCulturaEstado ? dib.historiaCulturaEstado().phase : null,
+        storyRingBuildPhase: dib && dib.historiaAroEstado ? dib.historiaAroEstado().phase : null,
+        storyHousingIsolated: aislado === 'vivienda',
+        storyAvailableUses: historiaProgramaFase === 'full_scale' ? historiaProgramaOrden.slice() : [],
+        storyTransitioning: historiaTransicion(), storyOpeningPhase: historiaFaseApertura,
         storyOpeningError: historiaErrorApertura, conservedNavesHighlighted: historiaNavesIluminadas,
-        conservedNavesCount: 5, sceneReady: false,
+        conservedNavesCount: 5, storyDiscarded: historiaDescartado, sceneReady: false,
+        storyAvailableActions: accionesHistoria(), storyGestureActions: gestosHistoria(),
         azimuth: azMeta, elevation: elMeta,
         floorProgress: dib && dib.progresoPisos ? dib.progresoPisos() : 0,
         lateralProgress: detalleV4.etapa === 'capas' ? 1 : 0,
@@ -1432,21 +1856,150 @@
   // árbol rechace. Para voz y otros controles, sólo una acción ejecutada
   // cancela el loop. El giro propio no pasa por estos métodos.
   Object.keys(window.AtlampaControl).forEach(function (name) {
-    if (['ready', 'getState', 'getAvailableActions', 'enterStoryMode', 'openStoryForJarvis', 'exitStoryMode'].includes(name)) return;
+    if (['ready', 'getState', 'getAvailableActions', 'enterStoryMode', 'openStoryForJarvis', 'revealStoryForJarvis', 'exitStoryMode', 'selectStoryUse', 'returnToStoryOverview', 'buildStoryHousing', 'buildStoryCommerce', 'buildStoryIndustry', 'buildStoryCulture', 'buildStoryRing', 'addStoryLandscape'].includes(name)) return;
     var original = window.AtlampaControl[name];
     if (typeof original !== 'function') return;
     window.AtlampaControl[name] = function () {
-      if (historiaActiva && (historiaApertura || historiaSalpicando)) return { ok: false, reason: 'story_transitioning' };
-      if (historiaActiva && !['orbit', 'pan', 'zoom', 'setUrbanContext', 'highlightConservedNaves'].includes(name)) return { ok: false, reason: 'story_mode_active' };
+      if (historiaActiva && historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+      if (historiaActiva && !gestosHistoria().includes(name)) return { ok: false, reason: 'story_action_not_in_tree' };
       var result = original.apply(this, arguments);
       if (result && result.ok && urbanRotationActive) stopUrbanRotation();
       return result;
     };
   });
+  function capturaPasoHistoria() {
+    return { naves: historiaNavesIluminadas, discarded: historiaDescartado,
+      index: historiaProgramaIndice, phase: historiaProgramaFase,
+      selectedUse: historiaUsoSeleccionado, builtUses: usosConstruidosHistoria(),
+      landscape: historiaPaisajeVisible };
+  }
+  var accionesNarrativas = ['highlightConservedNaves', 'discardExistingBuildings',
+    'createNextProgramVolume', 'placeCurrentProgramVolume', 'restoreStoryScale',
+    'buildStoryHousing', 'buildStoryCommerce', 'buildStoryIndustry', 'buildStoryCulture',
+    'buildStoryRing', 'addStoryLandscape'];
+  accionesNarrativas.forEach(function (name) {
+    var original = window.AtlampaControl[name];
+    window.AtlampaControl[name] = function () {
+      var antes = capturaPasoHistoria();
+      var resultado = original.apply(this, arguments);
+      if (historiaActiva && resultado && resultado.ok &&
+          !resultado.alreadyHighlighted && !resultado.alreadyDiscarded &&
+          !resultado.alreadyInProgress && !resultado.alreadyBuilt && !resultado.alreadyVisible) {
+        historiaPasos.push({ antes: antes, action: name });
+        if (!historiaReproduciendo) historiaRehacer = [];
+      }
+      actualizaPanelHistoria();
+      return resultado;
+    };
+  });
+  var seleccionaUsoOriginal = window.AtlampaControl.selectStoryUse;
+  window.AtlampaControl.selectStoryUse = function () {
+    var resultado = seleccionaUsoOriginal.apply(this, arguments);
+    if (resultado && resultado.ok && !historiaReproduciendo) historiaRehacer = [];
+    actualizaPanelHistoria();
+    return resultado;
+  };
+  function pasoSiguienteHistoria() {
+    if (!historiaActiva || historiaTransicion()) return { ok: false, reason: 'story_transitioning' };
+    var rehacer = historiaRehacer[historiaRehacer.length - 1];
+    if (rehacer) {
+      historiaReproduciendo = true;
+      var resultado = window.AtlampaControl[rehacer.action]();
+      historiaReproduciendo = false;
+      if (resultado && resultado.ok) historiaRehacer.pop();
+      actualizaPanelHistoria();
+      return resultado;
+    }
+    var accion = gestosHistoria().find(function (a) {
+      return ['highlightConservedNaves', 'discardExistingBuildings', 'createNextProgramVolume',
+        'placeCurrentProgramVolume', 'restoreStoryScale'].includes(a);
+    });
+    if (!accion && historiaProgramaFase === 'full_scale') {
+      var construye = { vivienda: 'buildStoryHousing', comercio: 'buildStoryCommerce',
+        industria: 'buildStoryIndustry', cultura: 'buildStoryCulture', aro: 'buildStoryRing' };
+      if (historiaUsoSeleccionado && !usosConstruidosHistoria().includes(historiaUsoSeleccionado))
+        accion = construye[historiaUsoSeleccionado];
+      else if (usosConstruidosHistoria().length === 5 && !historiaPaisajeVisible) accion = 'addStoryLandscape';
+    }
+    return accion ? window.AtlampaControl[accion]() : { ok: false, reason: 'choose_story_use' };
+  }
+  function pasoAnteriorHistoria() {
+    if (!historiaActiva || historiaTransicion() || !historiaPasos.length)
+      return { ok: false, reason: 'previous_step_unavailable' };
+    var paso = historiaPasos.pop();
+    var estabaAislado = aislado === 'vivienda';
+    if (estabaAislado) saleAislado();
+    var resultado;
+    try { resultado = dib.historiaRestauraCheckpoint(paso.antes); }
+    catch (error) {
+      historiaPasos.push(paso);
+      var aviso = document.querySelector('[data-historia-estado]');
+      if (aviso) aviso.textContent = 'Error al retroceder: ' + error.message;
+      console.error('HISTORIA_RETROCESO', error);
+      return { ok: false, reason: 'restore_exception' };
+    }
+    if (!resultado.ok) { historiaPasos.push(paso); return resultado; }
+    historiaNavesIluminadas = paso.antes.naves;
+    historiaDescartado = paso.antes.discarded;
+    historiaProgramaIndice = paso.antes.index;
+    historiaProgramaFase = paso.antes.phase;
+    historiaUsoSeleccionado = paso.antes.selectedUse;
+    historiaViviendaConstruida = paso.antes.builtUses.includes('vivienda');
+    historiaComercioConstruido = paso.antes.builtUses.includes('comercio');
+    historiaIndustriaConstruida = paso.antes.builtUses.includes('industria');
+    historiaCulturaConstruida = paso.antes.builtUses.includes('cultura');
+    historiaAroConstruido = paso.antes.builtUses.includes('aro');
+    historiaPaisajeVisible = paso.antes.landscape;
+    if (estabaAislado) { dib.reencuadra(); escala(); zona.classList.remove('con-zoom'); }
+    historiaRehacer.push(paso);
+    actualizaPanelHistoria();
+    return { ok: true, storyStep: pasoHistoria(), undone: paso.action };
+  }
+  function construyeUsoManual(uso) {
+    if (!historiaActiva || historiaProgramaFase !== 'full_scale' || historiaTransicion())
+      return { ok: false, reason: 'story_full_scale_required' };
+    if (uso === 'paisaje') return window.AtlampaControl.addStoryLandscape();
+    if (aislado === 'vivienda') vuelveVistaGeneralHistoria();
+    var seleccionado = window.AtlampaControl.selectStoryUse(uso);
+    if (!seleccionado.ok) return seleccionado;
+    return window.AtlampaControl[{ vivienda: 'buildStoryHousing', comercio: 'buildStoryCommerce',
+      industria: 'buildStoryIndustry', cultura: 'buildStoryCulture', aro: 'buildStoryRing' }[uso]]();
+  }
+  function actualizaPanelHistoria() {
+    var panel = document.querySelector('[data-historia-controles]');
+    if (!panel) return;
+    panel.hidden = !historiaActiva;
+    if (!historiaActiva) return;
+    var ocupado = historiaTransicion(), construidos = usosConstruidosHistoria();
+    var nombres = { comercio: 'Comercio', cultura: 'Arte y cultura', industria: 'Industria',
+      vivienda: 'Vivienda', aro: 'Aro' };
+    var texto = !historiaDescartado ? historiaNavesIluminadas ? 'Retirar construcciones' : 'Iluminar cinco naves' :
+      historiaProgramaFase === 'create' ? 'Crear ' + nombres[usoHistoria()] :
+      historiaProgramaFase === 'place' ? 'Colocar ' + nombres[usoHistoria()] :
+      historiaProgramaFase === 'complete' ? 'Acercar proyecto' :
+      historiaProgramaFase === 'full_scale' ? 'Elegir un uso para construir' : 'Animación en curso';
+    var estado = panel.querySelector('[data-historia-estado]');
+    if (estado) estado.textContent = ocupado ? 'Animación en curso…' : texto;
+    var anterior = panel.querySelector('[data-historia-anterior]');
+    var siguiente = panel.querySelector('[data-historia-siguiente]');
+    if (anterior) anterior.disabled = ocupado || !historiaPasos.length;
+    if (siguiente) siguiente.disabled = ocupado || (!historiaRehacer.length &&
+      historiaProgramaFase === 'full_scale' &&
+      !(historiaUsoSeleccionado && !construidos.includes(historiaUsoSeleccionado)) &&
+      !(construidos.length === 5 && !historiaPaisajeVisible));
+    panel.querySelectorAll('[data-historia-construye]').forEach(function (b) {
+      var uso = b.getAttribute('data-historia-construye');
+      b.disabled = ocupado || historiaProgramaFase !== 'full_scale' ||
+        (uso === 'paisaje' ? construidos.length !== 5 || historiaPaisajeVisible : construidos.includes(uso));
+      b.setAttribute('aria-pressed', String(uso === 'paisaje' ? historiaPaisajeVisible : construidos.includes(uso)));
+    });
+  }
+  window.AtlampaControl.nextStoryStep = pasoSiguienteHistoria;
+  window.AtlampaControl.previousStoryStep = pasoAnteriorHistoria;
   zona.addEventListener('wheel', function (ev) {
     if (!dib) return;   // el motor 3D todavía carga
     ev.preventDefault();
-    if (yendo || historiaApertura || historiaSalpicando) return;
+    if (yendo || historiaTransicion()) return;
     var c = enCuadro(ev), d = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaY;
     acerca(Math.exp(-d * 0.0018), c[0], c[1]);
   }, { passive: false });
@@ -1455,7 +2008,7 @@
   function distancia() { var k = Object.keys(dedos); return k.length < 2 ? 0 : Math.hypot(dedos[k[0]].x - dedos[k[1]].x, dedos[k[0]].y - dedos[k[1]].y); }
   zona.addEventListener('pointerdown', function (ev) {
     if (!dib) return;   // el motor 3D todavía carga
-    if (yendo || historiaApertura || historiaSalpicando) return;
+    if (yendo || historiaTransicion()) return;
     dedos[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
     try { zona.setPointerCapture(ev.pointerId); } catch (e) { /* puntero que ya no existe */ }
     // como en Rhino: arrastrar (derecho o izquierdo) orbita; Shift o el botón central mueve
@@ -1470,7 +2023,7 @@
     if (!dib) return;   // el motor 3D todavía carga
     var p = dedos[ev.pointerId];
     if (!p) { if (!historiaActiva && ev.pointerType === 'mouse' && !yendo) tooltip(dib.apartadoEn(ev), ev); return; }
-    if (yendo || historiaApertura || historiaSalpicando) return;
+    if (yendo || historiaTransicion()) return;
     var r = zona.getBoundingClientRect(), n = Object.keys(dedos).length, dx = ev.clientX - p.x, dy = ev.clientY - p.y;
     recorrido += Math.abs(dx) + Math.abs(dy);
     p.x = ev.clientX; p.y = ev.clientY;
@@ -1520,7 +2073,7 @@
   // en el vacío o ya aislado: encuadre (con la nave norte abierta, en el vacío la cierra)
   var clicPend = null;
   zona.addEventListener('dblclick', function (ev) {
-    if (yendo || !dib || historiaApertura || historiaSalpicando) return;
+    if (yendo || !dib || historiaTransicion()) return;
     if (historiaActiva) { dib.reencuadra(); escala(); zona.classList.remove('con-zoom'); return; }
     if (clicPend) { clearTimeout(clicPend); clicPend = null; }
     if (aislado === 'nave-norte' && !dib.apartadoEn(ev)) { saleAislado(); return; }
@@ -1532,9 +2085,9 @@
   // teclado, con el dibujo enfocado: flechas orbitan, + / − acercan, 0 encuadra
   zona.addEventListener('keydown', function (ev) {
     if (!dib) return;   // el motor 3D todavía carga
-    if (yendo || historiaApertura || historiaSalpicando) return;
+    if (yendo || historiaTransicion()) return;
     var k = ev.key, hecho = true;
-    if (historiaActiva && !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', '0'].includes(k)) return;
+    if (historiaActiva && !['ArrowUp', 'ArrowDown', '+', '=', '-', '0'].includes(k)) return;
     if (k === 'ArrowLeft') orbita(15, 0);
     else if (k === 'ArrowRight') orbita(-15, 0);
     else if (k === 'ArrowUp') orbita(0, 5);
@@ -1622,7 +2175,7 @@
   var tr = lee('atlampa-transicion', true);
   var aisla0 = h.filter(function (s) { return /^aisla=/.test(s); })[0];
   if (aisla0) { aislar(aisla0.slice(6)); termina(); }
-  else if (quieto.matches || h.indexOf('contexto') >= 0) { termina(); }
+  else if (kioscoJarvis || quieto.matches || h.indexOf('contexto') >= 0) { termina(); }
   else {
     bloquea(true);
     dib.arma(tr && tr.a === ESCENA && GENERAL ? tr.de : null, ARMA, termina);
