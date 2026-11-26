@@ -470,5 +470,5 @@ export function crea(api) {
 
   visibles();
   mueveCarros(0);
-  return { capa, vista, fluye, preparaContexto, destruye, listo: () => !!ctx };
+  return { capa, vista, fluye, preparaContexto, destruye, listo: () => !!ctx, grupoContexto: gCtx };
 }

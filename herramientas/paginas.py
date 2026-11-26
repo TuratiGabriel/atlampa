@@ -21,7 +21,7 @@ import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-V = '20261118-bim-elevacion1'    # versión de los archivos (para que el navegador no use los viejos)
+V = '20261125-story-manual-controls4'    # versión de los archivos (para que el navegador no use los viejos)
 
 ICONOS = {
     'propuesto': '<path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16"/><path d="M17 8h2a2 2 0 0 1 2 2v11M3 21h19M8 7h5M8 11h5M8 15h5M8 19h5"/>',
@@ -147,7 +147,7 @@ APARTADOS = {
         # (la sur: cubierta plegada en prepara-mercado.py, CUBIERTA_SUR; la de Rhino no cabía sobre su planta alta)
         'datos': ['Nave norte: 2 crujías · alero +6.20 · cumbrera +9.20', 'Nave sur: 3 crujías · las mismas aguas, subidas y plegadas (+7.90 / +10.90)',
                   'Nave sur: planta alta a +4.28 con manzanas y respiros'],
-        'extra': '', 'leyenda': [],
+        'extra': '', 'leyenda': [],   # (los subusos los pinta atlampa-pagina.js en la ficha, clicables)
     },
     'industria': {
         'titulo': 'Industria',
@@ -211,6 +211,8 @@ LEYENDA = '''
 PLANTILLA = '''<!doctype html>
 <html lang="es">
 <head>
+<style>html{{background:#08090b}}html.jarvis-story-loading body{{visibility:hidden!important}}</style>
+<script>if(new URLSearchParams(location.search).has('jarvis_kiosk'))document.documentElement.classList.add('jarvis-story-loading');</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlampa · {titulo_doc}</title>
@@ -289,6 +291,7 @@ PLANTILLA = '''<!doctype html>
         <p class="ad-fuente">Calles © colaboradores de OpenStreetMap</p>
       </div>
     </details>
+    <button class="hud-presentacion hud-historia" type="button" data-modo-historia aria-pressed="false" aria-keyshortcuts="F9" title="Ver preexistencia esquemática; F9 para regresar al proyecto">Modo historia <span>(F9)</span></button>
     <button class="hud-presentacion" type="button" data-modo-presentacion aria-pressed="false" aria-keyshortcuts="F8" title="Ocultar controles; F8 para recuperarlos">Modo presentación <span>(F8)</span></button>
   </nav>
 
@@ -296,7 +299,23 @@ PLANTILLA = '''<!doctype html>
 {ficha}
   </aside>
 
+  <div class="ad-historia-controles" data-historia-controles role="group" aria-label="Controles de Modo historia" hidden>
+    <div class="ad-historia-navegacion">
+      <button type="button" data-historia-anterior aria-label="Paso anterior" aria-keyshortcuts="ArrowLeft">←</button>
+      <span data-historia-estado aria-live="polite">Preexistencia</span>
+      <button type="button" data-historia-siguiente aria-label="Paso siguiente" aria-keyshortcuts="ArrowRight">→</button>
+    </div>
+    <div class="ad-historia-usos" role="group" aria-label="Construir usos">
+      <button type="button" data-historia-construye="vivienda" title="VV">Vivienda</button>
+      <button type="button" data-historia-construye="comercio" title="CM">Comercio</button>
+      <button type="button" data-historia-construye="industria" title="IN">Industria</button>
+      <button type="button" data-historia-construye="cultura" title="AC">Arte y cultura</button>
+      <button type="button" data-historia-construye="aro" title="AR">Aro</button>
+      <button type="button" data-historia-construye="paisaje" title="PS">Paisaje</button>
+    </div>
+  </div>
   <div class="hud-camara">
+    <button class="ad-context-toggle" type="button" data-historia-contexto aria-pressed="false" title="Mostrar u ocultar contexto urbano">Contexto urbano</button>
     <div class="ad-mini-fachadas" data-fachadas>
       <svg class="ad-mini" data-minimapa role="button" tabindex="0" aria-label="Brújula: nortear la vista"></svg>
       <button type="button" class="ad-mini-fachada ad-mini-fachada--n" data-fachada="norte" title="Fachada norte" aria-label="Ver elevación norte">N</button>

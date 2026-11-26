@@ -4,7 +4,7 @@
 
 Lee dos hojas de Diego SIN modificarlas:
   · modelo/arte_y_cultura_plantas.html: el edificio vigente (hoja de plantas v22):
-    placas N1, N2 y azotea, salas, auditorio, columnas, escaleras X1–X6, módulos de
+    placas N1, N2 y azotea, salas, columnas, escaleras X1–X6, módulos de
     cada nivel, sombrillas (las del edificio y las del tramo este del aro) y la
     azotea con los descansos de X3 y X6 (RFg), donde se ensancha el aro.
   · modelo/arte_y_cultura_concepto.html: las funciones de geometría de su visor
@@ -12,11 +12,12 @@ Lee dos hojas de Diego SIN modificarlas:
     (Rc, ringP, laneFn, flights). laneFn se ajusta para que las escaleras traseras
     (X4–X6) sigan el eje del aro de proyecto (C, R0, BULGE).
 Encima va construye(): las mallas y líneas del edificio por papel (losa, módulos, núcleo,
-estructura, sombrillas, escaleras con escalones y zancas, auditorio) y el interior de la hoja
+estructura, sombrillas, escaleras con escalones y zancas) y el interior de la hoja
 (muros y mamparas, vidrios como marcos, mobiliario: DATA.int) en su sistema local (x, z arriba, −y).
 El visor muestra los módulos como cajas en la vista general y el interior en el apartado de arte y cultura.
 Sin la azotea (es el aro del conjunto, que se ensancha sobre `azotea`), sin la
-estructura en X (solo columnas) y sin rampas.
+estructura en X (solo columnas) y sin rampas. Sin auditorio desde la hoja v35
+(2026-11-16): el foso a −3.00 chocaba con el estacionamiento subterráneo.
 Su sistema es el de Rhino: al diagrama se pasa con la misma traslación que los
 módulos (campo 'lat'): +497.9986, +392.0954 y +0.52 m.
 
@@ -73,49 +74,119 @@ function marco(a, b, z0, z1) {
   for (let i = 0; i <= n; i++) { const x = a[0] + (b[0] - a[0]) * i / n, y = a[1] + (b[1] - a[1]) * i / n; pos.push(x, z0, -y, x, z1, -y); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); return g;
 }
+// escalera en X (v24, v27: escalón de 1.10 y zancas a la vista): dos tramos bajos (carril 0) llegan al descanso central y dos altos (carril 1) salen de él.
+// Los tramos terminan en el borde del descanso; el barandal de cada orilla es continuo de punta a punta (el de adentro
+// del carril alto se interrumpe sólo en el descanso); zancas de acero cerradas a los dos lados de cada carril.
+function xStair(st, laneFn, Rc) {
+  const am = (st.a0 + st.a1) / 2, zm = (st.z0 + st.z1) / 2, r0 = st.lanes[0], r1 = st.lanes[1];
+  const rr = st.ring ? Rc(am) + (r0 + r1) / 2 : (r0 + r1) / 2, da = 1.3 / rr / deg;   // medio descanso: 1.3 m
+  const L0 = laneFn(st, 0), L1 = laneFn(st, 1), sg = Math.sign(r1 - r0) || 1, d = Math.sign(st.a1 - st.a0) || 1;
+  const la = am - d * da, lb = am + d * da;   // bordes del descanso
+  const zLane = (k, a) => { const za = k ? st.z1 : st.z0, u = (a - st.a0) / (st.a1 - st.a0), ua = (la - st.a0) / (st.a1 - st.a0), ub = (lb - st.a0) / (st.a1 - st.a0);
+    return u <= ua ? za + (zm - za) * u / ua : u >= ub ? za + (zm - za) * (1 - u) / (1 - ub) : zm; };
+  const path = (k, from, to, o) => { const fn = k ? L1 : L0, n = Math.max(8, Math.ceil(Math.abs(to - from) * rr * deg / 0.4)), s = [];
+    for (let i = 0; i <= n; i++) { const a = from + (to - from) * i / n, q = fn(a); s.push({ p: [q.p[0] + q.n[0] * o, q.p[1] + q.n[1] * o], n: q.n, z: zLane(k, a) }); } return s; };
+  const out = { steps: [], landing: null, posts: [], rails: [], strings: [] };
+  // escalones de 17 cm; cada pieza baja 45 cm para que el intradós se lea dentado
+  const flight = (k, aA, zA, aB, zB) => { const fn = k ? L1 : L0, ns = Math.max(4, Math.round(Math.abs(zB - zA) / .17));
+    for (let j = 0; j < ns; j++) { const qa = fn(aA + (aB - aA) * j / ns), qb = fn(aA + (aB - aA) * (j + 1) / ns), zt = zA + (zB - zA) * (j + 1) / ns;
+      const g = new THREE.BoxGeometry(Math.hypot(qb.p[0] - qa.p[0], qb.p[1] - qa.p[1]) + .03, .45, 1.1);
+      g.rotateY(Math.atan2(qb.p[1] - qa.p[1], qb.p[0] - qa.p[0])); g.translate((qa.p[0] + qb.p[0]) / 2, zt - .225, -(qa.p[1] + qb.p[1]) / 2); out.steps.push(g); } };
+  flight(0, st.a0, st.z0, la, zm); flight(0, st.a1, st.z0, lb, zm); flight(1, la, zm, st.a0, st.z1); flight(1, lb, zm, st.a1, st.z1);
+  // descanso central (abarca los dos carriles) y sus dos apoyos
+  const mid = a => { const p = L0(a), q = L1(a); return { p: [(p.p[0] + q.p[0]) / 2, (p.p[1] + q.p[1]) / 2], n: p.n }; }, hw = Math.abs(r1 - r0) / 2 + .6, s2 = [];
+  for (let i = 0; i <= 8; i++) { const q = mid(Math.min(la, lb) + Math.abs(lb - la) * i / 8); s2.push({ p: q.p, n: q.n, z: zm }); }
+  out.landing = ribbon(s2, hw, .3);
+  { const q = mid(am); for (const o of [hw - .35, -(hw - .35)]) { const h = zm - .3 - st.z0, g = new THREE.CylinderGeometry(.09, .09, h, 10); g.translate(q.p[0] + q.n[0] * o, st.z0 + h / 2, -(q.p[1] + q.n[1] * o)); out.posts.push(g); } }
+  // barandales: orilla de afuera de cada carril de punta a punta; orilla de adentro del carril alto, salvo el descanso
+  out.rails.push(path(0, st.a0, st.a1, -.575 * sg), path(1, st.a0, st.a1, .575 * sg), path(1, st.a0, la, -.575 * sg), path(1, lb, st.a1, -.575 * sg));
+  // zancas: las mismas orillas y la de adentro del carril bajo (bajo el borde del carril alto)
+  const zanca = s => { const pos = [], prof = [[-.025, -.52], [.025, -.52], [.025, .1], [-.025, .1]], P = (q, [o, dz]) => [q.p[0] + q.n[0] * o, q.z + dz, -(q.p[1] + q.n[1] * o)];
+    const quad = (A, B, C, D) => { pos.push(...A, ...B, ...C, ...A, ...C, ...D, ...A, ...C, ...B, ...A, ...D, ...C); };   // las dos caras: se ve de cualquier lado
+    for (let i = 0; i + 1 < s.length; i++) for (let j = 0; j < 4; j++) quad(P(s[i], prof[j]), P(s[i], prof[(j + 1) % 4]), P(s[i + 1], prof[(j + 1) % 4]), P(s[i + 1], prof[j]));
+    for (const q of [s[0], s[s.length - 1]]) quad(P(q, prof[0]), P(q, prof[1]), P(q, prof[2]), P(q, prof[3]));
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g; };
+  // zancas (v27): todas a ±0.575, por fuera del escalón (1.10) y dentro del carril (1.20): se ven de los dos lados y no invaden el tramo vecino
+  out.strings.push(zanca(path(0, st.a0, st.a1, -.575 * sg)), zanca(path(1, st.a0, st.a1, .575 * sg)), zanca(path(1, st.a0, la, -.575 * sg)), zanca(path(1, lb, st.a1, -.575 * sg)), zanca(path(0, st.a0, la, .575 * sg)), zanca(path(0, lb, st.a1, .575 * sg)));
+  return out;
+}
+
+// coordenadas de un punto respecto a la escalera: [ángulo, radio] (en las del aro, el radio se mide desde el eje del aro)
+function xStairLoc(st, Rc, C) {
+  return (x, y) => { if (st.ring) { const r = Math.hypot(x - C[0], y - C[1]), t = (Math.atan2(y - C[1], x - C[0]) / deg + 360) % 360; return [t, r - Rc(t)]; }
+    const r = Math.hypot(x - st.c[0], y - st.c[1]), b = (Math.atan2(y - st.c[1], x - st.c[0]) / deg + 360) % 360; return [b, r]; };
+}
+
+// dónde se abre el barandal de una losa a la altura z (v26): sólo en la boca de cada carril, es decir, dentro del ancho del carril
+// (las orillas de la losa a los lados del tramo, a 0.62 del eje, conservan su barandal); arriba hasta 3 m tramo adentro,
+// abajo hasta 5 m (lo que quede de losa bajo el tramo que sube no lleva barandal)
+function xStairGap(st, Rc, C) {
+  const am = (st.a0 + st.a1) / 2, loc = xStairLoc(st, Rc, C);
+  const rr = k => st.ring ? Rc(am) + st.lanes[k] : st.lanes[k];
+  return (x, y, z) => { const k = Math.abs(z - st.z1) < .05 ? 1 : Math.abs(z - st.z0) < .05 ? 0 : -1; if (k < 0) return false;
+    const [t, o] = loc(x, y); if (Math.abs(o - st.lanes[k]) >= .61) return false; const lim = k ? 3 : 5;
+    return [st.a0, st.a1].some(e => { const into = (t - e) * Math.sign(am - e) * rr(k) * deg; return into > -.1 && into < lim; }); };
+}
+
+// uniones (v26): el final de cada barandal de la escalera (arriba o abajo) con el barandal de la losa del MISMO lado del carril
+// y a menos de 0.8 m; nunca con el del otro lado, para que ninguna unión cruce la escalera. ends(z) da los extremos a esa altura.
+function xStairJoins(st, rails, ends, Rc, C) {
+  const loc = xStairLoc(st, Rc, C), out = [];
+  for (const r of rails) for (const q of [r[0], r[r.length - 1]]) {
+    const k = Math.abs(q.z - st.z1) < .05 ? 1 : Math.abs(q.z - st.z0) < .05 ? 0 : -1; if (k < 0) continue;
+    const E = ends(q.z); if (!E || !E.length) continue;
+    const oq = loc(q.p[0], q.p[1])[1] - st.lanes[k]; let b = null, bd = .8;
+    for (const p of E) { const ob = loc(p[0], p[1])[1] - st.lanes[k]; if (Math.sign(ob) !== Math.sign(oq) || Math.abs(ob) < .55) continue;
+      const dd = Math.hypot(p[0] - q.p[0], p[1] - q.p[1]); if (dd < bd) { bd = dd; b = p; } }
+    if (b && bd > .05) out.push([q.p, b, q.z]); }
+  return out;
+}
 export function construye() {
-  const P = { losa: [], modulo: [], nucleo: [], acero: [], aro: [], escalera: [], auditorio: [], muro: [], mueble: [] }, L = { parteluz: [], huella: [], borde: [], vidrio: [] };
-  P.auditorio.push(walls(D.BOWL, F.zPit, 0), flat(D.BOWL, F.zPit));
-  const rowD = (F.rout - F.rin) / F.rows;
-  for (let k = 0; k < F.rows; k++) P.auditorio.push(extr(sector(S, F.rin + rowD * k, F.rin + rowD * (k + 1), F.b0, F.b1), F.zPit, F.zPit + F.rise * (k + 1)));
-  P.auditorio.push(extr(sector(S, F.st0, F.st1, F.sb0, F.sb1), F.zPit, F.zStage));
+  const P = { losa: [], modulo: [], nucleo: [], acero: [], aro: [], escalera: [], muro: [], mueble: [] }, L = { parteluz: [], huella: [], borde: [], vidrio: [] };
+  // (v35, 2026-11-16) sin auditorio: el foso, sus gradas y el escenario chocaban con el estacionamiento subterráneo
   // (2026-10-13, hoja de plantas v22) solo columnas, sin estructura en X; las que llevan sombrilla siguen a +15.00 y abren una losa de un módulo
   const conUmb = new Set((D.umb || []).filter(p => !p.ring).map(p => p.i + ',' + p.j));
   for (const p of (D.umb || []).filter(p => p.ring)) { const g = new THREE.CylinderGeometry(.27, .22, LV.PAD - p.base, 12); g.translate(p.x, (p.base + LV.PAD) / 2, -p.y); P.acero.push(g); }
-  for (const c of D.cols) for (const [a, b] of [[0, LV.N1 - LV.slab], [LV.N1, LV.N2 - LV.slab], [LV.N2, LV.RF - LV.slab]].concat(conUmb.has(c.i + ',' + c.j) ? [[LV.RF, LV.PAD]] : [])) { const g = new THREE.CylinderGeometry(.3, .3, b - a, 10); g.translate(c.x, (a + b) / 2, -c.y); P.acero.push(g); }
+  // columnas de una pieza: del piso a la última losa que cargan, o hasta la sombrilla
+  for (const c of D.cols) { const top = conUmb.has(c.i + ',' + c.j) ? LV.PAD : AC.inPoly(c.x, c.y, D.RF) ? LV.RF - LV.slab : AC.inPoly(c.x, c.y, D.N2) ? LV.N2 - LV.slab : LV.N1 - LV.slab; const g = new THREE.CylinderGeometry(.3, .3, top, 10); g.translate(c.x, top / 2, -c.y); P.acero.push(g); }
   // (su aro y sus columnas no van: en el diagrama manda el aro de siempre, más grande)
   for (const p of (D.umb || [])) P.aro.push(boxFrom(p.P, LV.PAD, LV.PAD + .4));
   // (la azotea no es losa suya: es el aro, que se ensancha sobre ella; sus vigas sí)
   for (const [Q, top] of [[D.N1, LV.N1], [D.N2, LV.N2], [D.RF, LV.RF]]) {
-    if (Q !== D.RF) P.losa.push(extr(Q, top - LV.slab, top));
+    if (Q !== D.RF) P.losa.push(extr(Q, top - LV.slab, top, Q === D.N1 && D.H1 ? [D.H1] : undefined));   // (v30) doble altura del vestíbulo
     const b = beamsUnder(Q, top - LV.slab); if (b) P.acero.push(b);
   }
-  for (const [E, z0, z1] of [[D.E1, LV.N1, LV.N2 - LV.slab], [D.E2, LV.N2, LV.RF - LV.slab]]) L.parteluz.push(mullions(E, z0, z1, 2.75));
-  for (const [Q, z] of [[D.N1, LV.N1], [D.N2, LV.N2]]) L.borde.push(new THREE.BufferGeometry().setFromPoints(Q.concat([Q[0]]).flatMap((p, i, a) => i ? [new THREE.Vector3(a[i - 1][0], z + 1, -a[i - 1][1]), new THREE.Vector3(p[0], z + 1, -p[1])] : [])));
+  // (v29) la planta baja también se cierra (E0); (v30) en PB y N1 sólo llevan vidrio y parteluces las fachadas oriente y norte
+  // (F0g, F1g: líneas abiertas); las oeste y sur son muros sólidos y llegan como muros del interior (walls3)
+  for (const [E, Fg, z0, z1] of [[D.E0, D.F0g, 0, LV.N1 - LV.slab], [D.E1, D.F1g, LV.N1, LV.N2 - LV.slab], [D.E2, null, LV.N2, LV.RF - LV.slab]]) {
+    if (!E) continue;
+    for (const Pm of (Fg || [E])) L.parteluz.push(mullions(Fg ? Pm.concat(Pm.slice(0, -1).reverse()) : Pm, z0, z1, 2.75));
+  }
+  // barandal de las plataformas (línea a +1.00): se abre justo en el ancho de cada carril que llega o sale
+  const GAPS = D.stairs.map(st => xStairGap(st, AC.Rc, C));
+  const FIN = {};
+  const bordeCon = (Q, z) => { const pos = [], P = Q.concat([Q[0]]), pts = [], abre = p => GAPS.some(f => f(p[0], p[1], z));
+    for (let i = 0; i + 1 < P.length; i++) { const a = P[i], b = P[i + 1], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / .15));
+      for (let k = 0; k < n; k++) pts.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); }
+    pts.push(P[P.length - 1]);
+    const segs = []; let seg = [];
+    for (const p of pts) { if (abre(p)) { if (seg.length > 1) segs.push(seg); seg = []; } else seg.push(p); }
+    if (seg.length > 1) segs.push(seg);
+    if (segs.length > 1 && !abre(pts[0]) && !abre(pts[pts.length - 1])) segs[0] = segs.pop().concat(segs[0].slice(1));   // el arranque del polígono no es un corte
+    for (const s of segs) { for (let i = 0; i + 1 < s.length; i++) pos.push(s[i][0], z + 1, -s[i][1], s[i + 1][0], z + 1, -s[i + 1][1]); (FIN[z] = FIN[z] || []).push(s[0], s[s.length - 1]); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); return g; };
+  for (const [Q, z] of [[D.N1, LV.N1], [D.N2, LV.N2]]) L.borde.push(bordeCon(Q, z));
+  if (D.H1R) { const pos = []; for (let i = 0; i + 1 < D.H1R.length; i++) pos.push(D.H1R[i][0], LV.N1 + 1, -D.H1R[i][1], D.H1R[i + 1][0], LV.N1 + 1, -D.H1R[i + 1][1]); const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); L.borde.push(g); }   // barandal de la doble altura
+  // uniones (v26): del final de cada barandal de escalera al de la losa del mismo lado del carril (ninguna cruza la escalera)
+  { const pos = [], ends = z => FIN[Object.keys(FIN).find(k => Math.abs(+k - z) < .05)];
+    for (const st of D.stairs) for (const [p, b, z] of xStairJoins(st, xStair(st, AC.laneFn, AC.Rc).rails, ends, AC.Rc, C)) pos.push(p[0], z + 1, -p[1], b[0], z + 1, -b[1]);
+    if (pos.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); L.borde.push(g); } }
   // módulos como cajas (vista general); en el apartado de arte y cultura se ven por dentro (muros, vidrios y mobiliario de D.int)
   const zOf = { PIT: LV.PIT, PB: 0, N1: LV.N1, N2: LV.N2, RF: LV.RF };
   for (const m of D.mods) { const z0 = zOf[m.lv], h = m.u === 'ban0' ? .45 : LV.mod; (m.u === 'core' ? P.nucleo : P.modulo).push(boxFrom(m.P, z0, z0 + h)); }
   // escaleras en X: X1–X3 al frente y X4–X6 atrás (las traseras siguen el eje del aro de proyecto); X3 y X6 llegan al aro
-  for (const st of D.stairs) {
-    for (const f of AC.flights(st)) {
-      const n = Math.max(10, Math.ceil(Math.abs(f.a1 - f.a0) / 1)), s = [];
-      for (let i = 0; i <= n; i++) { const a = f.a0 + (f.a1 - f.a0) * i / n; const q = f.fn(a); s.push({ p: q.p, n: q.n, z: f.z0 + (f.z1 - f.z0) * i / n }); }
-      // escalones de 17 cm, cada uno con 28 cm de peralte abajo (el intradós se lee dentado)
-      const ns = Math.max(4, Math.round(Math.abs(f.z1 - f.z0) / .17));
-      for (let k = 0; k < ns; k++) {
-        const qa = f.fn(f.a0 + (f.a1 - f.a0) * k / ns), qb = f.fn(f.a0 + (f.a1 - f.a0) * (k + 1) / ns), zt = f.z0 + (f.z1 - f.z0) * (k + 1) / ns;
-        P.escalera.push(caja([(qa.p[0] + qb.p[0]) / 2, (qa.p[1] + qb.p[1]) / 2], Math.atan2(qb.p[1] - qa.p[1], qb.p[0] - qa.p[0]), Math.hypot(qb.p[0] - qa.p[0], qb.p[1] - qa.p[1]) + .03, 1.2, zt - .45, zt));
-      }
-      // zancas de acero a los lados y barandal (pasamanos y postes)
-      for (const o of [.63, -.63]) { P.acero.push(banda(s, [[o - .03, -.42], [o + .03, -.42], [o + .03, .08], [o - .03, .08]])); L.huella.push(baranda(s, o, .95)); }
-    }
-    const am = (st.a0 + st.a1) / 2, zm = (st.z0 + st.z1) / 2, q0 = AC.laneFn(st, 0), q1 = AC.laneFn(st, 1), da = 1.3 / (st.ring ? AC.Rc(am) + st.lanes[0] : st.lanes[0]) / deg;
-    const mid = a => { const p = q0(a), q = q1(a); return { p: [(p.p[0] + q.p[0]) / 2, (p.p[1] + q.p[1]) / 2], n: p.n }; }, hw = Math.abs(st.lanes[1] - st.lanes[0]) / 2 + .6, s2 = [];
-    for (let i = 0; i <= 6; i++) { const a = am - da + 2 * da * i / 6; const q = mid(a); s2.push({ p: q.p, n: q.n, z: zm }); }
-    P.escalera.push(ribbon(s2, hw, .3, 0));
-    // el descanso central se apoya en dos columnas delgadas
-    { const q = mid(am); for (const o of [hw - .35, -(hw - .35)]) { const x = q.p[0] + q.n[0] * o, y = q.p[1] + q.n[1] * o, h = zm - .3 - st.z0; const g = new THREE.CylinderGeometry(.09, .09, h, 8); g.translate(x, st.z0 + h / 2, -y); P.acero.push(g); } }
-  }
+  // escaleras en X (v24): X1–X3 al frente y X4–X6 atrás (las traseras siguen el eje del aro de proyecto); X3 y X6 llegan al aro
+  for (const st of D.stairs) { const X = xStair(st, AC.laneFn, AC.Rc); P.escalera.push(...X.steps, X.landing); P.acero.push(...X.posts, ...X.strings); for (const r of X.rails) L.huella.push(baranda(r, 0, .95)); }
   // interior (hoja de plantas): muros y mamparas, techos de los módulos de la azotea, vidrios como marcos y mobiliario
   const I = D.int || { muros: [], vidrios: [], techos: [], muebles: [] };
   for (const [ax, ay, bx, by, z0, z1, t] of I.muros) P.muro.push(muroEntre([ax, ay], [bx, by], z0, z1, t));
@@ -131,14 +202,23 @@ export function construye() {
   const mallas = {}, lineas = {};
   for (const k in P) if (P[k].length) mallas[k] = mergeGeometries(P[k].map(g => g.index ? g.toNonIndexed() : g).map(g => { for (const a of Object.keys(g.attributes)) if (a !== 'position' && a !== 'normal') g.deleteAttribute(a); if (!g.attributes.normal) g.computeVertexNormals(); return g; }));
   for (const k in L) if (L[k].length) lineas[k] = mergeGeometries(L[k]);
-  // lo que pisa en planta baja (para no poner paisaje ahí): el foso del
-  // auditorio y los módulos de planta baja; y la huella del nivel 1 (los
-  // árboles no caben bajo la losa)
+  // lo que pisa en planta baja (para no poner paisaje ahí): los módulos de
+  // planta baja (desde la v35 ya no hay foso del auditorio); y la huella del
+  // nivel 1 (los árboles no caben bajo la losa)
   const enDiagrama = Q => Q.map(p => [p[0] + DX, p[1] + DY]);
-  const pisa = [enDiagrama(D.BOWL)].concat(D.mods.filter(m => m.lv === 'PB' || m.lv === 'PIT').map(m => enDiagrama(m.P)));
+  const pisa = D.mods.filter(m => m.lv === 'PB' || m.lv === 'PIT').map(m => enDiagrama(m.P));
   // columnas de la retícula, para el mapa Nolli
   const cols = D.cols.map(c => [c.x + DX, c.y + DY]);
-  return { mallas, lineas, pisa, losa1: enDiagrama(D.N1), azotea: enDiagrama(D.RFg || D.RF), cols };
+  const aberturas = [];
+  for (const st of D.stairs.filter(st => Math.abs(st.z1 - LV.RF) < .05)) { const am = (st.a0 + st.a1) / 2, l = st.lanes[1], rr = st.ring ? AC.Rc(am) + l : l;
+    const pt = (t, o) => st.ring ? AC.ringP(t, o) : [st.c[0] + o * Math.cos(t * deg), st.c[1] + o * Math.sin(t * deg)];
+    for (const e of [st.a0, st.a1]) { const d = Math.sign(am - e), t0 = e - d * .15 / rr / deg, t1 = e + d * 3 / rr / deg, A = [], B = [];
+      for (let k = 0; k <= 8; k++) { const t = t0 + (t1 - t0) * k / 8; A.push(pt(t, l + .61)); B.push(pt(t, l - .61)); }
+      aberturas.push(enDiagrama(A.concat(B.reverse()))); } }
+  // los extremos de los barandales de esas escaleras en su llegada: el barandal del aro se une a ellos
+  const bocas = [];
+  for (const st of D.stairs.filter(st => Math.abs(st.z1 - LV.RF) < .05)) for (const r of xStair(st, AC.laneFn, AC.Rc).rails) for (const q of [r[0], r[r.length - 1]]) if (Math.abs(q.z - st.z1) < .05) bocas.push(enDiagrama([q.p])[0]);
+  return { mallas, lineas, pisa, losa1: enDiagrama(D.N1), azotea: enDiagrama(D.RFg || D.RF), cols, aberturas, bocas };
 }
 '''
 
@@ -240,8 +320,8 @@ def datos_del_edificio():
             if math.hypot(c['x'] - p['x'], c['y'] - p['y']) < 0.05:
                 q['i'], q['j'] = c['i'], c['j']
         umb.append(q)
-    return {'C': v['C'], 'R0': v['R0'], 'RW': v['RW'], 'BULGE': v['BULGE'], 'S': v['S'], 'FAN': v['FAN'], 'lat': v['lat'], 'lv': v['lv'],
-            'N1': v['N1'], 'N2': v['N2'], 'RF': v['RF'], 'RFg': v['RFg'], 'E1': v['E1'], 'E2': v['E2'], 'BOWL': v['BOWL'],
+    return {'C': v['C'], 'R0': v['R0'], 'RW': v['RW'], 'BULGE': v['BULGE'], 'S': v['S'], 'lat': v['lat'], 'lv': v['lv'],
+            'N1': v['N1'], 'N2': v['N2'], 'RF': v['RF'], 'RFg': v['RFg'], 'E0': v.get('E0'), 'F0g': v.get('F0g'), 'F1g': v.get('F1g'), 'H1': v.get('H1'), 'H1R': v.get('H1R'), 'E1': v['E1'], 'E2': v['E2'],
             'mods': mods, 'cols': [{'x': c['x'], 'y': c['y'], 'i': c['i'], 'j': c['j']} for c in v['cols']], 'par': [], 'umb': umb,
             'stairs': v['stairs'], 'grid': {'planes': []}, 'int': interior(ly, v['lv'])}
 

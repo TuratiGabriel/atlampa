@@ -129,6 +129,18 @@ const CLAY_TINTA = {
   verde: '#b7bbb5', tezontle: '#c4c2bc', agua: '#aebbc1', filtro: '#b7bbb5', arbusto: '#9ea49e', copa: '#979d98',
   est: '#b8bbbd', rampa: '#b8bbbd', contexto: '#e7e4dc', ctxsuelo: '#dadbd8', carro: '#aeb2b5'
 };
+// Subusos (Diego, 2026-11-19): tonos del mismo uso; el aro, con su amarillo. [color, clay]
+const SUBUSO_COLOR = {
+  'cul-comercio': ['#9466f0', '#6d48b0'], 'cul-galeria': ['#c9a6ff', '#9271c9'], 'cul-social': ['#efe2ff', '#c7b5e6'], aro: ['#f2c14e', '#d1a536'],
+  'viv-comercio': ['#fff0f8', '#f7c6de'],
+  'com-mercado': ['#8a98ff', '#4056b5'], 'com-libre': ['#cdd4ff', '#9aa6dc'], 'com-banos': ['#5468ff', '#22308a'],
+  'com-acuaponia': ['#72c6ff', '#3f8fc0'], 'com-descarga': ['#4c56a8', '#2a3270']
+};
+const SUBUSO_NOMBRE = {
+  'cul-comercio': 'Comercio (PB y N1)', 'cul-galeria': 'Galería (N2)', 'cul-social': 'Social (azotea)', aro: 'Aro y pista',
+  'viv-comercio': 'Módulos de comercio', 'com-mercado': 'Mercado', 'com-libre': 'Área libre', 'com-banos': 'Baños',
+  'com-acuaponia': 'Acuaponia', 'com-descarga': 'Zona de descarga'
+};
 // qué programa / espacio es cada papel
 const PROG_DE = { social: 'social', nave: 'comercio', vidrio: 'comercio', 'vidrio-vivienda': 'vivienda', 'vidrio-industria': 'industria', 'vidrio-cultura': 'cultura', industria: 'industria', cultura: 'cultura', modulo: 'vivienda', modcom: 'comercio', aro: 'aro', predio: 'publico', plaza: 'publico', verde: 'verde', agua: 'agua', filtro: 'agua', tezontle: 'tez', arbusto: 'verde', copa: 'verde', est: 'est', rampa: 'est' };
 // Público / privado (un solo botón, dos colores): privado, los volúmenes de
@@ -160,6 +172,8 @@ const CORTE_POS = { value: new THREE.Vector3(1e5, 1e5, 1e5) };
 const CORTE_ACT = { value: new THREE.Vector3(0, 0, 0) };
 const CORTE_DIR = { value: new THREE.Vector3(1, 1, 1) };
 const PISO_RANGO = { value: new THREE.Vector2(-1e5, 1e5) };
+// ver por pisos: alto de la banda que se desintegra bajo el corte mientras se mueve (0: sin banda)
+const PISO_BANDA = { value: 0 };
 const DETALLE_MIN = { value: new THREE.Vector2(-1e5, -1e5) };
 const DETALLE_MAX = { value: new THREE.Vector2(1e5, 1e5) };
 const ELEV_ACT = { value: 0 };
@@ -200,12 +214,12 @@ const DIB_LINEA = /* glsl */`
 function dibujable(mat, U) {   // un LineBasicMaterial que se dibuja con el canal U
   mat._dibUniforms = U;
   mat.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uPisoRango: PISO_RANGO, uDetalleMin: DETALLE_MIN, uDetalleMax: DETALLE_MAX, uElevacion: ELEV_ACT, uElevOrigen: ELEV_ORIG, uElevDir: ELEV_DIR }, U);
+    Object.assign(sh.uniforms, { uPisoRango: PISO_RANGO, uPisoBanda: PISO_BANDA, uDetalleMin: DETALLE_MIN, uDetalleMax: DETALLE_MAX, uElevacion: ELEV_ACT, uElevOrigen: ELEV_ORIG, uElevDir: ELEV_DIR }, U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aOtro; attribute float aLado; varying vec3 vDetalleW; varying float vElevDist; uniform vec3 uElevOrigen, uElevDir;' + DIB_GLSL)
       .replace('#include <begin_vertex>', DIB_LINEA)
       .replace('#include <project_vertex>', '#include <project_vertex>\n vDetalleW = (modelMatrix * vec4(transformed, 1.0)).xyz; vElevDist = dot(vDetalleW - uElevOrigen, uElevDir);');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vDetalleW; varying float vElevDist; uniform vec2 uPisoRango; uniform vec2 uDetalleMin; uniform vec2 uDetalleMax; uniform float uElevacion;')
-      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if (vDetalleW.y < uPisoRango.x || vDetalleW.y > uPisoRango.y || vDetalleW.x < uDetalleMin.x || vDetalleW.x > uDetalleMax.x || vDetalleW.z < uDetalleMin.y || vDetalleW.z > uDetalleMax.y) discard;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vDetalleW; varying float vElevDist; uniform vec2 uPisoRango; uniform float uPisoBanda; uniform vec2 uDetalleMin; uniform vec2 uDetalleMax; uniform float uElevacion;')
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if (vDetalleW.y < uPisoRango.x || vDetalleW.y > uPisoRango.y || vDetalleW.x < uDetalleMin.x || vDetalleW.x > uDetalleMax.x || vDetalleW.z < uDetalleMin.y || vDetalleW.z > uDetalleMax.y) discard;\n if (uPisoBanda > 0.0 && vDetalleW.y > uPisoRango.y - uPisoBanda) { vec3 q = floor(vDetalleW * 1.7); if (fract(sin(dot(q.xz + q.y * 0.37, vec2(12.9898, 78.233))) * 43758.5453) > (uPisoRango.y - vDetalleW.y) / uPisoBanda) discard; }')
       .replace('#include <color_fragment>', '#include <color_fragment>\nif (uElevacion > 0.5) { diffuseColor.rgb = vec3(0.08); diffuseColor.a *= mix(0.95, 0.5, smoothstep(9.0, 11.0, vElevDist)); }');
   };
   mat.customProgramCacheKey = () => 'dib-detail';
@@ -250,7 +264,7 @@ const VERT = /* glsl */`
   }`;
 const FRAG = /* glsl */`
   uniform vec3 uFondo; uniform vec3 uTinta; uniform float uModo; uniform float uTono; uniform float uPaso; uniform float uMundo;
-  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform vec3 uCortePos; uniform vec3 uCorteAct; uniform vec3 uCorteDir; uniform vec2 uPisoRango; uniform vec2 uDetalleMin; uniform vec2 uDetalleMax; uniform float uElevacion; uniform vec3 uElevOrigen; uniform vec3 uElevDir;
+  uniform float uGris; uniform float uGrano; uniform float uOpacidad; uniform vec3 uLuz; uniform float uPx; uniform float uBrillo; uniform float uGrueso; uniform vec3 uCortePos; uniform vec3 uCorteAct; uniform vec3 uCorteDir; uniform vec2 uPisoRango; uniform float uPisoBanda; uniform vec2 uDetalleMin; uniform vec2 uDetalleMax; uniform float uElevacion; uniform vec3 uElevOrigen; uniform vec3 uElevDir;
   varying vec3 vN; varying vec3 vW;` + DIB_GLSL + `
   // una raya cada periodo de c (antialias con fwidth; si es muy denso, el promedio)
   float raya(float c, float grueso) {
@@ -261,6 +275,15 @@ const FRAG = /* glsl */`
   }
   void main() {
     if (vW.y < uPisoRango.x || vW.y > uPisoRango.y) discard;
+    // ver por pisos: bajo el corte que se mueve, lo que se va (o llega) se desmorona en migajas con el rayado del dibujo
+    if (uPisoBanda > 0.0 && vW.y > uPisoRango.y - uPisoBanda) {
+      float k = (uPisoRango.y - vW.y) / uPisoBanda;
+      if (dibAzar(floor(vW * 1.7)) > k) discard;
+      if (k < 0.75) {
+        if (raya((gl_FragCoord.x - gl_FragCoord.y) / (4.5 * uPx), 0.3) < 0.4) discard;
+        gl_FragColor = vec4(mix(uFondo, uTinta, 0.42 * uBrillo), uOpacidad); return;
+      }
+    }
     if (vW.x < uDetalleMin.x || vW.x > uDetalleMax.x || vW.z < uDetalleMin.y || vW.z > uDetalleMax.y) discard;
     if ((uCorteAct.x > 0.5 && (vW.x - uCortePos.x) * uCorteDir.x > 0.0) ||
         (uCorteAct.y > 0.5 && (vW.y - uCortePos.y) * uCorteDir.y > 0.0) ||
@@ -579,6 +602,7 @@ function crea(svg, op) {
   const ARISTAS = {};   // clave → LineBasicMaterial
   const LINEAS = {};    // nombre → LineBasicMaterial (plantas, columnas…)
   let conColor = true, resalta = null, espacioAct = null, conEsquema = false, infraAct = null, matPersEsq = null;
+  let resaltado = null, techoFuera = null, verPiso = null, animPisos = null;   // subuso destacado y ver por pisos (ver transitaPisos)
   // con el esquema compositivo, el modelo entero queda muy tenue (pero se lee: no se va a negro)
   const TENUE_ESQ = 0.32;
   // Inspeccionando la estructura (no sólo mostrándola): de lo demás sólo
@@ -598,7 +622,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       uniforms: Object.assign({ uFondo: { value: new THREE.Color(0, 0, 0) }, uTinta: { value: new THREE.Color(1, 1, 1) }, uModo: { value: 0 }, uTono: { value: 0.5 },
         uPaso: { value: 3 }, uMundo: { value: 0 }, uGris: { value: 0.1 }, uGrano: { value: 0 }, uOpacidad: { value: 1 }, uLuz: { value: luz }, uPx: { value: renderer.getPixelRatio() },
         uBrillo: { value: 1 }, uGrueso: { value: 0.22 }, uCortePos: CORTE_POS, uCorteAct: CORTE_ACT, uCorteDir: CORTE_DIR,
-        uPisoRango: PISO_RANGO, uDetalleMin: DETALLE_MIN, uDetalleMax: DETALLE_MAX,
+        uPisoRango: PISO_RANGO, uPisoBanda: PISO_BANDA, uDetalleMin: DETALLE_MIN, uDetalleMax: DETALLE_MAX,
         uElevacion: ELEV_ACT, uElevOrigen: ELEV_ORIG, uElevDir: ELEV_DIR }, canalDe(papel))
     });
     m.userData.papel = papel;
@@ -632,6 +656,16 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const pr = PROG_DE[papel];
     if (!conColor || !pr) return blanco;
     return new THREE.Color(PROGRAMA[pr]).lerp(blanco, 0.15);
+  }
+  const esResaltado = d => d.subuso === resaltado.s || (resaltado.s === 'aro' && d.papel === 'aro');
+  // Subusos (ver SUBUSOS): dentro de su uso, el tono de su parte; fuera, el de siempre.
+  function tintaSub(d, actual) {
+    const c = d.subuso && SUBUSO_COLOR[d.subuso];
+    if (!c || espacioAct || !subusoActivo(d.subAp)) return actual;
+    const clay = estilo === ESTILOS.clay;
+    if (!conColor && !clay) return actual;
+    const col = new THREE.Color(clay && !conColor ? c[1] : c[0]);
+    return d.papel.startsWith('vidrio') ? col.lerp(blanco, 0.5) : clay ? col : col.lerp(blanco, 0.15);
   }
   // Al seleccionar un uso, los demás quedan visibles y translúcidos al 15 %.
   function apagado(papel) {
@@ -667,13 +701,13 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       u.uModo.value = e.modo !== undefined ? e.modo : estilo === ESTILOS.plano ? 1 : 0;
       // con Color, más tinta: que contraste con el negro
       u.uFondo.value.set(estilo.fondo); u.uTono.value = (e.tono || 0.4) * (conColor ? 1.35 : 1); u.uPaso.value = e.paso || 3; u.uGrueso.value = (e.grueso || 0.22) * (conColor ? 1.3 : 1); u.uMundo.value = e.mundo || 0; u.uGris.value = e.gris || 0.1; u.uGrano.value = e.grano || 0;
-      u.uTinta.value = tinta(m.userData.papel);
+      u.uTinta.value = tintaSub(m.userData, tinta(m.userData.papel));
       // Público / privado: las áreas se llenan de su color (el croquis sólo tenía aristas)
       if (espacioAct && espacioDe(m.userData.papel)) {
         if (u.uModo.value > 1.5) { u.uGris.value = Math.max(u.uGris.value, 0.2); u.uTono.value = Math.max(u.uTono.value, 0.45); }
         else u.uTono.value = Math.min(1, u.uTono.value * 2.2);
       }
-      u.uBrillo.value = enfasis(m.userData.papel, m.userData.ref) * (conEsquema ? TENUE_ESQ : 1);
+      u.uBrillo.value = enfasis(m.userData.papel, m.userData.ref) * (conEsquema ? TENUE_ESQ : 1) * (resaltado && !esResaltado(m.userData) ? 0.22 : 1);
       const ap = apagado(m.userData.papel), vid = m.userData.papel.startsWith('vidrio'), inf = !!infraAct;
       u.uOpacidad.value = (ap ? TENUE : 1) * (inf ? 0.09 : 1); m.transparent = ap || vid || inf; m.depthWrite = !ap && !vid && !inf;
       // inspeccionando la estructura: de lo demás, sólo el contorno (menos el aro)
@@ -683,8 +717,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     });
     Object.keys(ARISTAS).forEach(k => {
       const m = ARISTAS[k], e = estilo.papel[m.userData.papel] || estilo.papel.proyecto;
-      m.color.copy(tinta(m.userData.papel));
-      m.opacity = Math.min(1, (elevacionAct ? Math.max(0.55, e.arista || 0) : e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
+      m.color.copy(tintaSub(m.userData, tinta(m.userData.papel)));
+      m.opacity = Math.min(1, (elevacionAct ? Math.max(0.55, e.arista || 0) : e.arista || 0) * enfasis(m.userData.papel, m.userData.ref)) * (apagado(m.userData.papel) ? TENUE : 1) * (resaltado && !esResaltado(m.userData) ? 0.2 : 1) * (estilo.blanco || 1) * (conEsquema ? TENUE_ESQ : 1) * (infraAct ? 0.09 : 1);
       if (enEstr && m.userData.papel !== 'aro' && m.opacity > 0.001) m.opacity = 0.42;
       m.visible = m.opacity > 0.001;
     });
@@ -795,6 +829,1180 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     return me;
   }
   function pon(grupo, malla, papel, ap, umbral, extraAristas, estr) { return ponGeos(grupo, geos(malla, papel, umbral, extraAristas), papel, ap, estr); }
+  // Preexistencia, primer corte: Luis confirmó que las dos naves orientales
+  // son las mismas que ya figuran en el levantamiento de Contexto.3dm.
+  // Se construyen completas, sin el recorte del aro propuesto.
+  const historiaGrupo = new THREE.Group();
+  historiaGrupo.name = 'historia-preexistencia-confirmada';
+  historiaGrupo.visible = false;
+  escena.add(historiaGrupo);
+  historiaGrupo.add(new THREE.AmbientLight(0xffffff, 0.7));
+  const historiaLuz = new THREE.DirectionalLight(0xffffff, 0.7);
+  historiaLuz.position.set(-50, 90, 40);
+  historiaGrupo.add(historiaLuz);
+  // Toda la preexistencia arranca al 50% de la intensidad blanca anterior.
+  const historiaBlanco = new THREE.MeshLambertMaterial({ color: 0x808080, side: THREE.DoubleSide });
+  const historiaPiso = new THREE.MeshBasicMaterial({ color: 0x151515, side: THREE.DoubleSide });
+  const historiaContorno = new THREE.LineBasicMaterial({ color: 0x808080 });
+  const partesConservadas = [];
+  const historiaDescartables = new THREE.Group();
+  historiaDescartables.name = 'preexistencia-que-se-retira';
+  historiaGrupo.add(historiaDescartables);
+  function ponHistoria(grupo, malla, piso, materiales) {
+    const geometria = malla.geo();
+    grupo.add(new THREE.Mesh(geometria, piso ? historiaPiso : (materiales ? materiales.solido : historiaBlanco)));
+    grupo.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometria, 12), materiales ? materiales.contorno : historiaContorno));
+  }
+  const historiaSuelo = new Malla();
+  tapa(historiaSuelo, rect(PB.u0, PB.v0, PB.u1, PB.v1), -0.02);
+  ponHistoria(historiaGrupo, historiaSuelo, true);
+  function naveHistoria(grupo, nv, conservada) {
+    const paso = (nv.u1 - nv.u0) / nv.n;
+    for (let j = 0; j < nv.n; j++) {
+      const g = new THREE.Group(), m = new Malla();
+      grupo.add(g);
+      const u0 = nv.u0 + j * paso, u1 = u0 + paso, um = (u0 + u1) / 2;
+      const v0 = nv.v0, v1 = nv.v1, a = nv.alero, c = nv.cumbre;
+      const altura = u => a + (c - a) * Math.max(0, 1 - Math.abs(u - um) / (paso / 2));
+      muros(m, rect(u0, v0, u1, v1), 0, 0, altura);
+      m.tri(W(u0, v0, a), W(um, v0, c), W(u1, v0, a));
+      m.tri(W(u1, v1, a), W(um, v1, c), W(u0, v1, a));
+      m.quad(W(u0, v0, a), W(u0, v1, a), W(um, v1, c), W(um, v0, c));
+      m.quad(W(um, v0, c), W(um, v1, c), W(u1, v1, a), W(u1, v0, a));
+      const materiales = conservada ? { solido: historiaBlanco.clone(), contorno: historiaContorno.clone() } : null;
+      ponHistoria(g, m, false, materiales);
+      if (conservada) {
+        // Puntos breves sobre cada cubierta: la luz aparece como salpicadura,
+        // sin alterar la geometría ni el color definitivo de las naves.
+        const puntos = [];
+        for (let k = 0; k < 24; k++) {
+          const fu = ((k * 17 + j * 7) % 29 + 0.5) / 29;
+          const fv = ((k * 11 + j * 13) % 31 + 0.5) / 31;
+          const u = u0 + (u1 - u0) * fu, v = v0 + (v1 - v0) * fv;
+          const p = W(u, v, altura(u) + 0.16);
+          puntos.push(p[0], p[1], p[2]);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(puntos, 3));
+        const salpica = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 6, sizeAttenuation: false,
+          transparent: true, opacity: 0, depthTest: false, depthWrite: false }));
+        salpica.visible = false; g.add(salpica);
+        partesConservadas.push({ grupo: g, materiales, salpica });
+      }
+    }
+  }
+  G.NAVES.forEach((nv, i) => {
+    const g = new THREE.Group();
+    g.name = i ? 'nave-oriente-norte' : 'nave-oriente-sur';
+    historiaGrupo.add(g); naveHistoria(g, nv, true);
+  });
+  // La vista de Earth muestra dos conjuntos al oeste, separados de las naves
+  // del este y por un callejón transversal. Sus subdivisiones y alturas son
+  // aproximaciones de lectura, no datos constructivos medidos.
+  function bloqueHistoria(grupo, id, planta, z0, z1) {
+    const g = new THREE.Group(), m = new Malla();
+    g.name = id; grupo.add(g);
+    prisma(m, rect(planta[0], planta[1], planta[2], planta[3]), z0, z1);
+    ponHistoria(g, m, false);
+  }
+  function cobertizoHistoria(grupo, id, planta, altoOeste, altoEste) {
+    const [u0, v0, u1, v1] = planta, g = new THREE.Group(), m = new Malla();
+    g.name = id; grupo.add(g);
+    muros(m, rect(u0, v0, u1, v1), 0, 0, u => altoOeste + (altoEste - altoOeste) * (u - u0) / (u1 - u0));
+    m.quad(W(u0, v0, altoOeste), W(u1, v0, altoEste), W(u1, v1, altoEste), W(u0, v1, altoOeste));
+    ponHistoria(g, m, false);
+  }
+  const noroeste = new THREE.Group();
+  noroeste.name = 'conjunto-noroeste-earth'; historiaDescartables.add(noroeste);
+  // Cobertizo largo de Fresno: la cubierta baja hacia el patio interior.
+  cobertizoHistoria(noroeste, 'cubierta-fresno-inclinada', [449, 419, 469, 487], 7.2, 5.5);
+  bloqueHistoria(noroeste, 'ala-norte', [469, 468, 491, 487], 0, 5.2);
+  bloqueHistoria(noroeste, 'anexo-suroeste', [469, 419, 478, 441], 0, 5.8);
+  // Tres naves cortas separadas por juntas; las dos mayores del este vienen de G.NAVES.
+  naveHistoria(noroeste, { u0: 479, u1: 496, v0: 419, v1: 458, n: 1, alero: 6.3, cumbre: 7.6 });
+  naveHistoria(noroeste, { u0: 498, u1: 509, v0: 419, v1: 458, n: 1, alero: 5.9, cumbre: 7.5 });
+  naveHistoria(noroeste, { u0: 510, u1: 521, v0: 419, v1: 458, n: 1, alero: 5.9, cumbre: 7.5 });
+  bloqueHistoria(noroeste, 'ala-patio-oeste', [492, 462, 499, 487], 0, 5.0);
+  bloqueHistoria(noroeste, 'ala-patio-norte', [499, 479, 522, 487], 0, 5.2);
+  bloqueHistoria(noroeste, 'ala-patio-este', [516, 462, 522, 479], 0, 5.0);
+
+  const suroeste = new THREE.Group();
+  suroeste.name = 'conjunto-suroeste-earth'; historiaDescartables.add(suroeste);
+  bloqueHistoria(suroeste, 'cubierta-principal', [449, 345, 484, 395], 0, 6.0);
+  bloqueHistoria(suroeste, 'franja-sur-dos-niveles', [449, 324, 503, 345], 0, 9.0);
+  bloqueHistoria(suroeste, 'ala-hacia-naves', [484, 372, 503, 395], 0, 5.5);
+  bloqueHistoria(suroeste, 'monitor-de-cubierta', [452, 349, 459, 376], 6.0, 6.8);
+  // Reutiliza el eje ferroviario ESPUELA del visor, al nivel original del suelo;
+  // la pasarela elevada del proyecto queda oculta durante Historia.
+  const rielesHistoria = new Lineas(), ejeVias = ESPUELA[ESPUELA.length - 1][1];
+  for (const lado of [-0.72, 0.72]) rielesHistoria.seg(W(PB.u0, ejeVias + lado, 0.12), W(ESP_FIN, ejeVias + lado, 0.12));
+  for (let u = PB.u0 + 0.5; u < ESP_FIN; u += 1.6) rielesHistoria.seg(W(u, ejeVias - 1.3, 0.1), W(u, ejeVias + 1.3, 0.1));
+  const viasHistoria = new THREE.LineSegments(rielesHistoria.geo(), historiaContorno);
+  viasHistoria.name = 'vias-existentes-eje-espuela'; historiaGrupo.add(viasHistoria);
+  function portonHistoria(id, u) {
+    const lineas = new Lineas(), v0 = 396.6, v1 = 417.5, alto = 3.2;
+    for (const v of [v0, v1]) lineas.seg(W(u, v, 0.1), W(u, v, alto));
+    for (const h of [0.2, alto]) lineas.seg(W(u, v0, h), W(u, v1, h));
+    for (let v = v0 + 1.2; v < v1; v += 1.2) lineas.seg(W(u, v, 0.2), W(u, v, alto));
+    const puerta = new THREE.LineSegments(lineas.geo(), historiaContorno);
+    puerta.name = id; historiaDescartables.add(puerta);
+  }
+  portonHistoria('porton-fresno', PB.u0 + 0.4);
+  portonHistoria('porton-sabino', PB.u1 - 0.4);
+  // Bote temporal esquemático: durante B2 se coloca junto al borde de la vista.
+  const historiaBote = new THREE.Group(), historiaBoteLineas = new Lineas();
+  historiaBote.name = 'bote-temporal-b2'; historiaBote.visible = false; historiaGrupo.add(historiaBote);
+  const bu = 462, bv = 404, bw = 18, bd = 14, bh = 20;
+  function aroBote(u0, u1, v0, v1, h) {
+    const p = [W(u0, v0, h), W(u1, v0, h), W(u1, v1, h), W(u0, v1, h)];
+    for (let i = 0; i < 4; i++) historiaBoteLineas.seg(p[i], p[(i + 1) % 4]);
+    return p;
+  }
+  const fondoBote = aroBote(bu - bw * 0.35, bu + bw * 0.35, bv - bd * 0.35, bv + bd * 0.35, 0.2);
+  const bocaBote = aroBote(bu - bw * 0.5, bu + bw * 0.5, bv - bd * 0.5, bv + bd * 0.5, bh);
+  for (let i = 0; i < 4; i++) historiaBoteLineas.seg(fondoBote[i], bocaBote[i]);
+  aroBote(bu - bw * 0.6, bu + bw * 0.6, bv - bd * 0.58, bv + bd * 0.58, bh + 2.2);
+  historiaBoteLineas.seg(W(bu - 3, bv, bh + 2.2), W(bu - 3, bv, bh + 5));
+  historiaBoteLineas.seg(W(bu - 3, bv, bh + 5), W(bu + 3, bv, bh + 5));
+  historiaBoteLineas.seg(W(bu + 3, bv, bh + 5), W(bu + 3, bv, bh + 2.2));
+  const historiaBoteMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false });
+  historiaBote.add(new THREE.LineSegments(historiaBoteLineas.geo(), historiaBoteMaterial));
+  let historiaActiva3D = false, historiaVisibleAntes = null, historiaRaizAntes = null, historiaFondoAntes = null;
+  let historiaSalpicaduraToken = 0, historiaNavesIluminadas = false;
+  let historiaDescarteToken = 0, historiaDescartando = false, historiaDescartado = false;
+  const historiaProgramaOrden = ['comercio', 'cultura', 'industria', 'vivienda', 'aro'];
+  const historiaProgramas = new THREE.Group();
+  historiaProgramas.name = 'volumenes-programa-lod100'; historiaGrupo.add(historiaProgramas);
+  const historiaPlanoFondo = new THREE.Group(), historiaColocados = new THREE.Group();
+  historiaPlanoFondo.name = 'historia-plano-fondo'; historiaGrupo.add(historiaPlanoFondo);
+  historiaGrupo.children.slice().forEach(objeto => {
+    if (objeto !== historiaPlanoFondo && objeto !== historiaProgramas && !objeto.isLight) historiaPlanoFondo.add(objeto);
+  });
+  historiaPlanoFondo.add(historiaColocados);
+  const historiaMaterialesFondo = new Map();
+  function opacidadFondo(objeto, factor) {
+    objeto.traverse(o => {
+      const materiales = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+      materiales.forEach(m => {
+        if (!historiaMaterialesFondo.has(m)) historiaMaterialesFondo.set(m, { opacity: m.opacity, transparent: m.transparent });
+        const original = historiaMaterialesFondo.get(m);
+        m.opacity = original.opacity * factor;
+        const transparente = factor < 0.999 || original.transparent;
+        if (m.transparent !== transparente) { m.transparent = transparente; m.needsUpdate = true; }
+      });
+    });
+  }
+  function ajustaFondo(factor) {
+    historiaPlanoFondo.scale.setScalar(1 - 0.25 * factor);
+    opacidadFondo(historiaPlanoFondo, 1 - 0.15 * factor);
+    pide();
+  }
+  let historiaProgramaToken = 0, historiaProgramaIndice = 0, historiaProgramaFase = 'create', historiaProgramaActual = null;
+  let historiaFondoReducido = false;
+  let historiaUsoSeleccionado = null;
+  let historiaViviendaConstruyendo = false, historiaViviendaConstruida = false, historiaViviendaFase = null;
+  let historiaViviendaToken = 0, historiaViviendaCopias = [], historiaViviendaDetalle = false;
+  let historiaComercioConstruyendo = false, historiaComercioConstruido = false, historiaComercioFase = null;
+  let historiaComercioToken = 0, historiaComercioRestaurar = null;
+  let historiaIndustriaConstruyendo = false, historiaIndustriaConstruida = false, historiaIndustriaFase = null;
+  let historiaIndustriaToken = 0, historiaIndustriaRestaurar = null;
+  let historiaCulturaConstruyendo = false, historiaCulturaConstruida = false, historiaCulturaFase = null;
+  let historiaCulturaToken = 0, historiaCulturaRestaurar = null;
+  let historiaAroConstruyendo = false, historiaAroConstruido = false, historiaAroFase = null;
+  let historiaAroToken = 0, historiaAroRestaurar = null;
+  let historiaPaisajeVisible = false;
+  const historiaCulturaExtras = new THREE.Group();
+  historiaCulturaExtras.name = 'cultura-modulos-y-nucleos-existentes';
+  historiaPlanoFondo.add(historiaCulturaExtras);
+  function culturaRealesHistoria() {
+    // Revit clasifica las piezas del Aro con piezaId='aro': se construyen aparte.
+    return (gBIM?.cultura || []).filter(g => !g.name.endsWith('-aro'));
+  }
+  function aroRealesHistoria() {
+    const piezasAro = piezas.filter(p => p.ap === 'aro' && (p.g.name === 'aro' || p.g.name === 'cinta')).map(p => p.g);
+    const revitAro = (gBIM?.cultura || []).filter(g => g.name.endsWith('-aro'));
+    return piezasAro.concat(revitAro);
+  }
+  function comercioRealesHistoria() {
+    return piezas.filter(p => p.ap === 'comercio' && !p.g.userData.oculto).map(p => p.g);
+  }
+  function actualizaConstruidosHistoria() {
+    const comercio = historiaComercioConstruido ? new Set(comercioRealesHistoria()) : new Set();
+    const vivienda = historiaViviendaConstruida && gBIM?.vivienda ? new Set(gBIM.vivienda) : new Set();
+    const industria = historiaIndustriaConstruida && gBIM?.industria ? new Set(gBIM.industria) : new Set();
+    const cultura = historiaCulturaConstruida ? new Set(culturaRealesHistoria()) : new Set();
+    const aro = historiaAroConstruido ? new Set(aroRealesHistoria()) : new Set();
+    raizG.children.forEach(g => { g.visible = comercio.has(g) || vivienda.has(g) || industria.has(g) || cultura.has(g) || aro.has(g) ||
+      (historiaPaisajeVisible && (g === gPredio || g === gPai || g === gPlantas)); });
+    pide();
+  }
+  function historiaAgregaPaisaje() {
+    if (!historiaActiva3D || historiaProgramaFase !== 'full_scale')
+      return { ok: false, reason: 'story_full_scale_required' };
+    if (historiaPaisajeVisible) return { ok: true, alreadyVisible: true, visible: true };
+    if (![historiaViviendaConstruida, historiaComercioConstruido, historiaIndustriaConstruida,
+      historiaCulturaConstruida, historiaAroConstruido].every(Boolean))
+      return { ok: false, reason: 'all_five_uses_required' };
+    if (!PAI || !gPredio.children.length || !gPai.children.length || !gPlantas.children.length)
+      return { ok: false, reason: 'landscape_geometry_unavailable' };
+    historiaPaisajeVisible = true;
+    actualizaConstruidosHistoria();
+    return { ok: true, visible: true, sourceGroups: ['predio', 'paisaje', 'plantas'] };
+  }
+  function viviendaBimHistoria(categorias) {
+    if (!BIM || !gBIM.vivienda) return;
+    gBIM.vivienda.forEach(g => {
+      const categoria = g.name.match(/^revit-vivienda-([^-]+)-/);
+      g.visible = !categorias || !!(categoria && categorias.has(categoria[1]));
+    });
+    pide();
+  }
+  function historiaDetalleVivienda(si) {
+    if (!historiaActiva3D || !historiaViviendaConstruida)
+      return { ok: false, reason: 'housing_not_built' };
+    historiaViviendaDetalle = !!si;
+    // Se conservan las dos luces de Historia para iluminar el BIM aislado.
+    historiaPlanoFondo.visible = !si;
+    historiaProgramas.visible = !si;
+    if (!si) {
+      actualizaConstruidosHistoria();
+      viviendaBimHistoria(null);
+    }
+    pide();
+    return { ok: true, isolated: !!si };
+  }
+  function historiaViviendaEstado() {
+    return { phase: historiaViviendaFase, building: historiaViviendaConstruyendo,
+      built: historiaViviendaConstruida, isolated: historiaViviendaDetalle };
+  }
+  function historiaComercioEstado() {
+    return { phase: historiaComercioFase, building: historiaComercioConstruyendo,
+      built: historiaComercioConstruido };
+  }
+  function historiaIndustriaEstado() {
+    return { phase: historiaIndustriaFase, building: historiaIndustriaConstruyendo,
+      built: historiaIndustriaConstruida };
+  }
+  function historiaCulturaEstado() {
+    return { phase: historiaCulturaFase, building: historiaCulturaConstruyendo,
+      built: historiaCulturaConstruida };
+  }
+  function historiaAroEstado() {
+    return { phase: historiaAroFase, building: historiaAroConstruyendo,
+      built: historiaAroConstruido };
+  }
+  function historiaConstruyeAro(listo) {
+    if (!historiaActiva3D || historiaProgramaFase !== 'full_scale' || historiaUsoSeleccionado !== 'aro')
+      return { ok: false, reason: 'ring_selection_required' };
+    if (historiaAroConstruido) return { ok: true, alreadyBuilt: true, use: 'aro' };
+    if (historiaAroConstruyendo) return { ok: true, pending: true, alreadyInProgress: true };
+    const caja = historiaColocados.children.find(o => o.name === 'lod100-aro');
+    const aro = piezas.find(p => p.ap === 'aro' && p.g.name === 'aro')?.g;
+    const cinta = piezas.find(p => p.ap === 'aro' && p.g.name === 'cinta')?.g;
+    const losas = (gBIM?.cultura || []).filter(g => g.name.startsWith('revit-cultura-floors-') && g.name.endsWith('-aro'));
+    const muros = (gBIM?.cultura || []).filter(g => g.name.startsWith('revit-cultura-walls-') && g.name.endsWith('-aro'));
+    const tablero = aro?.children.find(o => o.isMesh && !o.isInstancedMesh);
+    if (!caja || !aro || !tablero || !losas.length || !muros.length)
+      return { ok: false, reason: 'ring_geometry_unavailable' };
+    const temporal = new THREE.Group(); temporal.name = 'aro-transicion-temporal';
+    historiaPlanoFondo.add(temporal);
+    const tableroTemporal = new THREE.Mesh(tablero.geometry,
+      new THREE.MeshLambertMaterial({ color: PROGRAMA.aro, side: THREE.DoubleSide,
+        transparent: true, opacity: 0, depthWrite: false }));
+    temporal.add(tableroTemporal);
+    const materialesCaja = caja.userData.solidos.filter(o => o.isMesh).map(o => o.material);
+    const cajasSolidas = caja.userData.solidos.filter(o => o.isMesh).map(o => {
+      o.geometry.computeBoundingBox();
+      return { malla: o, y: o.position.y, centro: o.geometry.boundingBox.getCenter(new THREE.Vector3()).y };
+    });
+    const escalaLosas = losas.map(g => [g, g.scale.y]);
+    limpiaFocoHistoria(); historiaUsoSeleccionado = 'aro';
+    historiaAroConstruyendo = true; historiaAroFase = 'flatten_to_real';
+    const token = ++historiaAroToken, inicio = performance.now(), duracion = 15000;
+    aro.visible = false; if (cinta) cinta.visible = false;
+    losas.concat(muros).forEach(g => { g.visible = false; });
+    const limpiar = () => {
+      escalaLosas.forEach(([g, y]) => { g.scale.y = y; });
+      tableroTemporal.material.dispose(); temporal.removeFromParent();
+    };
+    historiaAroRestaurar = limpiar;
+    const suave = t => { const x = Math.max(0, Math.min(1, t)); return x * x * (3 - 2 * x); };
+    function cuadro(ahora) {
+      if (token !== historiaAroToken || !historiaActiva3D) return;
+      const ms = Math.min(duracion, ahora - inicio);
+      historiaAroFase = ms < 4000 ? 'flatten_to_real' : ms < 7500 ? 'platform' :
+        ms < 11000 ? 'railings' : 'existing_connections';
+      const aplana = suave(ms / 4000);
+      cajasSolidas.forEach(({ malla, y, centro }) => {
+        malla.scale.y = 1 - 0.8 * aplana;
+        malla.position.y = y + centro * (1 - malla.scale.y);
+      });
+      materialesCaja.forEach(m => {
+        if (!m.transparent) { m.transparent = true; m.needsUpdate = true; }
+        m.depthWrite = false; m.opacity = 1 - aplana;
+      });
+      tableroTemporal.material.opacity = aplana;
+      if (ms >= 4000) {
+        caja.visible = false;
+        losas.forEach(g => { g.visible = true; g.scale.y = Math.max(0.001, suave((ms - 4000) / 3500)); });
+      }
+      if (ms >= 7500) {
+        tableroTemporal.visible = false;
+        aro.visible = true;
+        // El tablero es la plataforma; el trazo extra y las columnas contienen
+        // los pasamanos, balaustres y soportes ya modelados del Aro.
+        aro.children.forEach((g, i) => { g.visible = i === 0 || (ms >= 8500 && i === 1) || (ms >= 9500 && i >= 2); });
+      }
+      if (ms >= 11000) {
+        muros.forEach(g => { g.visible = true; });
+        if (cinta) cinta.visible = true;
+      }
+      pide();
+      if (ms < duracion) requestAnimationFrame(cuadro);
+      else {
+        limpiar(); historiaAroRestaurar = null;
+        caja.visible = false; aro.children.forEach(g => { g.visible = true; });
+        historiaAroConstruyendo = false; historiaAroConstruido = true;
+        historiaAroFase = 'built'; actualizaConstruidosHistoria();
+        if (listo) listo({ use: 'aro', built: true, existingConnections: !!cinta });
+      }
+    }
+    requestAnimationFrame(cuadro);
+    return { ok: true, pending: true, use: 'aro', durationMs: duracion,
+      existingConnections: !!cinta };
+  }
+  function historiaConstruyeCultura(listo) {
+    if (!historiaActiva3D || historiaProgramaFase !== 'full_scale' || historiaUsoSeleccionado !== 'cultura')
+      return { ok: false, reason: 'culture_selection_required' };
+    if (historiaCulturaConstruida) return { ok: true, alreadyBuilt: true, use: 'cultura' };
+    if (historiaCulturaConstruyendo) return { ok: true, pending: true, alreadyInProgress: true };
+    const grupo = historiaColocados.children.find(o => o.name === 'lod100-cultura');
+    const reales = culturaRealesHistoria();
+    const porCategoria = cat => reales.filter(g => g.name.startsWith('revit-cultura-' + cat + '-'));
+    const losas = porCategoria('floors'), escaleras = porCategoria('stairsRuns').concat(porCategoria('stairsLandings'));
+    const columnas = porCategoria('columns'), muros = porCategoria('walls');
+    const cdGrupo = piezas.find(p => p.g.name === 'cultura-detalle')?.g;
+    const modulosFuente = cdGrupo?.children.filter(g => ['cultura-modulos', 'cultura-nucleo'].includes(g.name)) || [];
+    if (!grupo || !CD || !CD.losa1?.length || !losas.length || !escaleras.length || !columnas.length || !muros.length || !modulosFuente.length)
+      return { ok: false, reason: 'culture_geometry_unavailable' };
+    const temporal = new THREE.Group(), niveles = [], recursos = [];
+    temporal.name = 'cultura-losasyhuella-temporales'; historiaPlanoFondo.add(temporal);
+    const curva = CD.losa1.map(q => new THREE.Vector3(...W(q[0], q[1], 0.12)));
+    const contorno = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(curva),
+      new THREE.LineDashedMaterial({ color: PROGRAMA.cultura, dashSize: 1.4, gapSize: 0.9,
+        transparent: true, opacity: 0, depthTest: false }));
+    contorno.computeLineDistances(); temporal.add(contorno);
+    const rangos = [[-Infinity, 3.32], [3.32, 6.32], [6.32, Infinity]];
+    rangos.forEach(([z0, z1], i) => {
+      const nivel = new THREE.Group(); nivel.name = 'cultura-losa-nivel-' + i;
+      losas.forEach(origen => {
+        const copia = origen.clone(true);
+        copia.traverse(o => {
+          o.visible = !o.isLine;
+          if (!o.isMesh) return;
+          const originalGeo = o.geometry;
+          const geo = originalGeo.index ? originalGeo.toNonIndexed() : originalGeo;
+          const at = geo.getAttribute('position'), puntos = [];
+          for (let k = 0; k + 2 < at.count; k += 3) {
+            const z = (at.getY(k) + at.getY(k + 1) + at.getY(k + 2)) / 3;
+            if (z >= z0 && z < z1) for (let j = 0; j < 3; j++) puntos.push(at.getX(k + j), at.getY(k + j), at.getZ(k + j));
+          }
+          const recorte = new THREE.BufferGeometry();
+          recorte.setAttribute('position', new THREE.Float32BufferAttribute(puntos, 3));
+          recorte.computeVertexNormals();
+          o.geometry = recorte;
+          o.material = new THREE.MeshLambertMaterial({ color: PROGRAMA.cultura,
+            side: THREE.DoubleSide, transparent: true, opacity: 0, depthWrite: false });
+          o.visible = puntos.length > 0;
+          recursos.push([recorte, o.material]);
+          if (geo !== originalGeo) geo.dispose();
+        });
+        nivel.add(copia);
+      });
+      temporal.add(nivel); niveles.push(nivel);
+    });
+    const modulos = modulosFuente.map(g => {
+      const copia = g.clone(true); copia.traverse(o => { o.visible = true; });
+      historiaCulturaExtras.add(copia); copia.visible = false; return copia;
+    });
+    const origenModulos = new Map(modulos.map(g => [g, g.position.y]));
+    limpiaFocoHistoria(); historiaUsoSeleccionado = 'cultura';
+    historiaCulturaConstruyendo = true; historiaCulturaFase = 'curved_footprint';
+    const token = ++historiaCulturaToken, inicio = performance.now(), duracion = 29000;
+    const cajaMateriales = grupo.userData.solidos.filter(o => o.isMesh).map(o => o.material);
+    reales.forEach(g => { g.visible = false; });
+    const limpiaTemporal = () => {
+      recursos.forEach(([geo, mat]) => { geo.dispose(); mat.dispose(); });
+      contorno.geometry.dispose(); contorno.material.dispose(); temporal.removeFromParent();
+      origenModulos.forEach((y, g) => { g.position.y = y; });
+    };
+    historiaCulturaRestaurar = () => {
+      limpiaTemporal();
+      modulos.forEach(g => g.removeFromParent());
+    };
+    const suave = t => { const x = Math.max(0, Math.min(1, t)); return x * x * (3 - 2 * x); };
+    function cuadro(ahora) {
+      if (token !== historiaCulturaToken || !historiaActiva3D) return;
+      const ms = Math.min(duracion, ahora - inicio);
+      if (ms < 6500) historiaCulturaFase = 'curved_footprint';
+      else if (ms < 15000) historiaCulturaFase = 'slabs_and_voids';
+      else if (ms < 21500) historiaCulturaFase = 'stairs_and_modules';
+      else historiaCulturaFase = 'structure_enclosure_glass';
+      const huella = suave(ms / 6500);
+      cajaMateriales.forEach(m => {
+        if (!m.transparent) { m.transparent = true; m.needsUpdate = true; }
+        m.depthWrite = false; m.opacity = 1 - huella;
+      });
+      grupo.visible = ms < 6500;
+      contorno.material.opacity = huella * (1 - suave((ms - 6500) / 8500));
+      niveles.forEach((nivel, i) => {
+        const t = suave((ms - 6500 - i * 2700) / 3000);
+        nivel.visible = ms >= 6500 + i * 2700 && ms < 21500;
+        nivel.scale.y = Math.max(0.001, t);
+        nivel.traverse(o => { if (o.isMesh) o.material.opacity = t; });
+      });
+      if (ms >= 15000) {
+        escaleras.forEach(g => { g.visible = true; });
+        modulos.forEach((g, i) => {
+          const t = suave((ms - 15000 - i * 700) / 4500);
+          g.visible = t > 0; g.position.y = origenModulos.get(g) + 7 * (1 - t);
+        });
+      }
+      if (ms >= 21500) {
+        losas.forEach(g => { g.visible = true; });
+        columnas.forEach(g => { g.visible = ms >= 21500; });
+        muros.forEach(g => { g.visible = ms >= 23000; });
+        porCategoria('roofs').forEach(g => { g.visible = ms >= 24000; });
+        porCategoria('doors').forEach(g => { g.visible = ms >= 25000; });
+        porCategoria('curtainPanels').forEach(g => { g.visible = ms >= 26000; });
+        porCategoria('curtainMullions').concat(porCategoria('railings'), porCategoria('topRails'))
+          .forEach(g => { g.visible = ms >= 27500; });
+      }
+      pide();
+      if (ms < duracion) requestAnimationFrame(cuadro);
+      else {
+        limpiaTemporal(); historiaCulturaRestaurar = null;
+        grupo.visible = false; reales.forEach(g => { g.visible = true; });
+        modulos.forEach(g => { g.visible = true; });
+        historiaCulturaConstruyendo = false; historiaCulturaConstruida = true;
+        historiaCulturaFase = 'built'; actualizaConstruidosHistoria();
+        if (listo) listo({ use: 'cultura', built: true, aroIndependent: true });
+      }
+    }
+    requestAnimationFrame(cuadro);
+    return { ok: true, pending: true, use: 'cultura', durationMs: duracion,
+      aroIndependent: true, floorLevels: niveles.length };
+  }
+  function historiaConstruyeIndustria(listo) {
+    if (!historiaActiva3D || historiaProgramaFase !== 'full_scale' || historiaUsoSeleccionado !== 'industria')
+      return { ok: false, reason: 'industry_selection_required' };
+    if (historiaIndustriaConstruida) return { ok: true, alreadyBuilt: true, use: 'industria' };
+    if (historiaIndustriaConstruyendo) return { ok: true, pending: true, alreadyInProgress: true };
+    const grupo = historiaColocados.children.find(o => o.name === 'lod100-industria');
+    const fuente = gBIM?.industria || [];
+    const porCategoria = categoria => fuente.filter(g => g.name.startsWith('revit-industria-' + categoria + '-'));
+    const muros = porCategoria('walls'), losas = porCategoria('floors');
+    const chacuacos = porCategoria('chacuacos'), chimeneas = porCategoria('chimeneas');
+    const puertas = porCategoria('doors'), ventanas = porCategoria('windows'), paneles = porCategoria('curtainPanels');
+    if (!grupo || !BIM || !muros.length || !losas.length || !chacuacos.length || !puertas.length || !ventanas.length)
+      return { ok: false, reason: 'industry_geometry_unavailable' };
+    const silueta = new THREE.Group();
+    silueta.name = 'industria-silueta-desde-bim';
+    const cascaron = [], losaSimple = [];
+    muros.concat(losas).forEach(origen => {
+      const copia = origen.clone(true), destino = muros.includes(origen) ? cascaron : losaSimple;
+      copia.traverse(objeto => {
+        objeto.visible = !objeto.isLine;
+        if (objeto.isMesh) {
+          objeto.material = new THREE.MeshLambertMaterial({ color: PROGRAMA.industria,
+            side: THREE.DoubleSide, transparent: true, opacity: 0, depthWrite: false });
+          destino.push(objeto.material);
+        }
+      });
+      silueta.add(copia);
+    });
+    if (!cascaron.length || !losaSimple.length) {
+      silueta.traverse(o => { if (o.isMesh) o.material.dispose(); });
+      return { ok: false, reason: 'industry_silhouette_unavailable' };
+    }
+    historiaPlanoFondo.add(silueta);
+    limpiaFocoHistoria(); historiaUsoSeleccionado = 'industria';
+    historiaIndustriaConstruyendo = true; historiaIndustriaFase = 'real_footprint';
+    const token = ++historiaIndustriaToken, inicio = performance.now(), duracion = 28000;
+    const cajaMateriales = grupo.userData.solidos.filter(o => o.isMesh).map(o => o.material);
+    const origenes = new Map(chacuacos.concat(chimeneas).map(g => [g, g.position.y]));
+    fuente.forEach(g => { g.visible = false; });
+    historiaIndustriaRestaurar = () => {
+      losas.forEach(g => { g.scale.y = 1; });
+      origenes.forEach((y, g) => { g.position.y = y; });
+      silueta.traverse(o => { if (o.isMesh) o.material.dispose(); });
+      silueta.removeFromParent();
+    };
+    const suave = t => { const x = Math.max(0, Math.min(1, t)); return x * x * (3 - 2 * x); };
+    function cuadro(ahora) {
+      if (token !== historiaIndustriaToken || !historiaActiva3D) return;
+      const ms = Math.min(duracion, ahora - inicio);
+      if (ms < 7000) historiaIndustriaFase = 'real_footprint';
+      else if (ms < 13000) historiaIndustriaFase = 'levels';
+      else if (ms < 21000) historiaIndustriaFase = 'chacuacos';
+      else historiaIndustriaFase = 'doors_windows_details';
+      const cambio = suave(ms / 7000);
+      cajaMateriales.forEach(m => {
+        if (!m.transparent) { m.transparent = true; m.needsUpdate = true; }
+        m.depthWrite = false;
+        m.opacity = 1 - cambio;
+      });
+      grupo.visible = ms < 7000;
+      cascaron.concat(losaSimple).forEach(m => { m.opacity = cambio; });
+      if (ms >= 7000) {
+        const niveles = suave((ms - 7000) / 6000);
+        losas.forEach(g => { g.visible = true; g.scale.y = Math.max(0.001, niveles); });
+        losaSimple.forEach(m => { m.opacity = 1 - niveles; });
+      }
+      if (ms >= 13000) {
+        chacuacos.concat(chimeneas).forEach((g, i) => {
+          const entrada = suave((ms - 13000 - i * 100) / 4800);
+          g.visible = entrada > 0;
+          g.position.y = origenes.get(g) - (2.5 + i * 0.03) * (1 - entrada);
+        });
+      }
+      if (ms >= 21000) {
+        const detalle = suave((ms - 21000) / 7000);
+        muros.forEach(g => { g.visible = true; });
+        cascaron.forEach(m => { m.opacity = 1 - detalle; });
+        puertas.forEach(g => { g.visible = ms >= 22500; });
+        ventanas.forEach(g => { g.visible = ms >= 24000; });
+        paneles.forEach(g => { g.visible = ms >= 25500; });
+      }
+      pide();
+      if (ms < duracion) requestAnimationFrame(cuadro);
+      else {
+        historiaIndustriaRestaurar(); historiaIndustriaRestaurar = null;
+        grupo.visible = false;
+        fuente.forEach(g => { g.visible = true; });
+        historiaIndustriaConstruyendo = false;
+        historiaIndustriaConstruida = true;
+        historiaIndustriaFase = 'built';
+        actualizaConstruidosHistoria();
+        if (listo) listo({ use: 'industria', built: true, chacuacos: chacuacos.length });
+      }
+    }
+    requestAnimationFrame(cuadro);
+    return { ok: true, pending: true, use: 'industria', durationMs: duracion,
+      chacuacos: chacuacos.length, roofSource: 'floors_and_walls' };
+  }
+  function historiaConstruyeComercio(listo) {
+    if (!historiaActiva3D || historiaProgramaFase !== 'full_scale' || historiaUsoSeleccionado !== 'comercio')
+      return { ok: false, reason: 'commerce_selection_required' };
+    if (historiaComercioConstruido) return { ok: true, alreadyBuilt: true, use: 'comercio' };
+    if (historiaComercioConstruyendo) return { ok: true, pending: true, alreadyInProgress: true };
+    const grupo = historiaColocados.children.find(o => o.name === 'lod100-comercio');
+    const reales = comercioRealesHistoria();
+    const categorias = new Map((gBIM?.comercio || []).map(g =>
+      [g, (g.name.match(/^revit-comercio-([^-]+)-/) || [])[1]]));
+    const modulos = reales.filter(g => /^mercado-locales$|^modcomercio\d+$/.test(g.name));
+    if (!grupo || !BIM || !categorias.size || !modulos.length ||
+        !['walls', 'floors', 'roofs', 'curtainPanels'].every(c => [...categorias.values()].includes(c)))
+      return { ok: false, reason: 'commerce_geometry_unavailable' };
+    limpiaFocoHistoria(); historiaUsoSeleccionado = 'comercio';
+    historiaComercioConstruyendo = true; historiaComercioFase = 'retained_naves_blue';
+    const token = ++historiaComercioToken, inicio = performance.now(), duracion = 28000;
+    const azul = new THREE.Color(PROGRAMA.comercio), blanco = new THREE.Color(0xffffff);
+    const cajaMats = grupo.userData.solidos.filter(o => o.isMesh).map(o => o.material);
+    const origenModulos = new Map(modulos.map(g => [g, g.position.y]));
+    const cubiertas = [...categorias].filter(([, c]) => c === 'roofs').map(([g]) => g);
+    const losas = [...categorias].filter(([, c]) => c === 'floors').map(([g]) => g);
+    historiaComercioRestaurar = () => {
+      losas.concat(cubiertas).forEach(g => { g.scale.y = 1; });
+      modulos.forEach(g => { g.position.y = origenModulos.get(g); });
+    };
+    const suave = t => { const x = Math.max(0, Math.min(1, t)); return x * x * (3 - 2 * x); };
+    reales.forEach(g => { g.visible = false; });
+    function cuadro(ahora) {
+      if (token !== historiaComercioToken || !historiaActiva3D) return;
+      const ms = Math.min(duracion, ahora - inicio);
+      const color = suave(ms / 5500);
+      partesConservadas.forEach(parte => {
+        parte.materiales.solido.color.copy(blanco).lerp(azul, color);
+        parte.materiales.contorno.color.copy(blanco).lerp(azul, color);
+        const desvanecer = suave((ms - 5500) / 6000);
+        [parte.materiales.solido, parte.materiales.contorno].forEach(m => {
+          const transparente = desvanecer > 0;
+          if (m.transparent !== transparente) { m.transparent = transparente; m.needsUpdate = true; }
+          m.opacity = 1 - desvanecer;
+        });
+        parte.grupo.visible = ms < 11500;
+      });
+      cajaMats.forEach(m => {
+        if (!m.transparent) { m.transparent = true; m.needsUpdate = true; }
+        m.opacity = 1 - 0.84 * color;
+      });
+      grupo.visible = ms < 11500;
+      if (ms < 5500) historiaComercioFase = 'retained_naves_blue';
+      else if (ms < 11500) historiaComercioFase = 'openings';
+      else if (ms < 17000) historiaComercioFase = 'second_floor';
+      else if (ms < 23000) historiaComercioFase = 'modules_drop';
+      else historiaComercioFase = 'formed_roof';
+      if (ms >= 5500) {
+        categorias.forEach((c, g) => {
+          if (['walls', 'doors', 'curtainPanels', 'curtainMullions'].includes(c)) g.visible = true;
+        });
+      }
+      if (ms >= 11500) {
+        const crecimiento = Math.max(0.001, suave((ms - 11500) / 5500));
+        losas.forEach(g => { g.visible = true; g.scale.y = crecimiento; });
+      }
+      if (ms >= 17000) {
+        const caida = 1 - suave((ms - 17000) / 6000);
+        modulos.forEach((g, i) => {
+          const t = suave((ms - 17000 - i * 250) / 4750);
+          g.visible = true;
+          g.position.y = origenModulos.get(g) + 12 * (1 - t) * caida;
+        });
+      }
+      if (ms >= 23000) {
+        const formar = Math.max(0.001, suave((ms - 23000) / 5000));
+        cubiertas.forEach(g => { g.visible = true; g.scale.y = formar; });
+        reales.forEach(g => { if (!categorias.has(g) && !modulos.includes(g)) g.visible = true; });
+      }
+      pide();
+      if (ms < duracion) requestAnimationFrame(cuadro);
+      else {
+        grupo.visible = false;
+        partesConservadas.forEach(parte => { parte.grupo.visible = false; });
+        historiaComercioRestaurar(); historiaComercioRestaurar = null;
+        reales.forEach(g => { g.visible = true; });
+        historiaComercioConstruyendo = false;
+        historiaComercioConstruido = true;
+        historiaComercioFase = 'built';
+        actualizaConstruidosHistoria();
+        if (listo) listo({ use: 'comercio', built: true });
+      }
+    }
+    requestAnimationFrame(cuadro);
+    return { ok: true, pending: true, use: 'comercio', durationMs: duracion };
+  }
+  function historiaConstruyeVivienda(listo) {
+    if (!historiaActiva3D || historiaProgramaFase !== 'full_scale' || historiaUsoSeleccionado !== 'vivienda')
+      return { ok: false, reason: 'housing_selection_required' };
+    if (historiaViviendaConstruida) return { ok: true, alreadyBuilt: true, use: 'vivienda' };
+    if (historiaViviendaConstruyendo) return { ok: true, pending: true, alreadyInProgress: true };
+    const grupo = historiaColocados.children.find(o => o.name === 'lod100-vivienda');
+    if (!grupo || !BIM || !gBIM.vivienda?.length) return { ok: false, reason: 'housing_geometry_unavailable' };
+    limpiaFocoHistoria();
+    historiaUsoSeleccionado = 'vivienda';
+    historiaViviendaConstruyendo = true;
+    historiaViviendaFase = 'rotate';
+    viviendaBimHistoria(new Set());
+    const token = ++historiaViviendaToken, inicio = performance.now(), duracion = 30000;
+    const partes = grupo.userData.rotaciones.map(r => r.parte);
+    const origenes = grupo.userData.rotaciones.map(r => r.neutral);
+    let copiasPreparadas = false, categoriaVisible = 'none';
+    const suave = t => { const x = Math.max(0, Math.min(1, t)); return x * x * (3 - 2 * x); };
+    function cuadro(ahora) {
+      if (token !== historiaViviendaToken || !historiaActiva3D) return;
+      const ms = Math.min(duracion, ahora - inicio);
+      const giro = suave(ms / 4500);
+      partes.forEach((parte, i) => { parte.rotation.y = origenes[i] * (1 - giro); });
+      if (ms >= 4500 && !copiasPreparadas) {
+        copiasPreparadas = true;
+        partes.forEach((parte, i) => {
+          const malla = parte.children.find(o => o.isMesh);
+          if (!malla) return;
+          malla.geometry.computeBoundingBox();
+          const caja = malla.geometry.boundingBox, largoX = caja.max.x - caja.min.x, largoZ = caja.max.z - caja.min.z;
+          const ejeLargo = largoX > largoZ ? 'x' : 'z', ejeCorto = ejeLargo === 'x' ? 'z' : 'x';
+          [-1, 1].forEach(signo => {
+            const copia = parte.clone(true);
+            copia.userData = { origen: parte, signo, ejeLargo, ejeCorto, longitud: Math.max(largoX, largoZ), base: parte.position.clone(), rotacion: parte.rotation.y, lado: i ? 1 : -1 };
+            grupo.add(copia); historiaViviendaCopias.push(copia);
+          });
+          parte.visible = false;
+        });
+      }
+      if (copiasPreparadas) {
+        const corte = suave((ms - 4500) / 4000), pasillo = suave((ms - 8500) / 4000);
+        const contrae = suave((ms - 12500) / 6500);
+        historiaViviendaCopias.forEach(copia => {
+          const d = copia.userData;
+          copia.position.copy(d.base);
+          const desplazamiento = new THREE.Vector3();
+          desplazamiento[d.ejeLargo] = d.signo * d.longitud * 0.25 * corte;
+          desplazamiento[d.ejeCorto] = d.lado * 1.5 * pasillo;
+          desplazamiento.applyAxisAngle(new THREE.Vector3(0, 1, 0), d.rotacion);
+          copia.position.add(desplazamiento);
+          copia.scale[d.ejeLargo] = 1 - 0.51 * corte;
+          copia.scale[d.ejeCorto] = 1 - 0.82 * contrae;
+          copia.scale.y = 1 - 0.98 * contrae;
+          copia.visible = ms < 19000;
+        });
+      }
+      if (ms < 4500) historiaViviendaFase = 'rotate';
+      else if (ms < 8500) historiaViviendaFase = 'split';
+      else if (ms < 12500) historiaViviendaFase = 'corridors';
+      else if (ms < 19000) historiaViviendaFase = 'contract_to_bim';
+      else if (ms < 24500) historiaViviendaFase = 'floors';
+      else historiaViviendaFase = 'facade_and_cores';
+      const etapaVisible = ms < 16500 ? 'none' : ms < 19000 ? 'shell' : ms < 24500 ? 'floors' : 'complete';
+      if (etapaVisible !== categoriaVisible) {
+        categoriaVisible = etapaVisible;
+        if (etapaVisible === 'shell') viviendaBimHistoria(new Set(['walls', 'columns', 'roofs']));
+        else if (etapaVisible === 'floors') viviendaBimHistoria(new Set(['walls', 'columns', 'roofs', 'floors']));
+        else if (etapaVisible === 'complete') viviendaBimHistoria(null);
+      }
+      pide();
+      if (ms < duracion) requestAnimationFrame(cuadro);
+      else {
+        grupo.visible = false;
+        historiaViviendaCopias.forEach(copia => grupo.remove(copia));
+        historiaViviendaCopias = [];
+        viviendaBimHistoria(null);
+        historiaViviendaConstruyendo = false;
+        historiaViviendaConstruida = true;
+        historiaViviendaFase = 'built';
+        if (listo) listo({ use: 'vivienda', built: true });
+        pide();
+      }
+    }
+    requestAnimationFrame(cuadro);
+    return { ok: true, pending: true, use: 'vivienda', durationMs: duracion };
+  }
+  const historiaFocosOriginales = new Map();
+  function limpiaFocoHistoria() {
+    historiaFocosOriginales.forEach((original, material) => {
+      material.emissive.copy(original.emissive);
+      material.emissiveIntensity = original.intensity;
+    });
+    historiaFocosOriginales.clear();
+    historiaUsoSeleccionado = null;
+    pide();
+  }
+  function historiaSeleccionaUso(uso) {
+    if (!historiaActiva3D || historiaProgramaFase !== 'full_scale')
+      return { ok: false, reason: 'story_full_scale_required' };
+    if (!historiaProgramaOrden.includes(uso)) return { ok: false, reason: 'unknown_use' };
+    if (historiaUsoSeleccionado === uso)
+      return { ok: true, use: uso, selectedUse: uso, buildStatus: 'pending_design', alreadySelected: true };
+    limpiaFocoHistoria();
+    const grupo = historiaColocados.children.find(o => o.name === 'lod100-' + uso);
+    if (!grupo) return { ok: false, reason: 'program_volume_missing', use: uso };
+    grupo.traverse(o => {
+      const m = o.material;
+      if (!o.isMesh || !m || !m.emissive) return;
+      historiaFocosOriginales.set(m, { emissive: m.emissive.clone(), intensity: m.emissiveIntensity });
+      m.emissive.set(0xffffff);
+      m.emissiveIntensity = 0.24;
+    });
+    historiaUsoSeleccionado = uso;
+    pide();
+    return { ok: true, use: uso, selectedUse: uso, buildStatus: 'pending_design' };
+  }
+  function historiaVistaGeneral() {
+    if (!historiaActiva3D || historiaProgramaFase !== 'full_scale')
+      return { ok: false, reason: 'story_full_scale_required' };
+    const anterior = historiaUsoSeleccionado;
+    limpiaFocoHistoria();
+    const construido = { vivienda: historiaViviendaConstruida, comercio: historiaComercioConstruido,
+      industria: historiaIndustriaConstruida, cultura: historiaCulturaConstruida, aro: historiaAroConstruido };
+    historiaColocados.children.forEach(g => {
+      const uso = g.name.replace(/^lod100-/, '');
+      if (Object.hasOwn(construido, uso)) g.visible = !construido[uso];
+    });
+    actualizaConstruidosHistoria();
+    return { ok: true, selectedUse: null, previousUse: anterior, alreadyOverview: anterior === null };
+  }
+  function mallaPrograma(grupo, malla, uso, pol, z0, raiz, pivote) {
+    const geometria = malla.isBufferGeometry ? malla : malla.geo(), color = new THREE.Color(PROGRAMA[uso]);
+    if (pivote) geometria.translate(-pivote.x, 0, -pivote.z);
+    const solido = new THREE.Mesh(geometria, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
+    solido.visible = false; grupo.add(solido); raiz.userData.solidos.push(solido);
+    // El Aro tiene superficie curva continua; sus facetas no se remarcan
+    // como malla. El contorno punteado del cue se genera aparte.
+    if (uso !== 'aro') {
+      const bordes = new THREE.LineSegments(new THREE.EdgesGeometry(geometria, 18),
+        new THREE.LineBasicMaterial({ color: color.clone().lerp(new THREE.Color(0xffffff), 0.28) }));
+      bordes.visible = false; grupo.add(bordes); raiz.userData.solidos.push(bordes);
+    }
+    const riLOD = ANILLO.re - (ANILLO.re - ANILLO.ri) * 1.25;
+    const huellas = uso === 'aro' ? [circ([ANILLO.u, ANILLO.v], riLOD, 96), circ([ANILLO.u, ANILLO.v], ANILLO.re, 96)] : [pol];
+    huellas.forEach(huella => {
+      const puntos = huella.map(p => new THREE.Vector3(...W(p[0], p[1], z0 + 0.08)));
+      puntos.push(puntos[0].clone());
+      if (pivote) puntos.forEach(p => p.sub(new THREE.Vector3(pivote.x, 0, pivote.z)));
+      const trazo = new THREE.Line(new THREE.BufferGeometry().setFromPoints(puntos),
+        new THREE.LineDashedMaterial({ color, dashSize: 1.2, gapSize: 0.8, transparent: true, opacity: 0.75, depthTest: false }));
+      trazo.computeLineDistances(); grupo.add(trazo); raiz.userData.huellas.push(trazo);
+      const chispas = [];
+      for (let i = 0; i < puntos.length - 1; i++) {
+        const a = puntos[i], b = puntos[i + 1], n = Math.max(1, Math.ceil(a.distanceTo(b) / 3));
+        for (let j = 0; j < n; j++) chispas.push(...a.clone().lerp(b, j / n).toArray());
+      }
+      const halo = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(chispas, 3)),
+        new THREE.PointsMaterial({ color, size: 2.5, sizeAttenuation: false, transparent: true, opacity: 0.34,
+          depthTest: false, depthWrite: false }));
+      halo.visible = false; grupo.add(halo); raiz.userData.halos.push(halo);
+    });
+    raiz.userData.piezas++;
+  }
+  function volumenesPrograma(uso) {
+    const grupo = new THREE.Group(); grupo.name = 'lod100-' + uso;
+    grupo.userData = { solidos: [], huellas: [], halos: [], rotaciones: [], piezas: 0 };
+    const agrega = (pol, z0, z1, enderezar) => {
+      if (!pol || pol.length < 3 || z1 <= z0) return;
+      const m = new Malla(); prisma(m, pol, z0, z1);
+      let parte = grupo, pivote = null;
+      if (enderezar) {
+        const u = pol.reduce((s, p) => s + p[0], 0) / pol.length, v = pol.reduce((s, p) => s + p[1], 0) / pol.length;
+        pivote = new THREE.Vector3(...W(u, v, 0));
+        parte = new THREE.Group(); parte.position.set(pivote.x, 0, pivote.z); grupo.add(parte);
+        const a = W(pol[0][0], pol[0][1], 0), b = W(pol[1][0], pol[1][1], 0);
+        // La franja larga queda sobre el eje norte–sur del mundo (Z), tanto
+        // al nacer como después de la pinza. El giro BIM vendrá en Etapa 3.
+        const neutral = Math.atan2(b[2] - a[2], b[0] - a[0]) + Math.PI / 2;
+        parte.rotation.y = neutral; grupo.userData.rotaciones.push({ parte, neutral });
+      }
+      mallaPrograma(parte, m, uso, pol, z0, grupo, pivote);
+    };
+    if (uso === 'comercio') {
+      // Una sola huella escalonada LOD100: 3 crujías al sur, 2 al norte.
+      const sur = G.NAVES[0], norte = G.NAVES[1], conector = Math.max(sur.u0, norte.u0) + 17;
+      agrega([[sur.u0, sur.v0], [sur.u1, sur.v0], [sur.u1, norte.v1],
+        [norte.u0, norte.v1], [norte.u0, norte.v0], [conector, norte.v0],
+        [conector, sur.v1], [sur.u0, sur.v1]], 0, Math.max(sur.cumbre, norte.cumbre));
+    } else if (uso === 'cultura') {
+      // Caja envolvente del edificio, sin curvas ni recortes de la losa.
+      const puntos = CD && CD.losa1 ? CD.losa1 : CULTURA.pabellones.flatMap(par => [G.aroPunto(par[0], CULTURA.r1), G.aroPunto(par[1], CULTURA.r1)]);
+      agrega(rect(Math.min(...puntos.map(p => p[0])), Math.min(...puntos.map(p => p[1])),
+        Math.max(...puntos.map(p => p[0])), Math.max(...puntos.map(p => p[1]))), 0, ANILLO.z - ANILLO.canto);
+    } else if (uso === 'industria') {
+      if (MOD && MOD.industria) {
+        const puntos = G.pares(MOD.industria.planta);
+        agrega(rect(Math.min(...puntos.map(p => p[0])), Math.min(...puntos.map(p => p[1])),
+          Math.max(...puntos.map(p => p[0])), Math.max(...puntos.map(p => p[1]))),
+          0, BIM ? BIM.bounds.industria[1][2] : MOD.industria.z1);
+      }
+    } else if (uso === 'vivienda') {
+      // Las dos franjas ya calculadas por el diagrama del proyecto, no una
+      // única caja que tape el patio central. Altura mayor de cada franja.
+      ESQ.masas.slice(0, 2).forEach(masa => {
+        const pol = [0, 2, 4, 6].map(i => [masa.pts[i].x + CEN[0], CEN[1] - masa.pts[i].z]);
+        const z0 = masa.pts[0].y;
+        const z1 = Math.min(BIM ? BIM.viviendaMaxZ : Infinity,
+          Math.max(...[1, 3, 5, 7].map(i => masa.pts[i].y)));
+        agrega(pol, z0, z1, true);
+      });
+    } else if (uso === 'aro') {
+      // Toroide LOD100: misma huella exterior y centro que el Aro, pero una
+      // sección circular con volumen vertical legible y hueco abierto.
+      const riLOD = ANILLO.re - (ANILLO.re - ANILLO.ri) * 1.25;
+      const tubo = (ANILLO.re - riLOD) / 2, radio = ANILLO.re - tubo;
+      const geometria = new THREE.TorusGeometry(radio, tubo, 20, 128);
+      geometria.rotateX(-Math.PI / 2);
+      geometria.translate(...W(ANILLO.u, ANILLO.v, ANILLO.z));
+      mallaPrograma(grupo, geometria, uso, null, ANILLO.z - tubo, grupo, null);
+    }
+    return grupo;
+  }
+  function historiaCreaPrograma(listo) {
+    if (!historiaActiva3D || !historiaDescartado) return { ok: false, reason: 'site_not_cleared' };
+    if (historiaProgramaFase !== 'create' || historiaProgramaIndice >= historiaProgramaOrden.length)
+      return { ok: false, reason: 'program_create_not_available' };
+    const uso = historiaProgramaOrden[historiaProgramaIndice], grupo = volumenesPrograma(uso);
+    if (!grupo.children.length) return { ok: false, reason: 'program_geometry_unavailable', use: uso };
+    historiaProgramaActual = grupo; historiaProgramas.add(grupo);
+    historiaProgramaFase = 'creating';
+    const token = ++historiaProgramaToken, inicio = performance.now();
+    const z0 = uso === 'vivienda' ? MOD.z0 : uso === 'aro' ? ANILLO.z - (ANILLO.re - ANILLO.ri) * 1.25 / 2 : 0;
+    const CUE = 500, CRECIMIENTO = uso === 'vivienda' || uso === 'aro' ? 1413 : 1130;
+    const reduceFondo = !historiaFondoReducido;
+    historiaFondoReducido = true;
+    // La pieza provisional se desplaza HACIA la cámara, no al este del
+    // predio. Así el Aro y las cajas nacen delante de usos ya colocados.
+    const profundidad = Math.min(80, cam.position.distanceTo(base.c) * 0.45);
+    const delante = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(-profundidad);
+    grupo.userData.desplazamiento = delante;
+    grupo.position.copy(delante);
+    function cuadro(ahora) {
+      if (token !== historiaProgramaToken || !historiaActiva3D) return;
+      const transcurrido = ahora - inicio;
+      if (reduceFondo) ajustaFondo(Math.min(1, transcurrido / 400));
+      const t = Math.max(0, Math.min(1, (transcurrido - CUE) / CRECIMIENTO)), k = t * t * (3 - 2 * t);
+      const cue = transcurrido < CUE;
+      grupo.userData.huellas.forEach(linea => { linea.visible = cue; });
+      grupo.userData.solidos.forEach(objeto => { objeto.visible = !cue; });
+      grupo.userData.halos.forEach(puntos => { puntos.visible = !cue; });
+      grupo.scale.y = cue ? 1 : Math.max(0.001, k);
+      grupo.position.copy(delante);
+      grupo.position.y += z0 * (1 - grupo.scale.y);
+      pide();
+      if (transcurrido < CUE + CRECIMIENTO) requestAnimationFrame(cuadro);
+      else {
+        grupo.scale.y = 1; grupo.position.copy(delante);
+        historiaProgramaFase = 'place'; if (listo) listo({ use: uso, index: historiaProgramaIndice });
+      }
+    }
+    requestAnimationFrame(cuadro);
+    return { ok: true, pending: true, use: uso, index: historiaProgramaIndice, pieces: grupo.userData.piezas,
+      cueMs: CUE, growthMs: CRECIMIENTO };
+  }
+  function historiaColocaPrograma(listo) {
+    if (!historiaActiva3D || historiaProgramaFase !== 'place' || !historiaProgramaActual)
+      return { ok: false, reason: 'program_place_not_available' };
+    const grupo = historiaProgramaActual, uso = historiaProgramaOrden[historiaProgramaIndice];
+    historiaProgramaFase = 'placing';
+    const token = ++historiaProgramaToken, inicio = performance.now(), delante = grupo.userData.desplazamiento;
+    function cuadro(ahora) {
+      if (token !== historiaProgramaToken || !historiaActiva3D) return;
+      const t = Math.max(0, Math.min(1, (ahora - inicio) / 1000)), k = t * t * (3 - 2 * t);
+      grupo.position.copy(delante).multiplyScalar(1 - k);
+      grupo.scale.setScalar(1 - 0.25 * k);
+      grupo.userData.halos.forEach(puntos => { puntos.material.opacity = 0.34 * (1 - k); });
+      pide();
+      if (t < 1) requestAnimationFrame(cuadro);
+      else {
+        grupo.position.set(0, 0, 0); grupo.scale.setScalar(1);
+        historiaColocados.add(grupo); historiaProgramaActual = null;
+        opacidadFondo(grupo, 0.85);
+        grupo.userData.halos.forEach(puntos => { puntos.visible = false; });
+        historiaProgramaIndice++; historiaProgramaFase = historiaProgramaIndice < historiaProgramaOrden.length ? 'create' : 'complete';
+        if (listo) listo({ use: uso, placedCount: historiaProgramaIndice });
+      }
+    }
+    requestAnimationFrame(cuadro);
+    return { ok: true, pending: true, use: uso, index: historiaProgramaIndice };
+  }
+  function historiaRestauraEscala(listo) {
+    if (!historiaActiva3D || historiaProgramaFase !== 'complete') return { ok: false, reason: 'program_not_complete' };
+    historiaProgramaFase = 'restoring';
+    const token = ++historiaProgramaToken, inicio = performance.now();
+    function cuadro(ahora) {
+      if (token !== historiaProgramaToken || !historiaActiva3D) return;
+      const t = Math.max(0, Math.min(1, (ahora - inicio) / 900)), k = t * t * (3 - 2 * t);
+      ajustaFondo(1 - k);
+      if (t < 1) requestAnimationFrame(cuadro);
+      else { historiaProgramaFase = 'full_scale'; if (listo) listo(); }
+    }
+    requestAnimationFrame(cuadro);
+    return { ok: true, pending: true, durationMs: 900 };
+  }
+  const historiaTenue = new THREE.Color(0x808080), historiaPlena = new THREE.Color(0xffffff);
+  function historiaNavesResalta(listo) {
+    if (!historiaActiva3D) return { ok: false, reason: 'story_mode_required' };
+    if (historiaNavesIluminadas) return { ok: true, alreadyHighlighted: true, count: partesConservadas.length };
+    historiaNavesIluminadas = true;
+    const token = ++historiaSalpicaduraToken, inicio = performance.now();
+    function cuadroSalpicadura(ahora) {
+      if (token !== historiaSalpicaduraToken || !historiaActiva3D) return;
+      partesConservadas.forEach((parte, i) => {
+        const t = Math.max(0, Math.min(1, (ahora - inicio - i * 85) / 450));
+        const suave = t * t * (3 - 2 * t);
+        parte.materiales.solido.color.copy(historiaTenue).lerp(historiaPlena, suave);
+        parte.materiales.contorno.color.copy(historiaTenue).lerp(historiaPlena, suave);
+        const pulso = Math.sin(Math.PI * t);
+        parte.salpica.material.opacity = Math.max(0, pulso) * 0.9;
+        parte.salpica.visible = pulso > 0.02;
+      });
+      pide();
+      if (ahora - inicio < 850) requestAnimationFrame(cuadroSalpicadura);
+      else {
+        partesConservadas.forEach(parte => {
+          parte.materiales.solido.color.copy(historiaPlena);
+          parte.materiales.contorno.color.copy(historiaPlena);
+          parte.salpica.visible = false;
+        });
+        pide(); if (listo) listo();
+      }
+    }
+    requestAnimationFrame(cuadroSalpicadura);
+    return { ok: true, pending: true, count: partesConservadas.length };
+  }
+  function historiaDescartaEdificios(listo) {
+    if (!historiaActiva3D) return { ok: false, reason: 'story_mode_required' };
+    if (!historiaNavesIluminadas) return { ok: false, reason: 'conserved_naves_required' };
+    if (historiaDescartado) return { ok: true, alreadyDiscarded: true };
+    if (historiaDescartando) return { ok: true, pending: true, alreadyInProgress: true };
+    historiaDescartando = true;
+    const token = ++historiaDescarteToken, inicio = performance.now();
+    // El destino sigue el encuadre actual, fuera del predio visible, aunque la
+    // cámara haya girado o cambiado de zoom antes del gesto.
+    const rayoBote = new THREE.Raycaster();
+    rayoBote.setFromCamera(new THREE.Vector2(-0.84, -0.66), cam);
+    const bordeBote = rayoBote.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3()) || new THREE.Vector3(...W(430, 390, 0));
+    historiaBote.position.copy(bordeBote).sub(new THREE.Vector3(...W(bu, bv, 0)));
+    const centroBote = new THREE.Vector3(...W(bu, bv, bh * 0.6)).add(historiaBote.position);
+    const piezas = historiaDescartables.children.map(objeto => ({
+      objeto, centro: new THREE.Box3().setFromObject(objeto).getCenter(new THREE.Vector3())
+    }));
+    historiaBote.visible = true; historiaBoteMaterial.opacity = 0;
+    // El bote aparece, deja una pausa para acompañar el puño y luego recibe
+    // todas las masas en un movimiento rápido. Las vías no son descartables.
+    const APARICION = 220, ESPERA = 590, VIAJE = 650, SALIDA = 160;
+    function cuadroDescarte(ahora) {
+      if (token !== historiaDescarteToken || !historiaActiva3D) return;
+      const t = ahora - inicio;
+      const avance = Math.max(0, Math.min(1, (t - APARICION - ESPERA) / VIAJE));
+      const rapido = 1 - Math.pow(1 - avance, 3);
+      piezas.forEach(({ objeto, centro }) => {
+        const escala = 1 - 0.98 * rapido;
+        const destino = centro.clone().lerp(centroBote, rapido);
+        destino.y += 16 * Math.sin(Math.PI * rapido);
+        objeto.scale.setScalar(escala);
+        objeto.position.copy(destino).addScaledVector(centro, -escala);
+      });
+      historiaBoteMaterial.opacity = t < APARICION ? Math.min(0.9, t / APARICION * 0.9) :
+        t > APARICION + ESPERA + VIAJE ? Math.max(0, 0.9 * (1 - (t - APARICION - ESPERA - VIAJE) / SALIDA)) : 0.9;
+      pide();
+      if (t < APARICION + ESPERA + VIAJE + SALIDA) requestAnimationFrame(cuadroDescarte);
+      else {
+        piezas.forEach(({ objeto }) => { objeto.visible = false; });
+        historiaBote.visible = false; historiaBoteMaterial.opacity = 0;
+        historiaDescartando = false; historiaDescartado = true;
+        pide(); if (listo) listo();
+      }
+    }
+    requestAnimationFrame(cuadroDescarte);
+    return { ok: true, pending: true, discardedGroups: piezas.length, preservedNaves: partesConservadas.length, preservesTracks: true };
+  }
+  // Reconstruye un corte narrativo sin repetir animaciones de 30 segundos.
+  // La cámara permanece donde la dejó el presentador.
+  function historiaRestauraCheckpoint(punto) {
+    if (!historiaActiva3D || !punto || !Number.isInteger(punto.index) || punto.index < 0 || punto.index > 5)
+      return { ok: false, reason: 'invalid_story_checkpoint' };
+    historiaModo(false);
+    historiaModo(true);
+    historiaNavesIluminadas = !!punto.naves;
+    partesConservadas.forEach(parte => {
+      const color = historiaNavesIluminadas ? historiaPlena : historiaTenue;
+      parte.materiales.solido.color.copy(color);
+      parte.materiales.contorno.color.copy(color);
+    });
+    historiaDescartado = !!punto.discarded;
+    historiaDescartables.children.forEach(objeto => { objeto.visible = !historiaDescartado; });
+    historiaProgramaIndice = punto.index;
+    const fase = punto.phase;
+    if (!['create', 'place', 'complete', 'full_scale'].includes(fase))
+      return { ok: false, reason: 'invalid_story_phase' };
+    for (let i = 0; i < punto.index; i++) {
+      const grupo = volumenesPrograma(historiaProgramaOrden[i]);
+      grupo.userData.huellas.forEach(o => { o.visible = false; });
+      grupo.userData.halos.forEach(o => { o.visible = false; });
+      grupo.userData.solidos.forEach(o => { o.visible = true; });
+      historiaColocados.add(grupo);
+    }
+    if (fase === 'place' && punto.index < historiaProgramaOrden.length) {
+      const grupo = volumenesPrograma(historiaProgramaOrden[punto.index]);
+      grupo.userData.huellas.forEach(o => { o.visible = false; });
+      grupo.userData.halos.forEach(o => { o.visible = false; });
+      grupo.userData.solidos.forEach(o => { o.visible = true; });
+      const profundidad = Math.min(80, cam.position.distanceTo(base.c) * 0.45);
+      grupo.userData.desplazamiento = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(-profundidad);
+      grupo.position.copy(grupo.userData.desplazamiento);
+      historiaProgramas.add(grupo); historiaProgramaActual = grupo;
+    }
+    historiaProgramaFase = fase;
+    historiaFondoReducido = fase !== 'full_scale' && (punto.index > 0 || fase === 'place' || fase === 'complete');
+    ajustaFondo(historiaFondoReducido ? 1 : 0);
+    const construidos = new Set(punto.builtUses || []);
+    historiaViviendaConstruida = construidos.has('vivienda'); historiaViviendaFase = historiaViviendaConstruida ? 'built' : null;
+    historiaComercioConstruido = construidos.has('comercio'); historiaComercioFase = historiaComercioConstruido ? 'built' : null;
+    historiaIndustriaConstruida = construidos.has('industria'); historiaIndustriaFase = historiaIndustriaConstruida ? 'built' : null;
+    historiaCulturaConstruida = construidos.has('cultura'); historiaCulturaFase = historiaCulturaConstruida ? 'built' : null;
+    historiaAroConstruido = construidos.has('aro'); historiaAroFase = historiaAroConstruido ? 'built' : null;
+    if (historiaCulturaConstruida) {
+      const fuente = piezas.find(p => p.g.name === 'cultura-detalle')?.g;
+      fuente?.children.filter(g => ['cultura-modulos', 'cultura-nucleo'].includes(g.name)).forEach(g => {
+        const copia = g.clone(true); copia.traverse(o => { o.visible = true; }); historiaCulturaExtras.add(copia);
+      });
+    }
+    historiaColocados.children.forEach(grupo => { grupo.visible = !construidos.has(grupo.name.replace(/^lod100-/, '')); });
+    partesConservadas.forEach(parte => { parte.grupo.visible = !historiaComercioConstruido; });
+    historiaPaisajeVisible = !!punto.landscape;
+    actualizaConstruidosHistoria();
+    if (fase === 'full_scale' && punto.selectedUse) historiaSeleccionaUso(punto.selectedUse);
+    pide();
+    return { ok: true, phase: fase, placedCount: historiaProgramaIndice, builtUses: [...construidos] };
+  }
+  function historiaModo(si) {
+    if (!!si === historiaActiva3D) return;
+    historiaActiva3D = !!si;
+    ++historiaSalpicaduraToken;
+    ++historiaDescarteToken;
+    ++historiaProgramaToken;
+    ++historiaViviendaToken;
+    ++historiaComercioToken;
+    ++historiaIndustriaToken;
+    ++historiaCulturaToken;
+    ++historiaAroToken;
+    if (historiaComercioRestaurar) { historiaComercioRestaurar(); historiaComercioRestaurar = null; }
+    if (historiaIndustriaRestaurar) { historiaIndustriaRestaurar(); historiaIndustriaRestaurar = null; }
+    if (historiaCulturaRestaurar) { historiaCulturaRestaurar(); historiaCulturaRestaurar = null; }
+    if (historiaAroRestaurar) { historiaAroRestaurar(); historiaAroRestaurar = null; }
+    limpiaFocoHistoria();
+    if (si) {
+      historiaViviendaConstruyendo = historiaViviendaConstruida = historiaViviendaDetalle = false;
+      historiaViviendaFase = null; historiaViviendaCopias = [];
+      historiaComercioConstruyendo = historiaComercioConstruido = false;
+      historiaComercioFase = null;
+      historiaIndustriaConstruyendo = historiaIndustriaConstruida = false;
+      historiaIndustriaFase = null;
+      historiaCulturaConstruyendo = historiaCulturaConstruida = false;
+      historiaCulturaFase = null; historiaCulturaExtras.clear();
+      historiaAroConstruyendo = historiaAroConstruido = false; historiaAroFase = null;
+      historiaPaisajeVisible = false;
+      historiaPlanoFondo.visible = historiaProgramas.visible = true;
+      historiaNavesIluminadas = false;
+      historiaDescartando = historiaDescartado = false;
+      historiaDescartables.children.forEach(objeto => { objeto.position.set(0, 0, 0); objeto.scale.setScalar(1); objeto.visible = true; });
+      historiaBote.visible = false; historiaBoteMaterial.opacity = 0;
+      historiaProgramas.traverse(objeto => {
+        if (objeto.geometry) objeto.geometry.dispose();
+        if (objeto.material) objeto.material.dispose();
+      });
+      historiaProgramas.clear(); historiaProgramaIndice = 0; historiaProgramaFase = 'create'; historiaProgramaActual = null;
+      historiaColocados.traverse(objeto => {
+        if (objeto.geometry) objeto.geometry.dispose();
+        if (objeto.material) objeto.material.dispose();
+      });
+      historiaColocados.clear(); historiaFondoReducido = false; ajustaFondo(0);
+      partesConservadas.forEach(parte => {
+        parte.grupo.visible = true;
+        parte.materiales.solido.color.copy(historiaTenue);
+        parte.materiales.contorno.color.copy(historiaTenue);
+        [parte.materiales.solido, parte.materiales.contorno].forEach(m => {
+          m.opacity = 1;
+          if (m.transparent) { m.transparent = false; m.needsUpdate = true; }
+        });
+        parte.salpica.material.opacity = 0; parte.salpica.visible = false;
+      });
+      historiaVisibleAntes = new Map(escena.children.filter(o => o !== historiaGrupo).map(o => [o, o.visible]));
+      historiaRaizAntes = new Map(raizG.children.map(o => [o, o.visible]));
+      historiaFondoAntes = escena.background;
+      historiaVisibleAntes.forEach((visible, o) => { o.visible = false; });
+      historiaRaizAntes.forEach((visible, o) => { if (o !== ext.grupoContexto) o.visible = false; });
+      // El contexto urbano es el mismo grupo del proyecto, sin duplicar edificios.
+      raizG.visible = true;
+      historiaGrupo.visible = true;
+      escena.background = new THREE.Color('#08090b');
+    } else {
+      historiaViviendaConstruyendo = historiaViviendaConstruida = historiaViviendaDetalle = false;
+      historiaViviendaFase = null;
+      historiaComercioConstruyendo = historiaComercioConstruido = false;
+      historiaComercioFase = null;
+      historiaIndustriaConstruyendo = historiaIndustriaConstruida = false;
+      historiaIndustriaFase = null;
+      historiaCulturaConstruyendo = historiaCulturaConstruida = false;
+      historiaCulturaFase = null; historiaCulturaExtras.clear();
+      historiaAroConstruyendo = historiaAroConstruido = false; historiaAroFase = null;
+      historiaPaisajeVisible = false;
+      historiaGrupo.visible = false;
+      if (historiaRaizAntes) historiaRaizAntes.forEach((visible, o) => { if (o !== ext.grupoContexto) o.visible = visible; });
+      if (historiaVisibleAntes) historiaVisibleAntes.forEach((visible, o) => { o.visible = visible; });
+      if (ext.vista) ext.vista(X);
+      escena.background = historiaFondoAntes;
+      historiaVisibleAntes = historiaRaizAntes = historiaFondoAntes = null;
+    }
+    pide();
+  }
   // lin: Lineas o una BufferGeometry de segmentos
   function ponLineas(grupo, lin, nombre, color, colorColor, ap, extra) {
     if (lin.isBufferGeometry ? !lin.attributes.position.count : !lin.p.length) return null;
@@ -809,7 +2017,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   const matArbol = matAtlas(ARBOLES_TEX.tex, ARBOLES_TEX.N, 1, DIB.base);
   // Arte y cultura detallado: el paisaje sólo se quita donde estorba de verdad
-  // (el foso del auditorio, los módulos de planta baja); los árboles, además,
+  // (los módulos de planta baja; el foso del auditorio se quitó en la v35); los árboles, además,
   // bajo la losa del nivel 1. Lo demás del suelo sigue debajo del edificio.
   // (se arma una vez: ya trasladado al diagrama y con sus aristas)
   const CD = CULTURA_DET ? fija('cultura', () => {
@@ -829,10 +2037,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const CAJA_N = MERCADO && MERCADO.paso3 ? MERCADO.cajaN : null;
   function conHuecoN(c, z, m, recorte) {
     menosCaja(c, CAJA_N).forEach(q => {
-      const r = recorte ? G.recortaConvexo(q, recorte) : rect(q[0], q[1], q[2], q[3]), F = CD && CD.pisa[0];
+      const r = recorte ? G.recortaConvexo(q, recorte) : rect(q[0], q[1], q[2], q[3]);
       if (!r) return;
-      if (F && F.every(p => p[0] > q[0] && p[0] < q[2] && p[1] > q[1] && p[1] < q[3])) tapaHueco(m, r, F, z);
-      else tapa(m, r, z);
+      tapa(m, r, z);   // (sin el hueco del foso de arte y cultura: el auditorio se quitó en la v35)
     });
   }
 
@@ -849,7 +2056,6 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const m = new Malla();
     if (ESC === 'estacionamiento') tapaHueco(m, rect(S.u0, S.v0, S.u1, S.v1), PRED, 0);
     else if (CAJA_N) conHuecoN([S.u0, S.v0, S.u1, S.v1], 0, m);   // Comercio: sin suelo bajo la nave norte (zanja y jardín hundidos)
-    else if (CD) tapaHueco(m, rect(S.u0, S.v0, S.u1, S.v1), CD.pisa[0], 0);   // con el foso del auditorio abierto
     else tapa(m, rect(S.u0, S.v0, S.u1, S.v1), 0);
     suelos.push(pon(gSitio, m, 'suelo', null));
     const [SW, SE, NE, NW] = [[GU.o, GU.s], [GU.e, GU.s], [GU.e, GU.n], [GU.o, GU.n]];
@@ -878,7 +2084,6 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   {
     const m = new Malla();
     if (CAJA_N) conHuecoN([PB.u0, PB.v0, PB.u1, PB.v1], 0.2, m, PRED);   // Comercio: la nave norte trae su propio piso
-    else if (CD) tapaHueco(m, PRED, CD.pisa[0], 0.2);   // con el hueco del foso del auditorio
     else tapa(m, PRED, 0.2);
     // el área verde es del paisaje (se queda en su apartado) pero no se pica: picar el piso no abre nada
     const verde = pon(gPredio, m, PAI ? 'verde' : 'predio', PAI ? 'paisajismo' : null, 1);
@@ -1346,6 +2551,12 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     for (let i = 1; i < P.length; i++) if (d <= P[i][0]) { const a = P[i - 1], b = P[i]; return b[0] > a[0] ? a[1] + (b[1] - a[1]) * (d - a[0]) / (b[0] - a[0]) : b[1]; }
     return P[P.length - 1][1];
   };
+  // (2026-10-14) el corte del aro ya no es de golpe: crece suave desde donde se une la cinta y se cierra suave
+  // después de que la cinta llega al piso (CINTA.corte: [t, metros]); CINTA.banda: [t, ri, re] de la cinta
+  const tabla = (T, t) => { const d = ((t - T[0][0]) % 360 + 360) % 360 + T[0][0]; if (d > T[T.length - 1][0]) return null;
+    for (let i = 1; i < T.length; i++) if (d <= T[i][0]) { const a = T[i - 1], b = T[i], f = b[0] > a[0] ? (d - a[0]) / (b[0] - a[0]) : 1; return a.map((v, k) => v + (b[k] - v) * f); } return null; };
+  const corteEn = t => { if (!CINTA) return 0; if (!CINTA.corte) return enCinta(t) ? CINTA.re - CINTA.ri : 0; const q = tabla(CINTA.corte, t); return q ? q[1] : 0; };
+  const bandaEn = t => { if (!CINTA) return null; if (!CINTA.banda) return enCinta(t) ? [CINTA.ri, CINTA.re] : null; const q = tabla(CINTA.banda, t); return q ? [q[1], q[2]] : null; };
   {
     const g = pieza('aro', 'aro', 0.6), n = 720, z1 = ANILLO.z, z0 = z1 - ANILLO.canto;
     ponGeos(g, fija('aro', () => {
@@ -1357,34 +2568,43 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const R = t => [G.aroPunto(t, ANILLO.ri), G.aroPunto(t, ANILLO.re)];
     const P = (t, r) => [ANILLO.u + Math.cos(t * RAD) * r, ANILLO.v + Math.sin(t * RAD) * r];
     let antes = null;
+    const cabos = [[], []];   // por borde (adentro, afuera): cada tramo y si va abierto
     ts.forEach((t, k) => {
       const t2 = k + 1 < ts.length ? ts[k + 1] : ts[0] + 360;
       if (t2 - t < 1e-6) return;
-      const cin = enCinta((t + t2) / 2);   // este tramo, ¿angosto?
-      const [a, A0] = R(t), [b, B0] = R(t2), A = cin ? P(t, CINTA.ri) : A0, B = cin ? P(t2, CINTA.ri) : B0;
+      const cin = enCinta((t + t2) / 2);   // este tramo, ¿junto a la cinta?
+      // el borde de afuera, recortado lo que diga corteEn (donde el aro se ensancha sobre arte y cultura manda la plataforma)
+      const corta = (q, tt) => { const c = corteEn(tt); return c > 1e-3 && Math.hypot(q[0] - ANILLO.u, q[1] - ANILLO.v) <= ANILLO.re + 0.01 ? P(tt, ANILLO.re - c) : q; };
+      const [a, A0] = R(t), [b, B0] = R(t2), A = corta(A0, t), B = corta(B0, t2);
       m.quad(W(a[0], a[1], z1), W(b[0], b[1], z1), W(B[0], B[1], z1), W(A[0], A[1], z1));
       m.quad(W(a[0], a[1], z0), W(A[0], A[1], z0), W(B[0], B[1], z0), W(b[0], b[1], z0));
       m.quad(W(A[0], A[1], z0), W(A[0], A[1], z1), W(B[0], B[1], z1), W(B[0], B[1], z0));
       m.quad(W(a[0], a[1], z0), W(b[0], b[1], z0), W(b[0], b[1], z1), W(a[0], a[1], z1));
-      // donde cambia el ancho: la cara de la orilla (de un radio al otro), con su barandal
-      if (antes !== null && antes !== cin) {
-        const q0 = P(t, CINTA.ri), q1 = A0;
-        m.quad(W(q0[0], q0[1], z0), W(q1[0], q1[1], z0), W(q1[0], q1[1], z1), W(q0[0], q0[1], z1));
-        if (Math.abs(zCinta(t) - z1) > 0.3) ln.seg(W(q0[0], q0[1], zb), W(q1[0], q1[1], zb));
-      }
+      // (el ancho cambia suave: ya no hay cara de orilla de un radio al otro)
       antes = cin;
       // barandal (pasamanos) por los dos bordes; en el tramo angosto, en el borde nuevo
       // sólo donde la cinta ya bajó más de 0.30 (antes es el mismo piso)
-      ln.seg(W(a[0], a[1], zb), W(b[0], b[1], zb));
-      if (!cin || z1 - zCinta((t + t2) / 2) > 0.3) ln.seg(W(A[0], A[1], zb), W(B[0], B[1], zb));
+      // (2026-10-14) donde llegan las escaleras de arte y cultura (X3, X6) el barandal se abre
+      const abierto = (p, q) => !!CD && !!CD.aberturas && CD.aberturas.some(P => G.dentro((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, P));
+      const oi = abierto(a, b), oe = abierto(A, B);
+      if (!oi) ln.seg(W(a[0], a[1], zb), W(b[0], b[1], zb));
+      if ((!cin || z1 - zCinta((t + t2) / 2) > 0.3) && !oe) ln.seg(W(A[0], A[1], zb), W(B[0], B[1], zb));
+      cabos[0].push({ p: a, o: oi }); cabos[1].push({ p: A, o: oe });
     });
+    // (2026-10-14, v26) donde el barandal del aro se abre para una escalera, su cabo se une con el final del barandal
+    // de la escalera (CD.bocas), el más cercano y a menos de 0.6 m: así no queda cortado y nunca cruza la escalera
+    if (CD && CD.bocas) for (const S of cabos) for (let i = 0; i < S.length; i++) {
+      const s = S[i], prev = S[(i - 1 + S.length) % S.length]; if (s.o === prev.o) continue;
+      let b = null, bd = 0.6; for (const q of CD.bocas) { const dd = Math.hypot(q[0] - s.p[0], q[1] - s.p[1]); if (dd < bd) { bd = dd; b = q; } }
+      if (b && bd > 0.03) ln.seg(W(s.p[0], s.p[1], zb), W(b[0], b[1], z1 + 0.95));
+    }
     // balaustres cada 2.4 m a lo largo de cada borde
     [r => R(r)[0], r => R(r)[1]].forEach((borde, lado) => {
       let d = 0, q = null;
       for (let i = 0; i <= 1440; i++) {
-        const t = i / 4, cin = lado === 1 && enCinta(t), p = cin ? P(t, CINTA.ri) : borde(t);
+        const t = i / 4, b0 = borde(t), cin = lado === 1 && enCinta(t), c = lado === 1 ? corteEn(t) : 0, p = c > 1e-3 && Math.hypot(b0[0] - ANILLO.u, b0[1] - ANILLO.v) <= ANILLO.re + 0.01 ? P(t, ANILLO.re - c) : b0;
         if (q) d -= Math.hypot(p[0] - q[0], p[1] - q[1]);
-        if (d <= 0 && (!cin || z1 - zCinta(t) > 0.3)) { ln.seg(W(p[0], p[1], z1), W(p[0], p[1], zb)); d += 2.4; }
+        if (d <= 0 && (!cin || z1 - zCinta(t) > 0.3) && !(CD && CD.aberturas && CD.aberturas.some(P => G.dentro(p[0], p[1], P)))) { ln.seg(W(p[0], p[1], z1), W(p[0], p[1], zb)); d += 2.4; }
         q = p;
       }
     });
@@ -1397,7 +2617,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const im = new THREE.InstancedMesh(col, mcol, cs.length), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Vector3(), V = new THREE.Vector3();
     cs.forEach((c, i) => {
       const t = Math.atan2(c[1] - ANILLO.v, c[0] - ANILLO.u) / RAD, r = Math.hypot(c[0] - ANILLO.u, c[1] - ANILLO.v);
-      const h = CINTA && r > CINTA.ri && enCinta(t) ? zCinta(t) - CINTA.canto : z0, p = W(c[0], c[1], 0);
+      // bajo el aro (con su corte) llega al aro; si no, y queda bajo la cinta, la carga; si no carga nada, no va
+      const bd = bandaEn(t), bajoAro = r - 0.4 <= ANILLO.re - corteEn(t) + 0.01, bajoCinta = !!bd && r + 0.4 > bd[0] && r - 0.4 < bd[1];
+      const h = bajoAro ? z0 : bajoCinta ? zCinta(t) - CINTA.canto : 0.001, p = W(c[0], c[1], 0);
       M.compose(V.set(p[0], p[1], p[2]), Q, E.set(1, h, 1)); im.setMatrixAt(i, M);
     });
     im.userData.ap = 'aro'; im.userData.estr = true; g.add(im); picables.push(im);
@@ -1418,7 +2640,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
 
   /* ===== 6b. Arte y cultura (el concepto detallado) =====
      Reemplaza a los pabellones simples en todas las escenas: un edificio de
-     tres niveles con auditorio hundido, escaleras en X, fachada de diagonales
+     tres niveles (sin auditorio desde la v35), escaleras en X, fachada de diagonales
      y parasoles a +12, bajo el aro de siempre (el suyo, más chico, no va).
      Viene en el sistema de Rhino: se traslada como los módulos. Los vidrios
      no se dibujan (nada transparente): la fachada se lee por sus parteluces. */
@@ -1428,7 +2650,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const g = pieza('cultura-detalle', 'cultura', 0.45);
     // en su apartado se ve por dentro (muros, vidrios como marcos y mobiliario); en las demás escenas, módulos y núcleos como cajas
     const PARTES_CD = [['losa', 'Losas', ['m-losa', 'l-borde']], ['acero', 'Estructura de acero', ['m-acero']],
-      ['escalera', 'Escaleras', ['m-escalera', 'l-huella']], ['auditorio', 'Auditorio', ['m-auditorio']], ['aro', 'Sombrillas', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]]
+      ['escalera', 'Escaleras', ['m-escalera', 'l-huella']], ['aro', 'Sombrillas', ['m-aro']], ['fachada', 'Fachada (parteluces)', ['l-parteluz']]]
       .concat(ESC === 'cultura' ? [['interior', 'Muros interiores', ['m-muro']], ['vidrio', 'Vidrios (marcos)', ['l-vidrio']], ['mobiliario', 'Mobiliario', ['m-mueble']]]
         : [['modulos', 'Módulos', ['m-modulo']], ['nucleo', 'Núcleos', ['m-nucleo']]]);
     PARTES_CD.forEach(([id, nombre, ks]) => {
@@ -1826,7 +3048,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     });
     // Se usa después de separar la vivienda: sólo el cuarto piso del sur.
     gBIM.viviendaSur4 = gruposSur4;
-    const nombres = { walls: 'Muros', floors: 'Losas', doors: 'Puertas', windows: 'Ventanas', curtainPanels: 'Paneles de fachada', curtainMullions: 'Montantes', roofs: 'Cubiertas', chacuacos: 'Chacuacos', chimeneas: 'Chimeneas' };
+    const nombres = { walls: 'Muros', floors: 'Losas', doors: 'Puertas', windows: 'Ventanas', curtainPanels: 'Paneles de fachada', curtainMullions: 'Montantes', roofs: 'Cubiertas', chacuacos: 'Chacuacos', chimeneas: 'Chimeneas', columns: 'Columnas', stairsRuns: 'Escaleras · tramos', stairsLandings: 'Escaleras · descansos', railings: 'Barandales', topRails: 'Pasamanos' };
     Object.entries(gruposPorCategoria).forEach(([ap, cats]) => Object.entries(cats).forEach(([cat, grupos]) =>
       parte(ap, 'bim-' + cat, nombres[cat] || cat, grupos)));
   }
@@ -1835,14 +3057,252 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     THREE, data: VIVIENDA4, CEN, pieza, geos, ponGeos, pide, ray, cam: () => cam, lienzo
   }) : null;
   let etapaVivienda4 = 'predio';
+  /* ===== Subusos: al entrar a un uso (su página o aislado), cada parte con su tono =====
+     (Diego, 2026-11-19). Cada triángulo y cada arista se reparte por dónde cae; la
+     geometría no cambia, sólo se separa en mallas con su propio material. Fuera del
+     uso, las mallas se ven igual que antes (sin tono propio). */
+  const enZona = (u, v, pol) => {
+    let d = false;
+    for (let i = 0, j = pol.length - 1; i < pol.length; j = i++) {
+      const [ui, vi] = pol[i], [uj, vj] = pol[j];
+      if ((vi > v) !== (vj > v) && u < (uj - ui) * (v - vi) / (vj - vi) + ui) d = !d;
+    }
+    return d;
+  };
+  const cercaTri = (u, v, t, tol) => {   // dentro del triángulo (u,v)×3, o a menos de tol
+    const s = (a, b, c, d, e, f) => (a - e) * (d - f) - (c - e) * (b - f);
+    const d1 = s(u, v, t[0], t[1], t[2], t[3]), d2 = s(u, v, t[2], t[3], t[4], t[5]), d3 = s(u, v, t[4], t[5], t[0], t[1]);
+    if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return true;
+    for (let k = 0; k < 6; k += 2) {
+      const ax = t[k], ay = t[k + 1], bx = t[(k + 2) % 6], by = t[(k + 3) % 6], dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1;
+      const q = Math.max(0, Math.min(1, ((u - ax) * dx + (v - ay) * dy) / L));
+      if (Math.hypot(u - ax - q * dx, v - ay - q * dy) < tol) return true;
+    }
+    return false;
+  };
+  // Zonas del mercado: de las plantas que mandó Gabriel (2026-11-19), en (u, v) del predio.
+  const ZONAS_MERCADO = [
+    ['com-banos', [[540.6, 440.9], [553.8, 440.9], [553.8, 418.7], [540.6, 418.7]], 0, 7.5],
+    ['com-banos', [[499.6, 344.6], [536.1, 344.6], [536.1, 326.1], [499.6, 326.1]], 4, 7.8],   // planta alta de la nave sur
+    ['com-descarga', [[516.8, 342], [557.3, 342], [557.3, 323.4], [516.8, 323.4]], -9, 4],
+    // acuaponia: la esquina SO de la PB sur, donde están sus tanques y camas (atlampa-mercado.js: sur.tanque, sur.cama)
+    ['com-acuaponia', [[499.6, 338], [516.5, 338], [516.5, 323.4], [499.6, 323.4]], -9, 4]
+  ];
+  const COMERCIO_VIV = BIM && BIM.subusos && BIM.subusos.vivienda;
+  const SUBUSOS = {
+    // arte y cultura: PB y N1 comercio, N2 galería, azotea social; el aro y la pista (y la cinta que baja), aparte
+    cultura: (u, v, z0, zc, nz, dz, nombre) => {
+      // sobre los pabellones (al poniente, entre 105° y 185° desde el centro del aro) el aro
+      // son las piezas que actualiza_vinculo.py marca por elemento (la pista, sus acabados y
+      // su barandal); en el resto del círculo, todo lo que cae en la banda del aro (su vidrio,
+      // la cinta que baja y sus dos filas de columnas), a cualquier altura
+      if (/-aro$/.test(nombre)) return 'aro';
+      const r = Math.hypot(u - ANILLO.u, v - ANILLO.v), a = Math.atan2(v - ANILLO.v, u - ANILLO.u) * 180 / Math.PI;
+      if (!(a >= 105 && a <= 185) && r >= 38.9 && r <= 47) return 'aro';
+      return z0 < 6.1 ? 'cul-comercio' : z0 < 9.3 ? 'cul-galeria' : 'cul-social';
+    },
+    // vivienda: los módulos sueltos de VIV-N1 junto al aro son comercio
+    vivienda: COMERCIO_VIV ? (u, v, z0, zc, nz, dz, nombre) => {
+      if (!/^revit-/.test(nombre) || z0 < COMERCIO_VIV.z[0] || z0 >= COMERCIO_VIV.z[1]) return null;
+      return COMERCIO_VIV.comercio.some(t => cercaTri(u, v, t, 0.3)) ? 'viv-comercio' : null;
+    } : null,
+    comercio: (u, v, z0, zc) => {
+      for (const [s, pol, za, zb] of ZONAS_MERCADO) if (zc >= za && zc < zb && enZona(u, v, pol)) return s;
+      // área libre: los dos patios del aro, que son lo del mercado que queda dentro del círculo
+      return Math.hypot(u - ANILLO.u, v - ANILLO.v) < ANILLO.ri ? 'com-libre' : 'com-mercado';
+    }
+  };
+  const subusoActivo = ap => !!SUBUSOS[ap] && (ESC === ap || (!!aisl && aisl.ap === ap));
+  {
+    const claveDe = (tabla, m) => Object.keys(tabla).find(k => tabla[k] === m);
+    // Un triángulo grande que cruza el borde de una zona se parte en cuatro (hasta 6 veces)
+    // para que el límite siga la zona; sólo donde las zonas son polígonos en planta.
+    const SUBDIVIDE = { comercio: true };
+    const reparte = (o, fn, nombre, ap) => {
+      const g0 = o.geometry, g = g0.index ? g0.toNonIndexed() : g0, paso = o.isMesh ? 3 : 2;
+      const atts = Object.entries(g.attributes).map(([nom, at]) => ({ nom, n: at.itemSize, a: at.array })), ip = atts.findIndex(t => t.nom === 'position');
+      const cubetas = new Map(), parte = o.isMesh && SUBDIVIDE[ap];
+      const clasifica = V => {
+        let x = 0, y = 0, z = 0, zmin = 1e9, zmax = -1e9;
+        V.forEach(vt => { const q = vt[ip]; x += q[0]; y += q[1]; z += q[2]; zmin = Math.min(zmin, q[1]); zmax = Math.max(zmax, q[1]); });
+        let nz = 0;
+        if (V.length === 3) {   // la normal del triángulo, para la pendiente de la cinta
+          const [a, b, c] = V.map(vt => vt[ip]), ax = b[0] - a[0], ay = b[1] - a[1], az = b[2] - a[2], bx = c[0] - a[0], by = c[1] - a[1], bz = c[2] - a[2];
+          const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+          nz = cy / (Math.hypot(cx, cy, cz) || 1);
+        }
+        return fn(x / V.length + CEN[0], CEN[1] - z / V.length, zmin, y / V.length, nz, zmax - zmin, nombre);
+      };
+      const mete = (s, V) => {
+        let c = cubetas.get(s);
+        if (!c) cubetas.set(s, c = atts.map(() => []));
+        V.forEach(vt => vt.forEach((val, k) => { for (let j = 0; j < val.length; j++) c[k].push(val[j]); }));
+      };
+      const medio = (A, B) => A.map((val, k) => val.map((x, j) => (x + B[k][j]) / 2));
+      const divide = (V, prof) => {
+        const s = clasifica(V);
+        if (parte && prof < 6) {
+          const [a, b, c] = V.map(vt => vt[ip]);
+          const area = Math.hypot((b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2;
+          if (area > 0.05 && V.some(vt => clasifica([vt]) !== s)) {
+            const [A, B, C] = V, ab = medio(A, B), bc = medio(B, C), ca = medio(C, A);
+            [[A, ab, ca], [ab, B, bc], [ca, bc, C], [ab, bc, ca]].forEach(T => divide(T, prof + 1));
+            return;
+          }
+        }
+        mete(s, V);
+      };
+      const cuenta = g.attributes.position.count;
+      for (let i = 0; i < cuenta; i += paso) {
+        const V = [];
+        for (let k = 0; k < paso; k++) V.push(atts.map(t => t.a.subarray((i + k) * t.n, (i + k + 1) * t.n)));
+        divide(V, 0);
+      }
+      if (cubetas.size === 1 && cubetas.has(null)) return;
+      const tabla = o.isMesh ? MATS : ARISTAS, clave = claveDe(tabla, o.material);
+      if (!clave) return;
+      cubetas.forEach((c, s) => {
+        const ng = new THREE.BufferGeometry();
+        atts.forEach((t, k) => ng.setAttribute(t.nom, new THREE.BufferAttribute(new t.a.constructor(c[k]), t.n)));
+        const mat = s ? (o.isMesh ? material : arista)(clave + '@' + s) : o.material;
+        if (s) Object.assign(mat.userData, o.material.userData, { subuso: s, subAp: ap });
+        const nuevo = o.isMesh ? new THREE.Mesh(ng, mat) : new THREE.LineSegments(ng, mat);
+        Object.assign(nuevo.userData, o.userData);
+        o.parent.add(nuevo);
+        if (o.isMesh && picables.includes(o)) picables.push(nuevo);
+      });
+      const k = picables.indexOf(o); if (k >= 0) picables.splice(k, 1);
+      o.parent.remove(o);
+      if (!g0.userData.fija) g0.dispose();
+      if (g !== g0) g.dispose();
+    };
+    piezas.forEach(({ g, ap }) => {
+      const fn = SUBUSOS[ap]; if (!fn) return;
+      const lista = [];
+      g.traverse(o => { if ((o.isMesh || o.isLineSegments) && o.geometry?.attributes?.position && (MATS[claveDe(MATS, o.material)] || ARISTAS[claveDe(ARISTAS, o.material)])) lista.push(o); });
+      lista.forEach(o => reparte(o, fn, g.name, ap));
+    });
+  }
   // Los cortes de piso son sólo de presentación. Conservan intactos los
   // triángulos leídos de Revit y se retiran al salir del uso aislado.
   const PISOS_USO = {
     comercio: [[0, 3.88], [3.88, 9.5]],
-    cultura: [[-2.98, 0], [0, 3.32], [3.32, 6.32], [6.32, 15.72]],
+    // v35 (lectura 2026-11-19): sin el foso del auditorio; PB, N1 y N2 + azotea.
+    cultura: [[-0.55, 3.32], [3.32, 6.32], [6.32, 15.72]],
     industria: [[0, 3.06], [3.06, 10.9]]
   };
+  /* Ver por pisos (Diego, 2026-11-19): se quita la cubierta y luego cada piso, de
+     arriba abajo, para ver el interior. Es un corte horizontal (el mismo uniform que
+     usa aislaPisoUso), así que sirve en la página del uso y aislado. */
+  const VER_PISOS = {
+    // [nombre, sin cubierta, corte en m]: cada corte, justo bajo la losa del piso de arriba
+    comercio: [['Completo'], ['Sin cubierta', 1], ['Planta baja', 1, 3.5]],
+    cultura: [['Completo'], ['Sin cubierta', 1], ['Nivel 2', 1, 9.4], ['Nivel 1', 1, 5.9], ['Planta baja', 1, 2.9]],
+    industria: [['Completo'], ['Sin cubierta', 1, 5.7], ['Planta baja', 1, 2.7]],
+    vivienda: [['Completo']].concat(Array.from({ length: 11 }, (_, i) => ['Nivel ' + (11 - i), 0, 10.64 + 3.3 * (11 - i) - 0.25]))
+  };
+  const ES_TECHO = /^revit-[a-z]+-(roofs|chacuacos|chimeneas)-/;
+  function pisosVer(ap) { return (VER_PISOS[ap] || []).map((p, i) => ({ id: i, nombre: p[0], activo: !resaltado && (verPiso ? verPiso.i : 0) === i })); }
+  const cajaDe = gs => { const b = new THREE.Box3(); gs.forEach(g => b.expandByObject(g)); return b; };
+  const techosDe = ap => piezas.filter(p => p.ap === ap && ES_TECHO.test(p.g.name)).map(p => p.g);
+  // termina de una vez la animación de pisos que esté a medias (los techos vuelven a su material)
+  function paraAnimPisos() {
+    if (!animPisos) return;
+    const a = animPisos; animPisos = null; a.fin();
+  }
+  /* De un estado a otro (techo fuera / corte z): el corte baja o sube animado y, bajo él,
+     lo que se va o llega se desmorona con el rayado del dibujo (PISO_BANDA); los techos
+     se desintegran igual, con un corte propio, y al final se ocultan. */
+  function transitaPisos(ap, techo, z, dur) {
+    paraAnimPisos();
+    limpiaExplosionUso();
+    DETALLE_MIN.value.set(-1e5, -1e5); DETALLE_MAX.value.set(1e5, 1e5);
+    const tope = cajaDe(gruposDe(ap)).max.y + 0.5;
+    const za = PISO_RANGO.value.y < 1e4 ? PISO_RANGO.value.y : tope, zb = z === null ? tope : z;
+    const antesTecho = techoFuera === ap, cambiaTecho = antesTecho !== techo;
+    const techos = cambiaTecho ? techosDe(ap) : [], tmp = [];
+    let rT = null, rU = null, bU = null;
+    if (techos.length) {
+      const b = cajaDe(techos); rT = [b.min.y - 0.2, b.max.y + 0.2];
+      rU = { value: new THREE.Vector2(-1e5, techo ? rT[1] : rT[0]) }; bU = { value: 0 };
+      techos.forEach(g => g.traverse(o => {
+        if (!(o.isMesh || o.isLineSegments) || !o.material) return;
+        const base = o.material;
+        const m = o.isMesh ? base.clone() : dibujable(base.clone(), { ...base._dibUniforms, uPisoRango: rU, uPisoBanda: bU });
+        if (o.isMesh) { m.uniforms.uPisoRango = rU; m.uniforms.uPisoBanda = bU; }
+        m.userData = base.userData; o.material = m; tmp.push([o, base, m]);
+      }));
+      techoFuera = null; visibles();
+    }
+    const fin = () => {
+      tmp.forEach(([o, base, m]) => { o.material = base; m.dispose(); });
+      PISO_RANGO.value.set(-1e5, z === null ? 1e5 : z); PISO_BANDA.value = 0;
+      techoFuera = techo ? ap : null;
+      visibles(); pide();
+    };
+    animPisos = { fin };
+    if (za === zb && !techos.length) { paraAnimPisos(); return; }
+    const suave = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const banda = t => 2.8 * (1 - Math.max(0, (t - 0.85) / 0.15));
+    anima(dur || 1300, t => {
+      const e = suave(t), tt = techos.length ? Math.min(1, t * 1.6) : 0, te = suave(tt);
+      if (techos.length) {   // primero se van (o al final llegan) los techos
+        const a = techo ? rT[1] : rT[0], b = techo ? rT[0] : rT[1], k = techo ? te : suave(Math.max(0, t * 1.6 - 0.6));
+        rU.value.y = a + (b - a) * k; bU.value = 2.2 * (1 - Math.max(0, (k - 0.85) / 0.15));
+      }
+      const tz = techos.length && techo ? Math.max(0, (t - 0.3) / 0.7) : techos.length ? Math.min(1, t / 0.7) : t, ez = suave(tz);
+      PISO_RANGO.value.set(-1e5, za + (zb - za) * ez); PISO_BANDA.value = za === zb ? 0 : banda(tz);
+    }, () => { if (animPisos && animPisos.fin === fin) { animPisos = null; fin(); } });
+  }
+  function verPisos(ap, i) {
+    const lista = VER_PISOS[ap], paso = lista && lista[i];
+    if (!paso) return { ok: false, reason: 'sin_pisos' };
+    verPiso = i > 0 ? { ap, i } : null;
+    if (resaltado) { resaltado = null; aplicaEstilo(); }
+    transitaPisos(ap, i > 0 && !!paso[1], i > 0 && paso[2] !== undefined ? paso[2] : null);
+    return { ok: true, use: ap, step: i, name: paso[0] };
+  }
+  /* Picarle a un subuso (en la ficha o en el modelo): se quitan los pisos de arriba y
+     se destaca; lo demás queda tenue. [sin cubierta, corte] */
+  const VISTA_SUBUSO = {
+    'cul-comercio': [1, 5.9], 'cul-galeria': [1, 9.4], 'cul-social': [1, null], aro: [0, null],
+    'viv-comercio': [0, 13.69],
+    'com-mercado': [1, null], 'com-libre': [0, null], 'com-banos': [1, null], 'com-acuaponia': [1, 3.5], 'com-descarga': [1, 3.5]
+  };
+  function resaltaSubuso(ap, s) {
+    if (!subusoActivo(ap)) return { ok: false, reason: 'use_not_active' };
+    if (!s || (resaltado && resaltado.s === s)) {   // de nuevo el mismo: se suelta
+      resaltado = null; verPiso = null; aplicaEstilo(); transitaPisos(ap, false, null);
+      return { ok: true, use: ap, subuse: null };
+    }
+    const v = VISTA_SUBUSO[s] || [0, null];
+    resaltado = { ap, s }; verPiso = null;
+    aplicaEstilo(); transitaPisos(ap, !!v[0], v[1]);
+    return { ok: true, use: ap, subuse: s, name: SUBUSO_NOMBRE[s] };
+  }
+  function subusoEn(ev) {
+    if (!ev || ev.clientX === undefined) return null;
+    const r = lienzo.getBoundingClientRect();
+    ndc.set((ev.clientX - r.left) / r.width * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, cam);
+    const hit = ray.intersectObjects(visiblesPicables(), false)
+      .find(h => h.point.y <= PISO_RANGO.value.y && !(h.object.material.userData.papel || '').startsWith('vidrio'));
+    const d = hit && hit.object.material.userData;
+    // el aro del conjunto (su propia pieza) cuenta como el aro de arte y cultura
+    if (hit && hit.object.userData.ap === 'aro' && subusoActivo('cultura')) return { ap: 'cultura', s: 'aro' };
+    return d && d.subuso && subusoActivo(d.subAp) ? { ap: d.subAp, s: d.subuso } : null;
+  }
+  function subusosLeyenda(ap) {
+    const vistos = new Set();
+    raizG.traverse(o => { const d = o.isMesh && o.material && o.material.userData; if (d && d.subuso && d.subAp === ap) vistos.add(d.subuso); });
+    const r = Object.keys(SUBUSO_COLOR).filter(k => vistos.has(k)).map(k => ({ id: k, nombre: SUBUSO_NOMBRE[k], color: SUBUSO_COLOR[k][0], activo: !!resaltado && resaltado.s === k }));
+    if (ap === 'vivienda' && r.length) r.unshift({ id: 'vivienda', nombre: 'Vivienda', color: PROGRAMA.vivienda });   // (lo demás no se reparte)
+    return r;
+  }
   function limpiaCorteUso() {
+    paraAnimPisos();
+    if (resaltado) { resaltado = null; aplicaEstilo(); }
+    techoFuera = null; verPiso = null; PISO_BANDA.value = 0;
     PISO_RANGO.value.set(-1e5, 1e5);
     DETALLE_MIN.value.set(-1e5, -1e5);
     DETALLE_MAX.value.set(1e5, 1e5);
@@ -2488,8 +3948,8 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     }
     // naves: su planta (recortada a las fachadas y por el círculo del aro)
     G.NAVES.forEach(nv => { const pol = G.menosCirculo(rect(nv.L.u0, nv.L.v0, nv.L.u1, nv.L.v1), [ANILLO.u, ANILLO.v], CORTE); if (pol) muro(pol, MURO); });
-    // arte y cultura: los módulos de planta baja (núcleos, oficinas…) y el foso del auditorio
-    if (CD) CD.pisa.forEach((pol, k) => muro(pol, k ? MURO : MURO * 0.7));
+    // arte y cultura: los módulos de planta baja (núcleos, oficinas…); desde la v35 ya no hay foso del auditorio
+    if (CD) CD.pisa.forEach(pol => muro(pol, MURO));
     // estructura: columnas del aro (Ø 0.8), de arte y cultura (Ø 0.6) y las que bajan de los módulos (□ 0.5, exageradas un poco)
     const punto = (u, v, r) => { const c = circ([u, v], r, 12); for (let k = 0; k < 12; k++) ed.tri(W(u, v, z), W(c[k][0], c[k][1], z), W(c[(k + 1) % 12][0], c[(k + 1) % 12][1], z)); };
     COLUMNAS.forEach(c => punto(c[0], c[1], 0.45));
@@ -2696,6 +4156,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     // inspeccionando cualquier cosa, el aro no se oculta
     if (conAro()) piezas.forEach(p => { if (p.ap === 'aro') p.g.visible = !n; });
     aislaVisibles();
+    if (techoFuera) piezas.forEach(p => { if (p.ap === techoFuera && ES_TECHO.test(p.g.name)) p.g.visible = false; });
     if (capas.corte && !enCorte) { enCorte = true; armaCorte(); enCorte = false; }   // el contorno sigue lo que se ve
   }
   let enCorte = false;
@@ -2902,6 +4363,17 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     const nx = GENERAL ? Math.max(0, Math.min(1, x || 0)) : 0;
     if (nx !== X) { X = nx; encuadra(); if (ext.vista) ext.vista(X); }   // al abrir (y con el contexto)
     ponCamara();
+  }
+  // El arranque de Jarvis necesita un cuadro amplio ya dibujado. Cancela
+  // cualquier vuelo anterior antes de anunciar que se puede revelar.
+  function fijaContextoHistoria() {
+    ++vueloTok;
+    X = 1;
+    encuadra();
+    if (ext.vista) ext.vista(1);
+    ponCamara();
+    renderer.render(escena, cam);
+    return { wide: base.h >= 440, halfHeight: base.h };
   }
   // el punto del modelo bajo el cursor (o del piso; o el que se mira)
   function puntoEn(fx, fy) {
@@ -3150,7 +4622,12 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
      aisla(null): todo regresa y se vuelve a dibujar desde lo que estaba aislado.
      (La página pone la axonometría: perspectiva(false).) */
   function gruposDe(ap) {
-    if (BIM && gBIM[ap]) return ap === 'estacionamiento' ? [gEst, ...gBIM[ap]] : gBIM[ap].slice();
+    if (BIM && gBIM[ap]) {
+      if (ap === 'estacionamiento') return [gEst, ...gBIM[ap]];
+      // el mercado: la envolvente de Revit y, dentro, lo del Rhino (puestos, plataformas, patios, PB sur)
+      if (ap === 'comercio') return gBIM[ap].concat(piezas.filter(p => p.ap === 'comercio' && /^mercado-/.test(p.g.name) && !p.g.userData.oculto).map(p => p.g));
+      return gBIM[ap].slice();
+    }
     if (ap === 'comercio' && MERCADO) return piezas.filter(p => /^mercado-|^cinta$/.test(p.g.name)).map(p => p.g);
     // la nave norte abierta: el mercado sin la nave sur (ni su planta baja, planta alta y acero) ni las columnas de la vivienda, y el aro (sin la cinta)
     if (ap === 'nave-norte' && MERCADO) return piezas.filter(p => (/^mercado-/.test(p.g.name) && !/^mercado-(pa|vivienda|sur-.*)$/.test(p.g.name)) || (p.ap === 'aro' && p.g.name !== 'cinta')).map(p => p.g);
@@ -3419,14 +4896,17 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   vista(0, AZ, EL);
 
   return {
-    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura, elevacionModo,
+    vista, solea, desarma, arma, destruye, apartadoEn, oculta, sotano, acerca, mueve, reencuadra, aspecto, capa, seleccion, espacio, inspeccionaEstructura, elevacionModo, historiaModo, historiaRestauraCheckpoint, historiaNavesResalta, historiaDescartaEdificios, historiaCreaPrograma, historiaColocaPrograma, historiaRestauraEscala, historiaSeleccionaUso, historiaVistaGeneral, historiaConstruyeVivienda, historiaDetalleVivienda, historiaViviendaEstado, historiaConstruyeComercio, historiaComercioEstado, historiaConstruyeIndustria, historiaIndustriaEstado, historiaConstruyeCultura, historiaCulturaEstado, historiaConstruyeAro, historiaAroEstado, historiaAgregaPaisaje,
     aisla, partes, ponParte, despiece, aislado: () => aisl ? aisl.ap : null, camara, corta,
     naveNorteEn, apartamentoEn: ev => etapaVivienda4 === 'piso' ? detalle4.apartmentAt(ev) : null,
     muroEn: ev => etapaVivienda4 === 'departamento' ? detalle4.wallAt(ev) : null,
     aislaDepartamento, aislaMuro, explotaMuro, etapaDetalle: () => etapaVivienda4,
     depura: () => ({ escena, capas, elevacion: elevacionAct, fachada: fachadaAct, camaraOrtogonal: cam === camO }),
     preparaContexto(listo) { if (ext.preparaContexto) ext.preparaContexto(listo); else if (listo) listo(); },
+    fijaContextoHistoria,
     contextoListo: () => !ext.listo || ext.listo(), separa, separaPisos, progresoPisos, aislaPiso4Sur,
+    pisosVer, verPisos, subusosLeyenda, resaltaSubuso, subusoEn, subusoResaltado: () => resaltado,
+    subusos: () => { const r = {}; raizG.traverse(o => { const d = o.isMesh && o.material && o.material.userData; if (d && d.subuso) { const k = d.subAp + '/' + d.subuso; r[k] = (r[k] || 0) + o.geometry.attributes.position.count / 3; } }); return r; },
     separaLados, progresoLateral: () => progresoLateral, pisosUso, aislaPisoUso, separaPisosUso, zonasProvisionales, aislaZonaProvisional,
     fluye(ms) { mueveInfra(ms); if (ext.fluye) ext.fluye(ms); }, camina, precarga() {}, suelo() {},
     minimapa: G.minimapa, limitesElevacion: [EL_MIN, EL_MAX], limitesDentro: EL_DENTRO, dentro, pasea, escena: ESC, tipos: MOD ? MOD.tipos : [],
