@@ -579,9 +579,11 @@ function crea(svg, op) {
     if (eje === 'x' || eje === 'z') cortesInvertidos[eje] = !!invertido;
     actualizaCortes();
   }
-  // los canales del dibujo a mano (ver DIB_GLSL): el sitio y el contexto urbano
-  const DIB = { base: canalDib(), ctx: canalDib() };
-  const canalDe = n => /^(ctx|contexto|carro|flecha-ctx)/.test(n) ? DIB.ctx : DIB.base;
+  // los canales del dibujo a mano (ver DIB_GLSL): el sitio y el contexto urbano; el Modo historia pide
+  // canales propios por papel (canalPropio) para dibujar o borrar sólo eso (la demolición, el corte del aro)
+  const DIB = { base: canalDib(), ctx: canalDib() }, DIB_PROPIO = {};
+  const canalDe = n => DIB_PROPIO[n.replace(/(-ref)?(-estr)?$/, '')] || (/^(ctx|contexto|carro|flecha-ctx)/.test(n) ? DIB.ctx : DIB.base);
+  const canalPropio = papel => DIB_PROPIO[papel] || (DIB_PROPIO[papel] = canalDib());
   const capaRot = document.createElement('div');
   capaRot.className = 'ad-3d-rotulos';
   trabajo.insertBefore(capaRot, svg);
@@ -3882,7 +3884,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (!HIST) {
       const mod = await import('./atlampa-historia.js' + (VER ? '?' + VER : ''));
       HIST = await mod.crea({
-        THREE, G, W, CEN, rect, ccw, Malla, Lineas, tapa, tapaHueco, muros, prisma, pon, ponLineas, material, linea,
+        THREE, G, W, CEN, rect, ccw, Malla, Lineas, tapa, tapaHueco, muros, prisma, pon, ponLineas, material, linea, arista, canalPropio,
         raizG, escena, trabajo, pide, aplicaEstilo, ESTILOS, dib: DIB.ctx, FIG, matAtlas, mallaAtlas,
         camara: () => cam, camaraEstado, camaraA, alPintar: f => { histPinta = f; }
       });

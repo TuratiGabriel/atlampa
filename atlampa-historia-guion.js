@@ -9,8 +9,9 @@
            lado      fracción del ancho que tapa la tarjeta (se centra en el resto)
    capas:  colonia (edificios y calles de toda Atlampa), coches, limite
    marcas: 'asentamientos' | 'balaceras' | 'cultura' | 'verdes' | 'espuela' | 'circuitoProyecto' | 'circuitoAtlampa' | 'mercado'
-           etapa 2: 'demolicion' (rojo y se desintegra) | 'aroConcepto' (la «o» sobre el predio) | 'corteAro' (se cortan las naves);
+           etapa 2: 'demolicion' (en rojo y se borra como se desarma en el visor) | 'corteAro' (el aro corta las naves);
            éstas se animan enteras (ida y regreso) y se quedan hechas mientras las siguientes slides las listen
+   aro:    { op, sube, dur } la «o» de «circuito», que es el aro: opacidad y cuánto sube (m); sin aro, no está
            (ver MARCAS abajo; en las balaceras, lado: 'izq' | 'der' pone el texto a un lado de los tiradores)
    compacto: true → de las marcas sólo quedan las figuras, sin sus textos (la slide de factores)
    rotulosDe: [ids] → sólo esas marcas ponen sus textos
@@ -322,17 +323,20 @@ export default [
     marcas: ['asentamientos', 'cultura', 'espuela'],
     compacto: true,
     fondo: { texto: 'circuito', pos: 'aro', op: 0.9 },
+    aro: { op: 0.95 },   // desde aquí la «o» (el aro) no se va
     rotulos: []
   },
 
-  /* ===== Etapa 2: del predio de hoy al proyecto (sobre el modelo) ===== */
+  /* ===== Etapa 2: del predio de hoy al proyecto (sobre el modelo) =====
+     aro: { op, sube, dur } en cada slide; si una slide no lo trae, la «o» se va. */
   {
     id: 'predio', etapa: 2,
     titulo: 'El predio',
-    // la cámara se acerca al predio; la palabra y la «o» se van y queda lo existente
+    // la cámara se acerca al predio; la palabra se va y la «o» sube, translúcida, para dejar ver lo existente
     camara: { encuadre: [447, 322, 559, 489], az: 37, el: 40, aire: 1.3, lado: 0.26, dur: 3400 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: [],
+    aro: { op: 0.3, sube: 14, dur: 1800 },
     tarjeta: {
       kicker: 'Etapa 2 · Preexistencia',
       titulo: 'El predio hoy',
@@ -348,10 +352,11 @@ export default [
   {
     id: 'demolicion', etapa: 2,
     titulo: 'Demolición',
-    // los muros y losas que no se conservan se marcan en rojo y se desintegran (las piezas de MARCAS.existente)
+    // los muros y losas que no se conservan se marcan en rojo y se borran como en el visor (las piezas de MARCAS.existente)
     camara: { encuadre: [447, 322, 559, 489], az: 37, el: 40, aire: 1.3, lado: 0.26, dur: 1200 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion'],
+    aro: { op: 0.3, sube: 14 },
     tarjeta: {
       kicker: 'Etapa 2 · Demolición',
       titulo: 'Lo que se retira',
@@ -368,19 +373,20 @@ export default [
   {
     id: 'aro', etapa: 2,
     titulo: 'El aro',
-    // primero la «o» de «circuito» sobre el predio, donde irá el aro; luego se demuele lo de las naves que queda dentro
-    camara: { encuadre: [447, 322, 559, 489], az: 37, el: 46, aire: 1.2, lado: 0.26, dur: 2000 },
+    // la «o» baja a su lugar y deja de ser translúcida: es el aro; luego se demuele lo de las naves que queda dentro
+    camara: { encuadre: [447, 322, 559, 489], az: 37, el: 52, aire: 1.2, lado: 0.26, dur: 2000 },
     capas: { colonia: true, coches: true, limite: true },
-    marcas: ['demolicion', 'aroConcepto', 'corteAro'],
+    marcas: ['demolicion', 'corteAro'],
+    aro: { op: 0.95, sube: 0, dur: 1700 },
     tarjeta: {
       kicker: 'Etapa 2 · El aro',
       titulo: 'El aro corta las naves',
-      texto: 'La «o» del circuito se posa sobre el predio, donde irá el aro. Lo que queda dentro de su círculo se demuele: las naves se cortan a 47 m del centro y el resto se conserva.',
+      texto: 'La «o» de «circuito» baja a su lugar: es el aro del proyecto. Lo que queda dentro de su círculo se demuele; las naves se cortan a 47 m del centro y el resto se conserva.',
       cifras: [
         ['≈ {corteNaves} m²', 'de nave que se demuele', 'dentro del círculo del aro'],
         ['47 m', 'radio del corte', 'desde el centro del aro']
       ],
-      leyenda: [['#ff6f63', 'el aro (concepto)'], ['#ff3b30', 'se demuele']],
+      leyenda: [['#ff6f63', 'el aro'], ['#ff3b30', 'se demuele']],
       fuente: 'Contexto.3dm (naves y aro) · visor del proyecto'
     },
     rotulos: []
