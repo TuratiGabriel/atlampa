@@ -96,13 +96,8 @@ body.modo-presentacion .hud-dato-punto,
 body.modo-presentacion .hud-datos-cerrar,
 body.modo-presentacion .ad-ayuda,
 body.modo-presentacion .ad-etiqueta{ display:none !important; }
-.ad-historia-espera{
-  display:none; position:absolute; top:20px; left:20px; z-index:4;
-  background:rgba(8,9,11,.88); border:1px solid #797770; border-radius:6px; color:#e5e1d9;
-  align-items:flex-start; flex-direction:column; gap:4px;
-  padding:10px 14px; pointer-events:none; font:13px var(--font-display);
-}
-.ad-historia-espera__titulo{ font-size:16px; }
+/* Historia conserva los controles de cámara para recorrer la preexistencia. */
+body.modo-presentacion.modo-historia .hud-camara{ display:flex !important; }
 body.modo-historia .ad-3d-esquema,
 body.modo-historia .ad-3d-seccion,
 body.modo-historia .ad-3d-rotulos{ visibility:hidden !important; }

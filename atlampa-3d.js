@@ -851,10 +851,9 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
   const historiaSuelo = new Malla();
   tapa(historiaSuelo, rect(PB.u0, PB.v0, PB.u1, PB.v1), -0.02);
   ponHistoria(historiaGrupo, historiaSuelo, true);
-  G.NAVES.forEach((nv, i) => {
+  function naveHistoria(grupo, nv) {
     const g = new THREE.Group(), m = new Malla();
-    g.name = i ? 'nave-oriente-norte' : 'nave-oriente-sur';
-    historiaGrupo.add(g);
+    grupo.add(g);
     const paso = (nv.u1 - nv.u0) / nv.n;
     for (let j = 0; j < nv.n; j++) {
       const u0 = nv.u0 + j * paso, u1 = u0 + paso, um = (u0 + u1) / 2;
@@ -867,34 +866,86 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
       m.quad(W(um, v0, c), W(um, v1, c), W(u1, v1, a), W(u1, v0, a));
     }
     ponHistoria(g, m, false);
+  }
+  G.NAVES.forEach((nv, i) => {
+    const g = new THREE.Group();
+    g.name = i ? 'nave-oriente-norte' : 'nave-oriente-sur';
+    historiaGrupo.add(g); naveHistoria(g, nv);
   });
-  // Masas occidentales interpretadas esquemáticamente de la vista cenital y
-  // oblicua de Earth facilitada por Luis. La calle de servicio central queda
-  // vacía; cotas y cubiertas de estas masas no son medidas constructivas.
-  [
-    { id: 'masa-noroeste-aproximada', planta: [449, 418.5, 522, 487], altura: 6.2 },
-    { id: 'masa-suroeste-aproximada', planta: [449, 323.5, 503.5, 395.5], altura: 6.0 }
-  ].forEach(({ id, planta, altura }) => {
+  // La vista de Earth muestra dos conjuntos al oeste, separados de las naves
+  // del este y por un callejón transversal. Sus subdivisiones y alturas son
+  // aproximaciones de lectura, no datos constructivos medidos.
+  function bloqueHistoria(grupo, id, planta, z0, z1) {
     const g = new THREE.Group(), m = new Malla();
-    g.name = id; historiaGrupo.add(g);
-    prisma(m, rect(planta[0], planta[1], planta[2], planta[3]), 0, altura);
+    g.name = id; grupo.add(g);
+    prisma(m, rect(planta[0], planta[1], planta[2], planta[3]), z0, z1);
     ponHistoria(g, m, false);
-  });
-  let historiaActiva3D = false, historiaVisibleAntes = null, historiaFondoAntes = null;
+  }
+  function cobertizoHistoria(grupo, id, planta, altoOeste, altoEste) {
+    const [u0, v0, u1, v1] = planta, g = new THREE.Group(), m = new Malla();
+    g.name = id; grupo.add(g);
+    muros(m, rect(u0, v0, u1, v1), 0, 0, u => altoOeste + (altoEste - altoOeste) * (u - u0) / (u1 - u0));
+    m.quad(W(u0, v0, altoOeste), W(u1, v0, altoEste), W(u1, v1, altoEste), W(u0, v1, altoOeste));
+    ponHistoria(g, m, false);
+  }
+  const noroeste = new THREE.Group();
+  noroeste.name = 'conjunto-noroeste-earth'; historiaGrupo.add(noroeste);
+  // Cobertizo largo de Fresno: la cubierta baja hacia el patio interior.
+  cobertizoHistoria(noroeste, 'cubierta-fresno-inclinada', [449, 419, 469, 487], 7.2, 5.5);
+  bloqueHistoria(noroeste, 'ala-norte', [469, 468, 491, 487], 0, 5.2);
+  bloqueHistoria(noroeste, 'anexo-suroeste', [469, 419, 478, 441], 0, 5.8);
+  // Tres naves cortas separadas por juntas; las dos mayores del este vienen de G.NAVES.
+  naveHistoria(noroeste, { u0: 479, u1: 496, v0: 419, v1: 458, n: 1, alero: 6.3, cumbre: 7.6 });
+  naveHistoria(noroeste, { u0: 498, u1: 509, v0: 419, v1: 458, n: 1, alero: 5.9, cumbre: 7.5 });
+  naveHistoria(noroeste, { u0: 510, u1: 521, v0: 419, v1: 458, n: 1, alero: 5.9, cumbre: 7.5 });
+  bloqueHistoria(noroeste, 'ala-patio-oeste', [492, 462, 499, 487], 0, 5.0);
+  bloqueHistoria(noroeste, 'ala-patio-norte', [499, 479, 522, 487], 0, 5.2);
+  bloqueHistoria(noroeste, 'ala-patio-este', [516, 462, 522, 479], 0, 5.0);
+
+  const suroeste = new THREE.Group();
+  suroeste.name = 'conjunto-suroeste-earth'; historiaGrupo.add(suroeste);
+  bloqueHistoria(suroeste, 'cubierta-principal', [449, 345, 484, 395], 0, 6.0);
+  bloqueHistoria(suroeste, 'franja-sur-dos-niveles', [449, 324, 503, 345], 0, 9.0);
+  bloqueHistoria(suroeste, 'ala-hacia-naves', [484, 372, 503, 395], 0, 5.5);
+  bloqueHistoria(suroeste, 'monitor-de-cubierta', [452, 349, 459, 376], 6.0, 6.8);
+  // Reutiliza el eje ferroviario ESPUELA del visor, al nivel original del suelo;
+  // la pasarela elevada del proyecto queda oculta durante Historia.
+  const rielesHistoria = new Lineas(), ejeVias = ESPUELA[ESPUELA.length - 1][1];
+  for (const lado of [-0.72, 0.72]) rielesHistoria.seg(W(PB.u0, ejeVias + lado, 0.12), W(ESP_FIN, ejeVias + lado, 0.12));
+  for (let u = PB.u0 + 0.5; u < ESP_FIN; u += 1.6) rielesHistoria.seg(W(u, ejeVias - 1.3, 0.1), W(u, ejeVias + 1.3, 0.1));
+  const viasHistoria = new THREE.LineSegments(rielesHistoria.geo(), historiaContorno);
+  viasHistoria.name = 'vias-existentes-eje-espuela'; historiaGrupo.add(viasHistoria);
+  function portonHistoria(id, u) {
+    const lineas = new Lineas(), v0 = 396.6, v1 = 417.5, alto = 3.2;
+    for (const v of [v0, v1]) lineas.seg(W(u, v, 0.1), W(u, v, alto));
+    for (const h of [0.2, alto]) lineas.seg(W(u, v0, h), W(u, v1, h));
+    for (let v = v0 + 1.2; v < v1; v += 1.2) lineas.seg(W(u, v, 0.2), W(u, v, alto));
+    const puerta = new THREE.LineSegments(lineas.geo(), historiaContorno);
+    puerta.name = id; historiaGrupo.add(puerta);
+  }
+  portonHistoria('porton-fresno', PB.u0 + 0.4);
+  portonHistoria('porton-sabino', PB.u1 - 0.4);
+  let historiaActiva3D = false, historiaVisibleAntes = null, historiaRaizAntes = null, historiaFondoAntes = null;
   function historiaModo(si) {
     if (!!si === historiaActiva3D) return;
     historiaActiva3D = !!si;
     if (si) {
       historiaVisibleAntes = new Map(escena.children.filter(o => o !== historiaGrupo).map(o => [o, o.visible]));
+      historiaRaizAntes = new Map(raizG.children.map(o => [o, o.visible]));
       historiaFondoAntes = escena.background;
       historiaVisibleAntes.forEach((visible, o) => { o.visible = false; });
+      historiaRaizAntes.forEach((visible, o) => { if (o !== ext.grupoContexto) o.visible = false; });
+      // El contexto urbano es el mismo grupo del proyecto, sin duplicar edificios.
+      raizG.visible = true;
       historiaGrupo.visible = true;
       escena.background = new THREE.Color('#08090b');
     } else {
       historiaGrupo.visible = false;
+      if (historiaRaizAntes) historiaRaizAntes.forEach((visible, o) => { if (o !== ext.grupoContexto) o.visible = visible; });
       if (historiaVisibleAntes) historiaVisibleAntes.forEach((visible, o) => { o.visible = visible; });
+      if (ext.vista) ext.vista(X);
       escena.background = historiaFondoAntes;
-      historiaVisibleAntes = historiaFondoAntes = null;
+      historiaVisibleAntes = historiaRaizAntes = historiaFondoAntes = null;
     }
     pide();
   }

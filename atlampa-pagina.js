@@ -1033,7 +1033,7 @@
     if (urbanRotationActive) stopUrbanRotation();
     if (b.hasAttribute('data-modo-historia')) { previsualizaHistoria(); return; }
     if (b.hasAttribute('data-modo-presentacion')) { ponModoPresentacion(!modoPresentacion); return; }
-    if (historiaActiva) return;
+    if (historiaActiva && !b.hasAttribute('data-zoom')) return;
     if (!dib) return;
     if (b.hasAttribute('data-fachada')) { seleccionaFachada(b.getAttribute('data-fachada')); return; }
     if (b.hasAttribute('data-corte-reset')) { restableceCortes(); return; }
@@ -1278,7 +1278,6 @@
     orbit: function (deltaAzDeg, deltaElDeg) {
       if (!controlListo()) return { ok: false, reason: 'not_ready' };
       if (!Number.isFinite(deltaAzDeg) || !Number.isFinite(deltaElDeg)) return { ok: false, reason: 'invalid_delta' };
-      if (prendida('contexto') && deltaElDeg) return { ok: false, reason: 'context_only_rotate_y' };
       var da = Math.max(-30, Math.min(30, deltaAzDeg));
       var de = Math.max(-30, Math.min(30, deltaElDeg));
       if (da) rapido = true; // usa TAU_MANO y la ruta rápida, no las flechas de 15°
@@ -1287,7 +1286,7 @@
     },
     pan: function (dx, dy) {
       if (!controlListo()) return {ok:false,reason:'not_ready'};
-      if (prendida('contexto')) return {ok:false,reason:'context_only_rotate_y'};
+      if (prendida('contexto')) return {ok:false,reason:'context_pan_unavailable'};
       if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > 0.15 || Math.abs(dy) > 0.15)
         return {ok:false,reason:'invalid_delta'};
       dib.mueve(dx, dy);
@@ -1296,7 +1295,6 @@
     },
     zoom: function (factor) {
       if (!controlListo()) return { ok: false, reason: 'not_ready' };
-      if (prendida('contexto')) return {ok:false,reason:'context_only_rotate_y'};
       if (!Number.isFinite(factor) || factor < 0.8 || factor > 1.25) return { ok: false, reason: 'invalid_factor' };
       acerca(factor);
       return { ok: true, factor: factor };
@@ -1354,8 +1352,8 @@
     getAvailableActions: function () {
       if (historiaActiva) return { ok: true, stage: 'story_etapa1', storyMode: true, sceneReady: false, actions: ['exitStoryMode'] };
       var comunes = ['orbit', 'pan', 'zoom'];
-      if (prendida('contexto')) return { ok: true, stage: 'contexto', orbitAxis: 'y',
-        actions: ['orbit', 'resetDetail', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation'] };
+      if (prendida('contexto')) return { ok: true, stage: 'contexto',
+        actions: ['orbit', 'zoom', 'resetDetail', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation'] };
       if (!aislado && ESCENA !== 'general') return { ok: true, stage: 'apartado_sin_aislar', actions: comunes.concat(['resetDetail']) };
       if (!aislado) return { ok: true, stage: 'predio', actions: comunes.concat(['setUrbanContext', urbanRotationActive ? 'stopUrbanRotation' : 'startUrbanRotation', 'isolateUse', 'resetDetail'], modoPresentacion ? ['enterStoryMode'] : []) };
       if (aislado === 'vivienda') {
@@ -1388,7 +1386,7 @@
     var original = window.AtlampaControl[name];
     if (typeof original !== 'function') return;
     window.AtlampaControl[name] = function () {
-      if (historiaActiva) return { ok: false, reason: 'story_mode_active' };
+      if (historiaActiva && !['orbit', 'pan', 'zoom'].includes(name)) return { ok: false, reason: 'story_mode_active' };
       var result = original.apply(this, arguments);
       if (result && result.ok && urbanRotationActive) stopUrbanRotation();
       return result;
@@ -1422,7 +1420,7 @@
   zona.addEventListener('pointermove', function (ev) {
     if (!dib) return;   // el motor 3D todavía carga
     var p = dedos[ev.pointerId];
-    if (!p) { if (ev.pointerType === 'mouse' && !yendo) tooltip(dib.apartadoEn(ev), ev); return; }
+    if (!p) { if (!historiaActiva && ev.pointerType === 'mouse' && !yendo) tooltip(dib.apartadoEn(ev), ev); return; }
     if (yendo) return;
     var r = zona.getBoundingClientRect(), n = Object.keys(dedos).length, dx = ev.clientX - p.x, dy = ev.clientY - p.y;
     recorrido += Math.abs(dx) + Math.abs(dy);
@@ -1441,6 +1439,7 @@
     delete dedos[ev.pointerId];
     pell = distancia();
     if (!Object.keys(dedos).length) { zona.classList.remove('arrastra', 'arrastra--mueve', 'arrastra--orbita'); mano = false; }
+    if (historiaActiva) return;
     // un clic (sin arrastrar) sobre un apartado lo abre
     if (era && uno && recorrido < 5 && ev.type === 'pointerup' && ev.button === 0 && !yendo && !historiaActiva) {
       if (detalleV4.etapa === 'piso') { var dep = dib.apartamentoEn(ev); if (dep) seleccionaDepartamentoV4(dep); return; }
@@ -1472,7 +1471,7 @@
   // en el vacío o ya aislado: encuadre (con la nave norte abierta, en el vacío la cierra)
   var clicPend = null;
   zona.addEventListener('dblclick', function (ev) {
-    if (historiaActiva) return;
+    if (historiaActiva) return;   // en la presentación el doble clic no reencuadra al proyecto
     if (yendo || !dib) return;
     if (clicPend) { clearTimeout(clicPend); clicPend = null; }
     if (aislado === 'nave-norte' && !dib.apartadoEn(ev)) { saleAislado(); return; }
