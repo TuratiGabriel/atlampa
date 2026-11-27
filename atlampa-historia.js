@@ -1376,10 +1376,11 @@ export async function crea(api) {
     // una slide sin tarjeta se centra en toda la pantalla
     const Wt = trabajo.clientWidth, gut = Math.max(16, Math.min(40, Wt * 0.03)), ancho = Math.min(360, Wt - 2 * gut);
     const ASP = Wt / Math.max(1, trabajo.clientHeight);
+    // sin tarjeta, lado sólo fija el acercamiento (el mismo que con ella) y lo encuadrado queda al centro
     const lado = conTarjeta === false ? (cs.lado || 0) : Math.min(0.45, Math.max(cs.lado || 0, (ancho + 2 * gut) / Wt));
     const h = Math.max((y1 - y0) / 2, (x1 - x0) / 2 / (ASP * (1 - lado))) * (cs.aire || 1.1);
     const c = c0.add(r.clone().multiplyScalar((x0 + x1) / 2)).add(up.clone().multiplyScalar((y0 + y1) / 2));
-    c.addScaledVector(r, -lado * h * ASP);   // lo encuadrado, centrado a la derecha de la tarjeta
+    if (conTarjeta !== false) c.addScaledVector(r, -lado * h * ASP);   // lo encuadrado, centrado a la derecha de la tarjeta
     return { c: [c.x, c.y, c.z], h, az, el };
   }
 

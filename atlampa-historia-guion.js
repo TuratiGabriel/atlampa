@@ -337,16 +337,6 @@ export default [
     capas: { colonia: true, coches: true, limite: true },
     marcas: [],
     aro: { op: 0.3, sube: 14, dur: 1800 },
-    tarjeta: {
-      kicker: 'Etapa 2 · Preexistencia',
-      titulo: 'El predio hoy',
-      texto: 'Una manzana completa dentro del circuito de la antigua espuela. Hoy hay oficinas en el lote norte y equipamiento en el sur; al oriente, dos naves industriales con valor patrimonial.',
-      cifras: [
-        ['17,180 m²', 'superficie del predio', 'dos cuentas catastrales'],
-        ['≈ {huellaHoy} m²', 'de huella construida', 'aprox., desde Google Earth']
-      ],
-      fuente: 'Levantamiento aproximado desde Google Earth · Área de Conservación Patrimonial'
-    },
     rotulos: []
   },
   {
@@ -357,17 +347,6 @@ export default [
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion'],
     aro: { op: 0.3, sube: 14 },
-    tarjeta: {
-      kicker: 'Etapa 2 · Demolición',
-      titulo: 'Lo que se retira',
-      texto: 'Las construcciones sin valor patrimonial se demuelen: sus muros y losas liberan el predio para el proyecto. Se conservan las naves industriales del oriente, con valor patrimonial, y las vías de la espuela.',
-      cifras: [
-        ['≈ {huellaDemolida} m²', 'de huella que se retira', 'aprox., desde Google Earth'],
-        ['{crujias}', 'crujías de nave que se conservan', '≈ {huellaNaves} m²']
-      ],
-      leyenda: [['#ff3b30', 'se demuele']],
-      fuente: 'Levantamiento aproximado desde Google Earth'
-    },
     rotulos: []
   },
   {
@@ -380,17 +359,6 @@ export default [
     marcas: ['demolicion', 'corteAro'],
     aro: { op: 0.95, sube: 0, dur: 1700 },
     fondo: { texto: 'circuito', pos: 'aro', op: 0.9, existente: 'cortado' },
-    tarjeta: {
-      kicker: 'Etapa 2 · El aro',
-      titulo: 'El circuito, en el proyecto',
-      texto: 'El concepto de circuito se mantiene dentro del proyecto: el aro es el eje y el circuito central del conjunto. Para abrirle paso, las naves se cortan en un círculo de 47 m de radio; el resto de las naves se conserva.',
-      cifras: [
-        ['≈ {corteNaves} m²', 'de nave que se demuele', 'dentro del círculo del aro'],
-        ['47 m', 'radio del corte', 'desde el centro del aro']
-      ],
-      leyenda: [['#ff6f63', 'el aro'], ['#ff3b30', 'se demuele']],
-      fuente: 'Contexto.3dm (naves y aro) · visor del proyecto'
-    },
     rotulos: []
   },
   {
@@ -402,17 +370,6 @@ export default [
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal'],
     aro: { op: 0.95, sube: 0 },
-    tarjeta: {
-      kicker: 'Etapa 2 · El aro',
-      titulo: 'El aro del proyecto',
-      texto: 'Un circuito peatonal elevado que une todos los usos del conjunto (vivienda, comercio, industria y arte y cultura) y le da una circulación continua a todo el proyecto: se recorre de un uso a otro sin bajar a la calle, y la cinta lo lleva hasta el nivel del suelo.',
-      cifras: [
-        ['≈ {aroLargo} m', 'de recorrido', 'por el eje del aro'],
-        ['{aroAncho} m', 'de ancho', 'radios de 39.5 a 46.55 m'],
-        ['+{aroAlto} m', 'nivel del piso del aro']
-      ],
-      fuente: 'Contexto.3dm (Diag::ring) · visor del proyecto'
-    },
     rotulos: []
   },
   {
@@ -424,19 +381,6 @@ export default [
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen'],
     aro: { op: 0.95, sube: 0 },
-    // (el programa de adentro va en la etapa 3, cuando se desglosen los usos)
-    tarjeta: {
-      kicker: 'Etapa 2 · Arte y cultura',
-      titulo: 'Arte y cultura',
-      texto: 'Nace del aro: se acomoda debajo de su curva y su azotea es parte del circuito, una sola losa con el aro. Sus tres plataformas de 3 m se escalonan hacia el patio y hacia atrás, así que cada nivel tiene terraza y vista al aro.',
-      cifras: [
-        ['1,953 m²', 'de superficie cerrada', 'tres niveles y azotea'],
-        ['+9.51 m', 'azotea', 'a la altura del aro'],
-        ['6', 'escaleras en X', 'tipo Vessel, al patio y atrás']
-      ],
-      nota: 'Proceso: el auditorio hundido de las primeras versiones se quitó porque chocaba con el estacionamiento subterráneo; su lugar es hoy el patio.',
-      fuente: 'Concepto y hoja de plantas de arte y cultura (v15 a v35)'
-    },
     rotulos: []
   },
   {
@@ -447,17 +391,6 @@ export default [
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta'],
     aro: { op: 0.95, sube: 0 },
-    tarjeta: {
-      kicker: 'Etapa 2 · Arte y cultura',
-      titulo: 'Fachadas y sombrillas',
-      texto: 'Las escaleras, la azotea y el aro comparten material y un barandal de vidrio continuo: todas las circulaciones se leen como una sola. Sobre la azotea, sombrillas tipo Johnson Wax a +15 dan sombra al circuito; se juntan sobre el edificio y se espacian al alejarse, sólo en los tramos asoleados del aro.',
-      cifras: [
-        ['+15 m', 'sombrillas tipo Johnson Wax', 'columnas que se abren en la azotea'],
-        ['5.5 × 4 m', 'cada sombrilla', 'un módulo, como la vivienda']
-      ],
-      nota: 'Proceso: las sombrillas empezaron circulares; se volvieron rectangulares, de un módulo, porque chocaban con el lenguaje de la vivienda.',
-      fuente: 'Concepto y hoja de plantas de arte y cultura (v15 a v35)'
-    },
     rotulos: []
   }
 ];
