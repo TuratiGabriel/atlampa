@@ -584,6 +584,21 @@ function crea(svg, op) {
   const DIB = { base: canalDib(), ctx: canalDib() }, DIB_PROPIO = {};
   const canalDe = n => DIB_PROPIO[n.replace(/(-ref)?(-estr)?$/, '')] || (/^(ctx|contexto|carro|flecha-ctx)/.test(n) ? DIB.ctx : DIB.base);
   const canalPropio = papel => DIB_PROPIO[papel] || (DIB_PROPIO[papel] = canalDib());
+  // una copia de las piezas del proyecto (por nombre) que se dibuja con el canal U, para que el Modo historia la
+  // arme sola (como la separación por pisos: materiales clonados, las líneas con su propio canal)
+  function copiaConCanal(nombres, U) {
+    const g = new THREE.Group(); g.name = 'copia-' + nombres.join('-');
+    raizG.children.filter(o => nombres.includes(o.name)).forEach(o => {
+      const c = o.clone(true); c.visible = true;
+      c.traverse(x => {
+        if (!x.material) return;
+        if (x.material.isShaderMaterial) { const m = x.material.clone(); Object.assign(m.uniforms, U); m.userData = Object.assign({}, x.material.userData); x.material = m; }
+        else if (x.material._dibUniforms) { const b = x.material, m = dibujable(b.clone(), Object.assign({}, b._dibUniforms, U)); m.userData = Object.assign({}, b.userData); x.material = m; }
+      });
+      g.add(c);
+    });
+    return g;
+  }
   const capaRot = document.createElement('div');
   capaRot.className = 'ad-3d-rotulos';
   trabajo.insertBefore(capaRot, svg);
@@ -3884,7 +3899,7 @@ const luz = new THREE.Vector3(-0.45, 0.8, 0.55).normalize();
     if (!HIST) {
       const mod = await import('./atlampa-historia.js' + (VER ? '?' + VER : ''));
       HIST = await mod.crea({
-        THREE, G, W, CEN, rect, ccw, Malla, Lineas, tapa, tapaHueco, muros, prisma, pon, ponLineas, material, linea, arista, canalPropio,
+        THREE, G, W, CEN, rect, ccw, Malla, Lineas, tapa, tapaHueco, muros, prisma, pon, ponLineas, material, linea, arista, canalPropio, copiaConCanal,
         raizG, escena, trabajo, pide, aplicaEstilo, ESTILOS, dib: DIB.ctx, FIG, matAtlas, mallaAtlas,
         camara: () => cam, camaraEstado, camaraA, alPintar: f => { histPinta = f; }
       });

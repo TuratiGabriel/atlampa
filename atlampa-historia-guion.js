@@ -373,21 +373,45 @@ export default [
   {
     id: 'aro', etapa: 2,
     titulo: 'El aro',
-    // la «o» baja a su lugar y deja de ser translúcida: es el aro; luego se demuele lo de las naves que queda dentro
-    camara: { encuadre: [447, 322, 559, 489], az: 37, el: 52, aire: 1.2, lado: 0.26, dur: 2000 },
+    // la «o» baja a su lugar, deja de ser translúcida y la palabra se vuelve a escribir (sobre lo que queda): el concepto
+    // es el aro; luego se demuele lo de las naves que queda dentro. La cámara se aleja un poco para que se vea la palabra
+    camara: { encuadre: [405, 300, 559, 489], az: 37, el: 50, aire: 1.18, lado: 0.26, dur: 2000 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro'],
     aro: { op: 0.95, sube: 0, dur: 1700 },
+    fondo: { texto: 'circuito', pos: 'aro', op: 0.9, existente: 'cortado' },
     tarjeta: {
       kicker: 'Etapa 2 · El aro',
-      titulo: 'El aro corta las naves',
-      texto: 'La «o» de «circuito» baja a su lugar: es el aro del proyecto. Lo que queda dentro de su círculo se demuele; las naves se cortan a 47 m del centro y el resto se conserva.',
+      titulo: 'El circuito, en el proyecto',
+      texto: 'Mantuvimos el concepto de circuito dentro del proyecto: la «o» de «circuito» se convierte en el aro, el eje y el circuito central del conjunto. Lo que queda dentro de su círculo se demuele; las naves se cortan a 47 m del centro y el resto se conserva.',
       cifras: [
         ['≈ {corteNaves} m²', 'de nave que se demuele', 'dentro del círculo del aro'],
         ['47 m', 'radio del corte', 'desde el centro del aro']
       ],
       leyenda: [['#ff6f63', 'el aro'], ['#ff3b30', 'se demuele']],
       fuente: 'Contexto.3dm (naves y aro) · visor del proyecto'
+    },
+    rotulos: []
+  },
+  {
+    id: 'aroReal', etapa: 2,
+    titulo: 'El aro del proyecto',
+    // cerca del predio: la «o» baja y se adelgaza hasta ser el aro del visor, que se dibuja debajo; la «o» se apaga y
+    // la gente empieza a caminar sobre el aro
+    camara: { encuadre: [452, 354, 560, 464], az: 37, el: 30, aire: 1.05, lado: 0.26, dur: 3000 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal'],
+    aro: { op: 0.95, sube: 0 },
+    tarjeta: {
+      kicker: 'Etapa 2 · El aro',
+      titulo: 'El aro del proyecto',
+      texto: 'La «o» conceptual se vuelve el aro del proyecto: un circuito peatonal elevado que recorre el predio y conecta sus usos.',
+      cifras: [
+        ['≈ {aroLargo} m', 'de recorrido', 'por el eje del aro'],
+        ['{aroAncho} m', 'de ancho', 'radios de 39.5 a 46.55 m'],
+        ['+{aroAlto} m', 'nivel del piso del aro']
+      ],
+      fuente: 'Contexto.3dm (Diag::ring) · visor del proyecto'
     },
     rotulos: []
   }

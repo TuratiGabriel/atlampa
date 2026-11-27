@@ -439,7 +439,7 @@ export async function crea(api) {
       const a = q.p[j - 1], b = q.p[j], f = (d - q.acc[j - 1]) / ((q.acc[j] - q.acc[j - 1]) || 1);
       const du = (b[0] - a[0]) * va, dv = (b[1] - a[1]) * va, n = Math.hypot(du, dv) || 1;
       const u = a[0] + (b[0] - a[0]) * f - dv / n * q.lado * va, v = a[1] + (b[1] - a[1]) * f + du / n * q.lado * va;
-      const w = W(u + du / n, v + dv / n, 0), o = W(u, v, 0.25);
+      const w = W(u + du / n, v + dv / n, 0), o = W(u, v, PM.z != null ? PM.z : 0.25);   // PM.z: a qué altura caminan
       PM.aPos.setXYZ(i, o[0], o[1], o[2]);
       PM.aVolt.setX(i, (w[0] - o[0]) * derecha.x + (w[2] - o[2]) * derecha.z >= 0 ? 1 : -1);
       PM.aPose.setX(i, Math.floor(Math.abs(s) / (0.35 * q.esc * k)) % 4);
@@ -934,18 +934,69 @@ export async function crea(api) {
   // sube (s.aro: { op, sube, dur }); sin s.aro, no está. Sube translúcida para dejar ver el predio y luego baja a
   // su lugar, opaca: así se lee que la «o» es el aro.
   const matO = new THREE.MeshBasicMaterial({ color: CIRCUITO, transparent: true, opacity: 0, side: THREE.DoubleSide });
-  let aroO = null, aroEst = { op: 0, sube: 0 }, aroTw = null;
+  let aroO = null, aroEst = { op: 0, sube: 0 }, aroTw = null, aroForma = null;
   function armaAroO() {
     const A = G.ANILLO, lay = disenoAro('circuito', AZ_NORTE); lay.tex.dispose();   // el grosor de las letras de la palabra
-    const rm = A.re - lay.grosor / 2, circulo = [];
-    for (let i = 0; i <= 120; i++) { const t = i / 120 * Math.PI * 2; circulo.push([A.u + rm * Math.cos(t), A.v + rm * Math.sin(t)]); }
-    aroO = new THREE.Mesh(cinta(circulo, lay.grosor, ALTO_EXISTENTE + 4), matO); aroO.name = 'historia-aro'; aroO.renderOrder = 13;
+    const circ = r => { const c = []; for (let i = 0; i <= 120; i++) { const t = i / 120 * Math.PI * 2; c.push([A.u + r * Math.cos(t), A.v + r * Math.sin(t)]); } return c; };
+    const geo = cinta(circ(A.re - lay.grosor / 2), lay.grosor, ALTO_EXISTENTE + 4);
+    // la misma cinta con la forma del aro del proyecto (su piso, de ri a re), para pasar de una a otra
+    const real = cinta(circ((A.ri + A.re) / 2), A.re - A.ri, A.z + 0.04);
+    aroForma = { de: geo.attributes.position.array.slice(), a: real.attributes.position.array, k: 0 };
+    aroO = new THREE.Mesh(geo, matO); aroO.name = 'historia-aro'; aroO.renderOrder = 13;
     gH.add(aroO); aplicaAro(aroEst);
   }
+  // 0: la «o» de la palabra · 1: con la forma del aro del proyecto
+  function formaAro(k) {
+    if (!aroO || Math.abs(aroForma.k - k) < 1e-4) return;
+    aroForma.k = k;
+    const p = aroO.geometry.attributes.position, de = aroForma.de, a = aroForma.a;
+    for (let i = 0; i < de.length; i++) p.array[i] = de[i] + (a[i] - de[i]) * k;
+    p.needsUpdate = true; aroO.geometry.computeBoundingSphere();
+  }
+  // la opacidad de la «o»: la de la slide, y se apaga cuando el aro del proyecto ya está (marca aroReal)
+  const opAro = () => aroEst.op * (1 - tramo(marcaK.aroReal || 0, 0.55, 0.9));
   function aplicaAro(e) {
     aroEst = e;
     if (!aroO) return;
-    matO.opacity = e.op; aroO.position.y = e.sube; aroO.visible = e.op > 0.002;
+    matO.opacity = opAro(); aroO.position.y = e.sube; aroO.visible = matO.opacity > 0.002;
+  }
+  // slide «El aro del proyecto»: la «o» baja y se adelgaza hasta tener la forma del aro; el aro del visor (sus piezas
+  // 'aro' y 'cinta', copiadas con su propio canal) se dibuja como en el visor, de abajo hacia arriba; la «o» se apaga y
+  // la gente empieza a caminar sobre el aro
+  function armaAroReal() {
+    const A = G.ANILLO, g = new THREE.Group(); g.name = 'marca-aro-real'; g.visible = false; gH.add(g);
+    const U = { uDib: { value: new THREE.Vector4(1, 1, 0, 0) }, uDibO: { value: new THREE.Vector3() }, uDibV: { value: new THREE.Vector3(0, 300, 0) } };
+    const real = api.copiaConCanal ? api.copiaConCanal(['aro', 'cinta'], U) : new THREE.Group();
+    real.visible = false; g.add(real);
+    // el barrido: de abajo hacia arriba (y un poco en diagonal) sobre la caja del aro, como se dibuja una axonometría
+    const caja = new THREE.Box3().setFromObject(real), t = caja.getSize(new THREE.Vector3()), w = new THREE.Vector3(0.3, 1, 0.3);
+    U.uDibO.value.copy(caja.min); U.uDibV.value.copy(w.multiplyScalar(1 / Math.max(1, w.dot(t))));
+    const arma = a => { U.uDib.value.x = Math.min(1, a / 0.7); U.uDib.value.y = Math.max(0, Math.min(1, (a - 0.32) / 0.68)); };
+    // la gente sobre el aro: tres carriles, en los dos sentidos
+    const GENTE = [], circ = r => { const c = []; for (let i = 0; i <= 180; i++) { const th = i / 180 * Math.PI * 2; c.push([A.u + r * Math.cos(th), A.v + r * Math.sin(th)]); } return c; };
+    [A.ri + 1.4, (A.ri + A.re) / 2, A.re - 1.4].forEach(r => {
+      const pts = circ(r), acc = [0];
+      for (let j = 1; j < pts.length; j++) acc.push(acc[j - 1] + Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]));
+      const L = acc[acc.length - 1];
+      for (let k = 0; k < 14; k++) GENTE.push({ p: pts, acc, L, lado: (azarP() - 0.5) * 1.2, s0: azarP() * L * 2, vel: (0.9 + 0.5 * azarP()) * 1.4 * (azarP() < 0.5 ? 1 : -1),
+        tile: FIG.camina[Math.floor(azarP() * FIG.camina.length)], esc: 0.9 + 0.2 * azarP() });
+    });
+    const matG = api.matAtlas(FIG.tex, FIG.N, FIG.POSES, DC_), GM = api.mallaAtlas(GENTE.length, matG);
+    GENTE.forEach((x, i) => { GM.aEsc.setXY(i, FIG.ancho * x.esc, FIG.alto * x.esc); GM.aTile.setX(i, x.tile); });
+    GM.malla.geometry.instanceCount = GENTE.length; GM.malla.renderOrder = 8; GM.z = A.z + 0.02; g.add(GM.malla);
+    const opG = matG.uniforms.uOpacidad; opG.value = 0;
+    Object.assign(CALCULADOS, { aroLargo: Math.round(Math.PI * (A.ri + A.re) / 10) * 10, aroAncho: (A.re - A.ri).toFixed(2), aroAlto: A.z.toFixed(2) });
+    MARCA.aroReal = { g, piezas: [], rotulos: [], dur: 5200, durSale: 1200,
+      aplica(k) {
+        formaAro(suave(tramo(k, 0, 0.38)));
+        if (aroO) { matO.opacity = opAro(); aroO.visible = matO.opacity > 0.002; }
+        real.visible = k > 0.3;
+        arma(tramo(k, 0.3, 0.86));
+        opG.value = tramo(k, 0.84, 1);
+        GM.malla.visible = opG.value > 0;
+      },
+      latido(ms, k) { if (opG.value > 0 && !quieto.matches) mueveGente(GENTE, GM, ms); }
+    };
   }
   function ponAro(c, retraso) {
     const meta = { op: c ? (c.op == null ? 0.95 : c.op) : 0, sube: (c && c.sube) || 0 };
@@ -1020,18 +1071,19 @@ export async function crea(api) {
     transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8
   });
   // (la «o» no se imprime: es el aro, que levita sobre lo existente; ver aroO)
-  function ponImpresa(lay) {
+  // existente: 'cortado' imprime sobre lo que queda después de la demolición y del corte del aro
+  function ponImpresa(lay, existente) {
     const U = matImpresa.uniforms;
     if (U.uMapa.value && U.uMapa.value !== lay.tex) U.uMapa.value.dispose();
     U.uMapa.value = lay.tex; U.uO.value.copy(lay.c); U.uEx.value.copy(lay.ex); U.uNw.value.copy(lay.nw); U.uAncho.value = lay.ancho; U.uAlto.value = lay.alto;
-    const clave = lay.caja.map(Math.round).join(',');
+    const clave = lay.caja.map(Math.round).join(',') + '|' + (existente || '');
     if (!fondoAro || fondoAro.userData.clave !== clave) {
       if (fondoAro) { fondoAro.children.forEach(o => o.geometry.dispose()); gH.remove(fondoAro); }
       const g = new THREE.Group(), k = lay.caja, m = 12;
       const piso = new Malla(); tapa(piso, api.rect(k[0] - m, k[1] - m, k[2] + m, k[3] + m), 0.25);
       const ed = new Malla();
       EDIF.forEach(e => { if (e.q.some(p => p[0] > k[0] - m && p[0] < k[2] + m && p[1] > k[1] - m && p[1] < k[3] + m)) prisma(ed, e.q, 0, e.h); });
-      [piso, ed, mallaExistente()].forEach(x => { if (!x.p.length) return; const o = new THREE.Mesh(x.geo(), matImpresa); o.renderOrder = 12; o.frustumCulled = false; g.add(o); });
+      [piso, ed, existente === 'cortado' ? mallaNavesCortadas() : mallaExistente()].forEach(x => { if (!x.p.length) return; const o = new THREE.Mesh(x.geo(), matImpresa); o.renderOrder = 12; o.frustumCulled = false; g.add(o); });
       g.userData = { clave }; g.visible = false; gH.add(g);
       fondoAro = g;
     }
@@ -1051,7 +1103,7 @@ export async function crea(api) {
     if (op.pos === 'aro') {
       const lay = op._diseno || disenoAro(t, o.az);
       fondo3D.visible = false; fondoTexto = null;
-      const g = ponImpresa(lay); g.visible = true;
+      const g = ponImpresa(lay, op.existente); g.visible = true;
       const meta = op.op == null ? 0.92 : op.op;
       anima(1600, k => { if (tok === fondoTok) { matImpresa.uniforms.uOp.value = aroDe + (meta - aroDe) * k; } });
       return;
@@ -1231,7 +1283,7 @@ export async function crea(api) {
       const tandas = [armaSuelo, armaCalles, armaExistente, armaLimite];
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
       tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa, armaMercado,
-        armaDemolicion, armaCorteAro, armaAroO,
+        armaDemolicion, armaCorteAro, armaAroO, armaAroReal,
         () => { mueveCarros(performance.now()); caminan(performance.now()); });
       (function sigue() {
         tandas.shift()();
