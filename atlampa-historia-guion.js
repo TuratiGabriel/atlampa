@@ -13,6 +13,7 @@
    compacto: true → de las marcas sólo quedan las figuras, sin sus textos (la slide de factores)
    rotulosDe: [ids] → sólo esas marcas ponen sus textos
    tarjeta: kicker, titulo, texto, cifras [[valor, etiqueta, nota]], nota, fuente
+            (una slide sin tarjeta no la muestra y se encuadra en toda la pantalla)
    rotulos: { u, v, z, texto, sub, tipo: 'calle' | 'punto', lado: 'izq' (texto a la izquierda) }
    fondo: { texto, pos: 'esquina' | 'centro' | 'aro', blur, op, alto } · 'aro': la última letra es el aro del
           proyecto en su lugar, y camara.encuadre: 'fondo' encuadra la palabra
@@ -270,45 +271,39 @@ export default [
     rotulos: []
   },
   {
-    id: 'circuito',
-    titulo: 'Circuito',
-    // la palabra escrita sobre la colonia; su «o» es el aro del proyecto, en su lugar (un guiño a lo que será)
-    camara: { encuadre: 'fondo', az: 20, el: 30, aire: 1.05, lado: 0.26, dur: 3000 },   // el ángulo de la vista de Diego (el del visor por omisión)
-    capas: { colonia: true, coches: true, limite: true },
-    marcas: ['asentamientos', 'cultura', 'espuela'],
-    compacto: true,
-    fondo: { texto: 'circuito', pos: 'aro', op: 0.9 },
-    tarjeta: {
-      kicker: 'Concepto · 1 / 2',
-      titulo: 'Circuito',
-      texto: '(circuitus, latín): rodear, recorrer, volver. El circuito se plantea como un dispositivo de conexión capaz de organizar relaciones entre espacios residuales, habitantes, producción y paisaje. Frente a una colonia fragmentada, reconecta lo que hoy está separado a partir de sus propios recursos.',
-      leyenda: [['#ff6f63', 'la «o»: el aro del proyecto'], ['#e8a25a', 'espuela'], ['#f5c518', 'asentamientos'], ['#c9a6ff', 'cultura']],
-      nota: 'Metabolismo urbano: agua, energía, materiales, personas y capital que entran, se transforman y vuelven a circular.',
-      fuente: 'Lámina «circuito» (Actividad 02A)'
-    },
-    rotulos: []
-  },
-  {
     id: 'concepto',
     titulo: 'Atlampa en circuito',
     camara: { encuadre: [-500, -540, 1700, 1460], az: 'norte', el: 58, aire: 1.02, lado: 0.26, dur: 3000 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['circuitoAtlampa', 'espuela', 'verdes', 'mercado'],
     rotulosDe: ['circuitoAtlampa', 'mercado'],
+    // lleva también lo que decía la slide «Circuito» (la definición y el metabolismo urbano)
     tarjeta: {
-      kicker: 'Concepto · 2 / 2',
+      kicker: 'Concepto',
       titulo: 'Atlampa en circuito',
-      texto: 'Así como hay circuitos dentro del proyecto, el concepto busca influir en toda Atlampa. Nuestros usos extienden el circuito y el ecosistema de las necesidades de la colonia: el circuito sale del predio, retoma la espuela (≈ 1.5 km) y reconecta lo fragmentado, convirtiendo los vacíos y las estructuras existentes en oportunidades.',
+      texto: '(circuitus, latín): rodear, recorrer, volver. Un dispositivo que conecta espacios residuales, habitantes, producción y paisaje. Nuestros usos llevan el circuito y el ecosistema de necesidades a toda Atlampa: sale del predio, retoma la espuela (≈ 1.5 km) y reconecta lo fragmentado.',
       cifras: [
         ['Social', 'vivienda · cultura · calle activa', 'Las Vías, Casa Wabi, balaceras'],
         ['Productivo', 'mercado · microindustria', 'el mercado sale por la espuela'],
         ['Ecológico', 'agua · paisaje', 'hacia los parques cercanos'],
         ['≈ {puestos}', 'puestos en fin de semana', 'mercado sobre ruedas']
       ],
-      leyenda: [['#8fd0ff', 'agua'], ['#ffd34d', 'energía'], ['#d2d4d8', 'materiales'], ['#ffffff', 'personas'], ['#7dffb0', 'capital']],
-      nota: 'Un ejemplo: los fines de semana, el mercado del proyecto sale de las naves y se extiende por la espuela como un mercado sobre ruedas, e impacta directamente sobre la colonia.',
+      leyenda: [['#ff6f63', 'circuito'], ['#e8a25a', 'espuela'], ['#8fd0ff', 'agua'], ['#ffd34d', 'energía'], ['#d2d4d8', 'materiales'], ['#ffffff', 'personas'], ['#7dffb0', 'capital']],
+      nota: 'Metabolismo urbano: agua, energía, materiales, personas y capital entran, se transforman y vuelven a circular.',
       fuente: 'Lámina «circuito» (Actividad 02A)'
     },
+    rotulos: []
+  },
+  {
+    id: 'circuito',
+    titulo: 'Circuito',
+    // Última slide de la etapa 1 y paso a la etapa 2: sólo la palabra escrita sobre la colonia, sin tarjeta.
+    // Su «o» es el aro del proyecto, en su lugar (un guiño a lo que será). Ángulo de la captura de Diego (2026-11-26).
+    camara: { encuadre: 'fondo', az: 37, el: 32, aire: 1.28, lado: 0, dur: 3000 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['asentamientos', 'cultura', 'espuela'],
+    compacto: true,
+    fondo: { texto: 'circuito', pos: 'aro', op: 0.9 },
     rotulos: []
   }
 ];

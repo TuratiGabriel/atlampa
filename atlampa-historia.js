@@ -1023,7 +1023,7 @@ export async function crea(api) {
   }
 
   /* ---------- 7. Cámara de cada slide ---------- */
-  function objetivo(cs) {
+  function objetivo(cs, conTarjeta) {
     const az = cs.az === 'norte' || cs.az == null ? AZ_NORTE : cs.az, el = cs.el == null ? 60 : cs.el;
     const k = cs.encuadre === 'colonia' || !cs.encuadre ? CAJA_LIM : cs.encuadre;
     const a = az * RAD, e = el * RAD;
@@ -1035,9 +1035,11 @@ export async function crea(api) {
       const p = V3(u, v, z).sub(c0), px = p.dot(r), py = p.dot(up);
       x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
     })));
-    // la tarjeta tapa su ancho real (360 px más márgenes): en pantallas angostas, proporcionalmente más
+    // la tarjeta tapa su ancho real (360 px más márgenes): en pantallas angostas, proporcionalmente más;
+    // una slide sin tarjeta se centra en toda la pantalla
     const Wt = trabajo.clientWidth, gut = Math.max(16, Math.min(40, Wt * 0.03)), ancho = Math.min(360, Wt - 2 * gut);
-    const ASP = Wt / Math.max(1, trabajo.clientHeight), lado = Math.min(0.45, Math.max(cs.lado || 0, (ancho + 2 * gut) / Wt));
+    const ASP = Wt / Math.max(1, trabajo.clientHeight);
+    const lado = conTarjeta === false ? (cs.lado || 0) : Math.min(0.45, Math.max(cs.lado || 0, (ancho + 2 * gut) / Wt));
     const h = Math.max((y1 - y0) / 2, (x1 - x0) / 2 / (ASP * (1 - lado))) * (cs.aire || 1.1);
     const c = c0.add(r.clone().multiplyScalar((x0 + x1) / 2)).add(up.clone().multiplyScalar((y0 + y1) / 2));
     c.addScaledVector(r, -lado * h * ASP);   // lo encuadrado, centrado a la derecha de la tarjeta
@@ -1078,14 +1080,14 @@ export async function crea(api) {
         s.fondo._diseno = disenoAro(s.fondo.texto, s.fondo.az == null || s.fondo.az === 'norte' ? AZ_NORTE : s.fondo.az);   // la palabra, a lo largo de las calles (norte arriba), aunque la cámara gire
         if (cs.encuadre === 'fondo') { const k = s.fondo._diseno.caja, m = 30; cs.encuadre = [k[0] - m, k[1] - m, k[2] + m, k[3] + m]; }
       }
-      const obj = objetivo(cs);
+      const obj = objetivo(cs, !!s.tarjeta);
       ponFondo(s.fondo, obj);
       api.camaraA(obj, dur, () => {
         if (tok !== irTok) return;
         volando = false;
         if (avisos.fin) avisos.fin();
       });
-      if (!mismo) setTimeout(() => { if (tok === irTok && activo) muestraTarjeta(s, n); }, Math.min(900, dur * 0.45));
+      if (!mismo && s.tarjeta) setTimeout(() => { if (tok === irTok && activo) muestraTarjeta(s, n); }, Math.min(900, dur * 0.45));
       // lo que entra, al llegar
       setTimeout(() => {
         if (tok !== irTok || !activo) return;
