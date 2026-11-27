@@ -966,8 +966,9 @@ export async function crea(api) {
   function armaAroReal() {
     const A = G.ANILLO, g = new THREE.Group(); g.name = 'marca-aro-real'; g.visible = false; gH.add(g);
     const U = { uDib: { value: new THREE.Vector4(1, 1, 0, 0) }, uDibO: { value: new THREE.Vector3() }, uDibV: { value: new THREE.Vector3(0, 300, 0) } };
-    // el aro como se ve en el visor: sus piezas y, del Revit, las losas y los muros del aro
-    const real = api.copiaConCanal ? api.copiaConCanal(['aro', 'cinta'].concat(piezasDe(/^revit-cultura-(floors|walls)-.*-aro$/)), U) : new THREE.Group();
+    // el aro como se ve en el visor: sus piezas y, del Revit, las losas del aro (sus muros, los de la azotea de arte y
+    // cultura, entran con «Completo»)
+    const real = api.copiaConCanal ? api.copiaConCanal(['aro', 'cinta'].concat(piezasDe(/^revit-cultura-floors-.*-aro$/)), U) : new THREE.Group();
     real.visible = false; g.add(real);
     // el barrido: de abajo hacia arriba (y un poco en diagonal) sobre la caja del aro, como se dibuja una axonometría
     const caja = new THREE.Box3().setFromObject(real), t = caja.getSize(new THREE.Vector3()), w = new THREE.Vector3(0.3, 1, 0.3);
@@ -1058,7 +1059,7 @@ export async function crea(api) {
   function armaCulturaCompleta() {
     const g = new THREE.Group(); g.name = 'marca-cultura-completa'; g.visible = false; gH.add(g);
     const tiempos = [
-      [/^revit-cultura-walls-\d+-entero$/, 0, 0.45],                              // muros
+      [/^revit-cultura-walls-/, 0, 0.45],                                         // muros (con los de la azotea, del aro)
       [/^revit-cultura-(doors|curtainPanels|curtainMullions)-/, 0.22, 0.62],     // cancelería y puertas
       [/^revit-cultura-(columns|railings|topRails)-/, 0.38, 0.8],                 // columnas y barandales
       [/^revit-cultura-roofs-/, 0.6, 1]                                            // sombrillas

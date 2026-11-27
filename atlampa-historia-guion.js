@@ -419,19 +419,23 @@ export default [
     id: 'culturaVolumen', etapa: 2,
     titulo: 'Arte y cultura',
     // las losas de arte y cultura salen del aro (plegadas a su nivel) y se despliegan hasta su lugar; al final, las escaleras
-    camara: { encuadre: [446, 362, 540, 460], az: 37, el: 32, aire: 1.04, lado: 0.26, dur: 2400 },
+    // el ángulo de la captura de Diego (2026-11-26)
+    camara: { encuadre: [462, 360, 570, 468], az: 'norte', el: 27, aire: 1.12, lado: 0.26, dur: 2400 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen'],
     aro: { op: 0.95, sube: 0 },
+    // (el programa de adentro va en la etapa 3, cuando se desglosen los usos)
     tarjeta: {
       kicker: 'Etapa 2 · Arte y cultura',
       titulo: 'Arte y cultura',
-      texto: 'Un edificio escalonado bajo el aro, abierto al patio: planta baja, dos niveles y una azotea a +9.51 por la que pasa el aro. Seis escaleras en X, tipo Vessel, conectan sus plataformas con el circuito.',
+      texto: 'Nace del aro: se acomoda debajo de su curva y su azotea es parte del circuito, una sola losa con el aro. Sus tres plataformas de 3 m se escalonan hacia el patio y hacia atrás, así que cada nivel tiene terraza y vista al aro.',
       cifras: [
-        ['1,953 m²', 'de superficie cerrada', 'PB, N1, N2 y azotea'],
-        ['6', 'escaleras en X', 'tipo Vessel, de dos carriles']
+        ['1,953 m²', 'de superficie cerrada', 'tres niveles y azotea'],
+        ['+9.51 m', 'azotea', 'a la altura del aro'],
+        ['6', 'escaleras en X', 'tipo Vessel, al patio y atrás']
       ],
-      fuente: 'Hoja de plantas de arte y cultura v35 · Revit ArteCultura_Aro_ARQ'
+      nota: 'Proceso: el auditorio hundido de las primeras versiones se quitó porque chocaba con el estacionamiento subterráneo; su lugar es hoy el patio.',
+      fuente: 'Concepto y hoja de plantas de arte y cultura (v15 a v35)'
     },
     rotulos: []
   },
@@ -439,20 +443,20 @@ export default [
     id: 'culturaCompleta', etapa: 2,
     titulo: 'Completo',
     // lo demás se arma como un uso en el visor: muros, cancelería y puertas, columnas y barandales, sombrillas
-    camara: { encuadre: [446, 362, 540, 460], az: 37, el: 32, aire: 1.04, lado: 0.26, dur: 1200 },
+    camara: { encuadre: [462, 360, 570, 468], az: 'norte', el: 27, aire: 1.12, lado: 0.26, dur: 1200 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta'],
     aro: { op: 0.95, sube: 0 },
     tarjeta: {
       kicker: 'Etapa 2 · Arte y cultura',
-      titulo: 'Qué hay adentro',
-      texto: 'En planta baja y N1, Péndulo (café-librería) y Gandhi (librería). En N2, dos salas de exposición y dos talleres en renta. En la azotea, exposición al aire libre y un café bajo sombrillas tipo Johnson Wax a +15.',
+      titulo: 'Fachadas y sombrillas',
+      texto: 'Las escaleras, la azotea y el aro comparten material y un barandal de vidrio continuo: todas las circulaciones se leen como una sola. Sobre la azotea, sombrillas tipo Johnson Wax a +15 dan sombra al circuito; se juntan sobre el edificio y se espacian al alejarse, sólo en los tramos asoleados del aro.',
       cifras: [
-        ['1,278 m²', 'de comercio', 'Péndulo, Gandhi y café'],
-        ['559 m²', 'de cultura', 'salas de exposición'],
-        ['116 m²', 'de talleres', 'dos en renta']
+        ['+15 m', 'sombrillas tipo Johnson Wax', 'columnas que se abren en la azotea'],
+        ['5.5 × 4 m', 'cada sombrilla', 'un módulo, como la vivienda']
       ],
-      fuente: 'Hoja de plantas de arte y cultura v35 · Revit ArteCultura_Aro_ARQ'
+      nota: 'Proceso: las sombrillas empezaron circulares; se volvieron rectangulares, de un módulo, porque chocaban con el lenguaje de la vivienda.',
+      fuente: 'Concepto y hoja de plantas de arte y cultura (v15 a v35)'
     },
     rotulos: []
   }
