@@ -1,5 +1,5 @@
 /* ============================================================
-   ATLAMPA — Modo historia · guion de la etapa 1
+   ATLAMPA — Modo historia · guion de las etapas 1 y 2
    Cada slide es un estado del visor. Coordenadas en metros del visor (u, v);
    ver PRESENTACION FINAL/CONTEXTO.md y herramientas/prepara-historia.mjs.
 
@@ -8,7 +8,9 @@
            el        elevación (89 = cenital) · aire: holgura · dur: ms
            lado      fracción del ancho que tapa la tarjeta (se centra en el resto)
    capas:  colonia (edificios y calles de toda Atlampa), coches, limite
-   marcas: 'asentamientos' | 'balaceras' | 'cultura' | 'verdes' | 'espuela' | 'circuitoProyecto' | 'circuitoAtlampa'
+   marcas: 'asentamientos' | 'balaceras' | 'cultura' | 'verdes' | 'espuela' | 'circuitoProyecto' | 'circuitoAtlampa' | 'mercado'
+           etapa 2: 'demolicion' (rojo y se desintegra) | 'aroConcepto' (la «o» sobre el predio) | 'corteAro' (se cortan las naves);
+           éstas se animan enteras (ida y regreso) y se quedan hechas mientras las siguientes slides las listen
            (ver MARCAS abajo; en las balaceras, lado: 'izq' | 'der' pone el texto a un lado de los tiradores)
    compacto: true → de las marcas sólo quedan las figuras, sin sus textos (la slide de factores)
    rotulosDe: [ids] → sólo esas marcas ponen sus textos
@@ -20,13 +22,29 @@
    ============================================================ */
 
 export const MARCAS = {
-  // El predio hoy: además de las naves de G.NAVES, las masas occidentales que Luis estimó desde Earth
-  // (handoff/LEVANTAMIENTO_PREEXISTENCIA.md; alturas aproximadas).
+  // El predio hoy, con el levantamiento detallado de Luis desde Google Earth (handoff/LEVANTAMIENTO_PREEXISTENCIA.md;
+  // es el mismo de atlampa-3d.js, historiaGrupo). Las dos naves orientales son G.NAVES y se conservan; estas piezas
+  // son lo que se demuele en la etapa 2. Subdivisiones y alturas aproximadas. planta: [u0, v0, u1, v1].
   existente: {
-    masas: [
-      { planta: [449, 418.5, 522, 487], alto: 6.2 },
-      { planta: [449, 323.5, 503.5, 395.5], alto: 6.0 }
-    ]
+    piezas: [
+      // conjunto noroeste
+      { id: 'cubierta-fresno-inclinada', tipo: 'cobertizo', planta: [449, 419, 469, 487], altoO: 7.2, altoE: 5.5 },
+      { id: 'ala-norte', planta: [469, 468, 491, 487], alto: 5.2 },
+      { id: 'anexo-suroeste', planta: [469, 419, 478, 441], alto: 5.8 },
+      { id: 'nave-corta-1', tipo: 'nave', planta: [479, 419, 496, 458], alero: 6.3, cumbre: 7.6 },
+      { id: 'nave-corta-2', tipo: 'nave', planta: [498, 419, 509, 458], alero: 5.9, cumbre: 7.5 },
+      { id: 'nave-corta-3', tipo: 'nave', planta: [510, 419, 521, 458], alero: 5.9, cumbre: 7.5 },
+      { id: 'ala-patio-oeste', planta: [492, 462, 499, 487], alto: 5.0 },
+      { id: 'ala-patio-norte', planta: [499, 479, 522, 487], alto: 5.2 },
+      { id: 'ala-patio-este', planta: [516, 462, 522, 479], alto: 5.0 },
+      // conjunto suroeste
+      { id: 'cubierta-principal', planta: [449, 345, 484, 395], alto: 6.0 },
+      { id: 'franja-sur-dos-niveles', planta: [449, 324, 503, 345], alto: 9.0 },
+      { id: 'ala-hacia-naves', planta: [484, 372, 503, 395], alto: 5.5 },
+      { id: 'monitor-de-cubierta', planta: [452, 349, 459, 376], z0: 6.0, alto: 6.8 }
+    ],
+    // portones de la calle interior, en Fresno y en Sabino (también se demuelen)
+    portones: { v0: 396.6, v1: 417.5, alto: 3.2 }
   },
   // Booklet p. 68: franjas sobre el derecho de vía de la antigua espuela
   // (Crisantema, "Las Vías"), georreferidas con el límite de la colonia.
@@ -304,6 +322,67 @@ export default [
     marcas: ['asentamientos', 'cultura', 'espuela'],
     compacto: true,
     fondo: { texto: 'circuito', pos: 'aro', op: 0.9 },
+    rotulos: []
+  },
+
+  /* ===== Etapa 2: del predio de hoy al proyecto (sobre el modelo) ===== */
+  {
+    id: 'predio', etapa: 2,
+    titulo: 'El predio',
+    // la cámara se acerca al predio; la palabra y la «o» se van y queda lo existente
+    camara: { encuadre: [447, 322, 559, 489], az: 37, el: 40, aire: 1.3, lado: 0.26, dur: 3400 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: [],
+    tarjeta: {
+      kicker: 'Etapa 2 · Preexistencia',
+      titulo: 'El predio hoy',
+      texto: 'Una manzana completa dentro del circuito de la antigua espuela. Hoy hay oficinas en el lote norte y equipamiento en el sur; al oriente, dos naves industriales con valor patrimonial.',
+      cifras: [
+        ['17,180 m²', 'superficie del predio', 'dos cuentas catastrales'],
+        ['≈ {huellaHoy} m²', 'de huella construida', 'aprox., desde Google Earth']
+      ],
+      fuente: 'Levantamiento aproximado desde Google Earth · Área de Conservación Patrimonial'
+    },
+    rotulos: []
+  },
+  {
+    id: 'demolicion', etapa: 2,
+    titulo: 'Demolición',
+    // los muros y losas que no se conservan se marcan en rojo y se desintegran (las piezas de MARCAS.existente)
+    camara: { encuadre: [447, 322, 559, 489], az: 37, el: 40, aire: 1.3, lado: 0.26, dur: 1200 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion'],
+    tarjeta: {
+      kicker: 'Etapa 2 · Demolición',
+      titulo: 'Lo que se retira',
+      texto: 'Se demuelen los muros y losas de las construcciones sin valor patrimonial. Se conservan las naves del oriente y las vías de la espuela.',
+      cifras: [
+        ['≈ {huellaDemolida} m²', 'de huella que se retira', 'aprox., desde Google Earth'],
+        ['{crujias}', 'crujías de nave que se conservan', '≈ {huellaNaves} m²']
+      ],
+      leyenda: [['#ff3b30', 'se demuele']],
+      fuente: 'Levantamiento aproximado desde Google Earth'
+    },
+    rotulos: []
+  },
+  {
+    id: 'aro', etapa: 2,
+    titulo: 'El aro',
+    // primero la «o» de «circuito» sobre el predio, donde irá el aro; luego se demuele lo de las naves que queda dentro
+    camara: { encuadre: [447, 322, 559, 489], az: 37, el: 46, aire: 1.2, lado: 0.26, dur: 2000 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'aroConcepto', 'corteAro'],
+    tarjeta: {
+      kicker: 'Etapa 2 · El aro',
+      titulo: 'El aro corta las naves',
+      texto: 'La «o» del circuito se posa sobre el predio, donde irá el aro. Lo que queda dentro de su círculo se demuele: las naves se cortan a 47 m del centro y el resto se conserva.',
+      cifras: [
+        ['≈ {corteNaves} m²', 'de nave que se demuele', 'dentro del círculo del aro'],
+        ['47 m', 'radio del corte', 'desde el centro del aro']
+      ],
+      leyenda: [['#ff6f63', 'el aro (concepto)'], ['#ff3b30', 'se demuele']],
+      fuente: 'Contexto.3dm (naves y aro) · visor del proyecto'
+    },
     rotulos: []
   }
 ];

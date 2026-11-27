@@ -23,6 +23,7 @@ export async function crea(api) {
   if (!window.ATLAMPA_HISTORIA_DATOS) await cargaScript(conV('atlampa-historia-datos.js'));
   const guionMod = await import(conV('./atlampa-historia-guion.js'));
   const GUION = guionMod.default, MARCAS = guionMod.MARCAS;
+  const etapaDe = i => (GUION[i] && GUION[i].etapa) || 1;   // etapa de la presentación (la 1 por omisión)
   const H = window.ATLAMPA_HISTORIA_DATOS;
   const { THREE, G, W, CEN, Malla, Lineas, tapa, prisma, pon, ponLineas, material, raizG, trabajo, pide, aplicaEstilo, ESTILOS } = api;
   const D = G.D, S = G.S, R = D.rect, RAD = Math.PI / 180, DC_ = api.dib;
@@ -142,30 +143,79 @@ export async function crea(api) {
       return [p[0] - dy / l * o, p[1] + dx / l * o];
     });
   }
-  // El predio como está hoy (levantamiento de Luis, handoff/LEVANTAMIENTO_PREEXISTENCIA.md): las dos
-  // naves orientales de Contexto.3dm, completas y con cubierta a dos aguas, y las masas occidentales
-  // aproximadas desde Earth (MARCAS.existente). En la etapa 1 el proyecto no aparece.
-  function mallaExistente() {
-    const m = new Malla();
-    G.NAVES.forEach(nv => {
-      const paso = (nv.u1 - nv.u0) / nv.n;
-      for (let j = 0; j < nv.n; j++) {
-        const u0 = nv.u0 + j * paso, u1 = u0 + paso, um = (u0 + u1) / 2, v0 = nv.v0, v1 = nv.v1, a = nv.alero, c = nv.cumbre;
-        const altura = u => a + (c - a) * Math.max(0, 1 - Math.abs(u - um) / (paso / 2));
-        api.muros(m, api.rect(u0, v0, u1, v1), 0, 0, altura);
-        m.tri(W(u0, v0, a), W(um, v0, c), W(u1, v0, a));
-        m.tri(W(u1, v1, a), W(um, v1, c), W(u0, v1, a));
-        m.quad(W(u0, v0, a), W(u0, v1, a), W(um, v1, c), W(um, v0, c));
-        m.quad(W(um, v0, c), W(um, v1, c), W(u1, v1, a), W(u1, v0, a));
-      }
+  // El predio como está hoy: el levantamiento detallado de Luis desde Google Earth (atlampa-3d.js, historiaGrupo;
+  // handoff/LEVANTAMIENTO_PREEXISTENCIA.md), con sus piezas en MARCAS.existente del guion. Las dos naves orientales
+  // (G.NAVES, de Contexto.3dm) se conservan; lo demás se demuele en la etapa 2 y el aro corta las naves en G.CORTE.
+  // En la etapa 1 el proyecto no aparece.
+  const EXI = MARCAS.existente || { piezas: [] };
+  function mallaNave(m, nv) {
+    const paso = (nv.u1 - nv.u0) / nv.n;
+    for (let j = 0; j < nv.n; j++) {
+      const u0 = nv.u0 + j * paso, u1 = u0 + paso, um = (u0 + u1) / 2, v0 = nv.v0, v1 = nv.v1, a = nv.alero, c = nv.cumbre;
+      const altura = u => a + (c - a) * Math.max(0, 1 - Math.abs(u - um) / (paso / 2));
+      api.muros(m, api.rect(u0, v0, u1, v1), 0, 0, altura);
+      m.tri(W(u0, v0, a), W(um, v0, c), W(u1, v0, a));
+      m.tri(W(u1, v1, a), W(um, v1, c), W(u0, v1, a));
+      m.quad(W(u0, v0, a), W(u0, v1, a), W(um, v1, c), W(um, v0, c));
+      m.quad(W(um, v0, c), W(um, v1, c), W(u1, v1, a), W(u1, v0, a));
+    }
+  }
+  function mallaPieza(m, p) {
+    const [u0, v0, u1, v1] = p.planta;
+    if (p.tipo === 'nave') mallaNave(m, { u0, v0, u1, v1, n: p.n || 1, alero: p.alero, cumbre: p.cumbre });
+    else if (p.tipo === 'cobertizo') {   // cubierta de un agua, de altoO (al poniente) a altoE
+      const z = u => p.altoO + (p.altoE - p.altoO) * (u - u0) / (u1 - u0);
+      api.muros(m, api.rect(u0, v0, u1, v1), 0, 0, z);
+      m.quad(W(u0, v0, p.altoO), W(u1, v0, p.altoE), W(u1, v1, p.altoE), W(u0, v1, p.altoO));
+    } else prisma(m, api.rect(u0, v0, u1, v1), p.z0 || 0, p.alto);
+  }
+  const altoPieza = p => p.tipo === 'nave' ? p.cumbre : p.tipo === 'cobertizo' ? Math.max(p.altoO, p.altoE) : p.alto;
+  const ALTO_EXISTENTE = Math.max(...G.NAVES.map(n => n.cumbre), ...EXI.piezas.map(altoPieza));
+  function mallaNaves() { const m = new Malla(); G.NAVES.forEach(nv => mallaNave(m, nv)); return m; }
+  function mallaDemuele() { const m = new Malla(); EXI.piezas.forEach(p => mallaPieza(m, p)); return m; }
+  function mallaExistente() { const m = mallaNaves(); EXI.piezas.forEach(p => mallaPieza(m, p)); return m; }
+  // las naves que se conservan, ya cortadas por el aro (las mismas piezas del visor: G.PIEZAS), con su cara de corte
+  function mallaNavesCortadas() {
+    const m = new Malla(), e = 1e-3;
+    G.PIEZAS.forEach(pz => {
+      const nv = pz.nv, L = pz.L, zf = u => nv.alero + (nv.cumbre - nv.alero) * Math.max(0, 1 - Math.abs(u - pz.um) / pz.run);
+      const borde = (a, b) => (Math.abs(a[0] - L.u0) < e && Math.abs(b[0] - L.u0) < e) || (Math.abs(a[0] - L.u1) < e && Math.abs(b[0] - L.u1) < e) ||
+        (Math.abs(a[1] - L.v0) < e && Math.abs(b[1] - L.v0) < e) || (Math.abs(a[1] - L.v1) < e && Math.abs(b[1] - L.v1) < e);
+      [true, false].forEach(izq => {
+        const h = G.cortaU(pz.pol, pz.um, izq); if (!h) return;
+        tapa(m, h, 0, u => zf(u));
+        api.muros(m, h, 0, 0, u => zf(u), (a, b) => borde(a, b) || !!(a[2] && b[2]));
+      });
     });
-    ((MARCAS.existente && MARCAS.existente.masas) || []).forEach(x => prisma(m, api.rect(...x.planta), 0, x.alto));
     return m;
   }
+  // los portones de la calle interior (entre los dos lotes), en Fresno y en Sabino
+  function lineasPortones() {
+    const l = new Lineas(), p = EXI.portones; if (!p) return l;
+    [G.PB.u0 + 0.4, G.PB.u1 - 0.4].forEach(u => {
+      [p.v0, p.v1].forEach(v => l.seg(W(u, v, 0.1), W(u, v, p.alto)));
+      [0.2, p.alto].forEach(h => l.seg(W(u, p.v0, h), W(u, p.v1, h)));
+      for (let v = p.v0 + 1.2; v < p.v1; v += 1.2) l.seg(W(u, v, 0.2), W(u, v, p.alto));
+    });
+    return l;
+  }
+  const areaPol = q => Math.abs(q.reduce((s, p, i) => { const r = q[(i + 1) % q.length]; return s + p[0] * r[1] - r[0] * p[1]; }, 0)) / 2;
+  const EXIS = {};   // grupos de lo existente: naves completas, naves cortadas por el aro y lo que se demuele
   function armaExistente() {
     const piso = new Malla(); tapa(piso, api.rect(G.PB.u0, G.PB.v0, G.PB.u1, G.PB.v1), 0.02);
     pon(gCol, piso, 'ctxsuelo', null, false);
-    pon(gCol, mallaExistente(), 'ctxpredio', null, 25);
+    const grupo = (nombre, malla, visible) => { const g = new THREE.Group(); g.name = nombre; g.visible = visible; gCol.add(g); pon(g, malla, 'ctxpredio', null, 25); return g; };
+    EXIS.naves = grupo('existente-naves', mallaNaves(), true);
+    EXIS.cortadas = grupo('existente-naves-cortadas', mallaNavesCortadas(), false);
+    EXIS.demuele = grupo('existente-demuele', mallaDemuele(), true);
+    ponLineas(EXIS.demuele, lineasPortones(), 'ctxresalta', 0xffffff);
+    // cifras para las tarjetas (huellas en planta; lo de Earth es aproximado)
+    const A = G.ANILLO, fmt = x => (Math.round(x / 10) * 10).toLocaleString('es-MX');
+    const rN = nv => api.rect(nv.u0, nv.v0, nv.u1, nv.v1);
+    const aN = G.NAVES.reduce((s, nv) => s + areaPol(rN(nv)), 0);
+    const aD = EXI.piezas.filter(p => !p.z0).reduce((s, p) => s + (p.planta[2] - p.planta[0]) * (p.planta[3] - p.planta[1]), 0);
+    const aC = G.NAVES.reduce((s, nv) => { const q = G.menosCirculo(rN(nv), [A.u, A.v], G.CORTE); return s + areaPol(rN(nv)) - (q ? areaPol(q) : 0); }, 0);
+    Object.assign(CALCULADOS, { huellaHoy: fmt(aN + aD), huellaDemolida: fmt(aD), huellaNaves: fmt(aN), corteNaves: fmt(aC), crujias: G.NAVES.reduce((s, nv) => s + nv.n, 0) });
     // el predio resaltado: su contorno (doble, con la banqueta) y un velo claro sobre el piso
     const lp = new Lineas(), P = G.PRED;
     lp.poli(P.map(q => W(q[0], q[1], 0.3)), true);
@@ -176,6 +226,9 @@ export async function crea(api) {
     velo.renderOrder = 2; gCol.add(velo);
     const tv = new Lineas();
     adentro(G.ESPUELA, S).forEach(t => [-0.72, 0.72].forEach(o => tv.poli(franjaLado(t, o).map(q => W(q[0], q[1], 0.06)))));
+    // los durmientes de las vías que cruzan el predio (como en el levantamiento de Luis)
+    const ejeVias = G.ESPUELA[G.ESPUELA.length - 1][1];
+    for (let u = G.PB.u0 + 0.5; u < G.ESP_FIN; u += 1.6) tv.seg(W(u, ejeVias - 1.3, 0.05), W(u, ejeVias + 1.3, 0.05));
     ponLineas(gCol, tv, 'ctxtren', 0xffffff);
   }
   const EDIF = D.edificios.map(f => ({ h: f[0], q: pares(f, 1) })).concat(H.edificios.map(f => ({ h: f[0], q: pares(f, 1) })));
@@ -744,11 +797,174 @@ export async function crea(api) {
       } };
   }
 
+  /* ---------- 3c. Etapa 2: la demolición (en rojo, se desintegra) y el corte del aro ----------
+     Estas marcas no sólo aparecen: su avance k (0…1) es la animación entera, de ida y de regreso
+     (aplica(k)); se quedan hechas mientras las slides siguientes las sigan listando. */
+  const GLSL_RUIDO = /* glsl */`
+    float hs(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+    float ruido(vec3 x) {
+      vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(hs(i), hs(i + vec3(1, 0, 0)), f.x), mix(hs(i + vec3(0, 1, 0)), hs(i + vec3(1, 1, 0)), f.x), f.y),
+                 mix(mix(hs(i + vec3(0, 0, 1)), hs(i + vec3(1, 0, 1)), f.x), mix(hs(i + vec3(0, 1, 1)), hs(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+    }`;
+  // pasa del color de lo existente (colA) al rojo (colR) y luego se deshace: con un poco de ruido y primero lo de arriba;
+  // recorte: sólo lo que queda dentro del círculo del aro
+  function matDisuelve(U, colA, colR, recorte) {
+    return new THREE.ShaderMaterial({
+      uniforms: { uRojo: U.uRojo, uDis: U.uDis, uLatido: U.uLatido, uColA: { value: new THREE.Color(colA) }, uColR: { value: new THREE.Color(colR) },
+        uC: { value: new THREE.Vector2(recorte ? recorte.x : 0, recorte ? recorte.z : 0) }, uR: { value: recorte ? recorte.r : 0 } },
+      vertexShader: /* glsl */`varying vec3 vP;
+        void main() { vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: GLSL_RUIDO + /* glsl */`uniform float uRojo; uniform float uDis; uniform float uLatido; uniform float uR; uniform vec3 uColA; uniform vec3 uColR; uniform vec2 uC; varying vec3 vP;
+        void main() {
+          if (uR > 0.0 && length(vP.xz - uC) > uR) discard;
+          float n = 0.62 * ruido(vP * 0.42) + 0.18 * ruido(vP * 2.1) + 0.2 * (1.0 - clamp(vP.y / 10.0, 0.0, 1.0));
+          float u = uDis * 1.12 - 0.04;
+          if (uDis > 0.0 && n < u) discard;
+          float borde = uDis > 0.0 ? 1.0 - smoothstep(0.0, 0.05, n - u) : 0.0;
+          vec3 c = mix(uColA, uColR, uRojo) * (1.0 + 0.45 * uLatido * uRojo);
+          gl_FragColor = vec4(mix(c, vec3(1.0, 0.78, 0.45), borde), 1.0);
+        }`,
+      side: THREE.DoubleSide
+    });
+  }
+  // el polvo: puntos sobre las caras de lo que se deshace, que se sueltan cuando pasa el frente y suben
+  function polvo(geo, n, U, recorte, color) {
+    const pos = geo.attributes.position, ix = geo.index, nt = (ix ? ix.count : pos.count) / 3;
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3();
+    const acum = [], tris = []; let tot = 0;
+    const vert = k => ix ? ix.getX(k) : k;
+    for (let t = 0; t < nt; t++) {
+      a.fromBufferAttribute(pos, vert(3 * t)); b.fromBufferAttribute(pos, vert(3 * t + 1)); c.fromBufferAttribute(pos, vert(3 * t + 2));
+      tot += ab.subVectors(b, a).cross(ac.subVectors(c, a)).length() / 2; acum.push(tot); tris.push(t);
+    }
+    const P = [], T = [], D = [];
+    for (let intento = 0; P.length < n * 3 && intento < n * 8; intento++) {
+      const r = Math.random() * tot; let lo = 0, hi = acum.length - 1;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (acum[m] < r) lo = m + 1; else hi = m; }
+      const t = tris[lo];
+      a.fromBufferAttribute(pos, vert(3 * t)); b.fromBufferAttribute(pos, vert(3 * t + 1)); c.fromBufferAttribute(pos, vert(3 * t + 2));
+      let s = Math.random(), q = Math.random(); if (s + q > 1) { s = 1 - s; q = 1 - q; }
+      const p = a.clone().addScaledVector(ab.subVectors(b, a), s).addScaledVector(ac.subVectors(c, a), q);
+      if (recorte && Math.hypot(p.x - recorte.x, p.z - recorte.z) > recorte.r) continue;
+      P.push(p.x, p.y, p.z);
+      T.push(0.8 * Math.random() + 0.2 * (1 - Math.min(1, p.y / 10)));
+      const ang = Math.random() * Math.PI * 2, rap = 0.4 + Math.random();
+      D.push(Math.cos(ang) * rap, 0.6 + Math.random() * 0.9, Math.sin(ang) * rap);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    g.setAttribute('aT', new THREE.Float32BufferAttribute(T, 1));
+    g.setAttribute('aD', new THREE.Float32BufferAttribute(D, 3));
+    const m = new THREE.ShaderMaterial({
+      uniforms: { uDis: U.uDis, uCol: { value: new THREE.Color(color) }, uPx: { value: window.devicePixelRatio || 1 } },
+      vertexShader: /* glsl */`uniform float uDis; uniform float uPx; attribute float aT; attribute vec3 aD; varying float vA; varying float vT;
+        void main() {
+          float t = clamp((uDis * 1.12 - 0.04 - aT) / 0.28, 0.0, 1.0);
+          vec3 p = position + aD * vec3(5.0, 7.0, 5.0) * t - vec3(0.0, 2.0 * t * t, 0.0);
+          vA = (t > 0.0 && t < 1.0) ? 1.0 - t : 0.0; vT = t;
+          vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv;
+          gl_PointSize = vA > 0.0 ? (1.5 + 2.5 * (1.0 - t)) * uPx : 0.0;
+        }`,
+      fragmentShader: /* glsl */`uniform vec3 uCol; varying float vA; varying float vT;
+        void main() { if (vA <= 0.0) discard; vec2 q = gl_PointCoord - 0.5; if (dot(q, q) > 0.25) discard; gl_FragColor = vec4(mix(vec3(1.0, 0.8, 0.5), uCol, vT), vA); }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+    });
+    const pts = new THREE.Points(g, m); pts.frustumCulled = false; pts.renderOrder = 9; pts.visible = false;
+    return pts;
+  }
+  const tramo = (k, a, b) => Math.max(0, Math.min(1, (k - a) / (b - a)));
+  const uDemo = () => ({ uRojo: { value: 0 }, uDis: { value: 0 }, uLatido: { value: 0 } });
+  // slide «Demolición»: los muros y losas de lo que no se conserva se marcan en rojo y se desintegran
+  function armaDemolicion() {
+    const U = uDemo(), g = new THREE.Group(); g.name = 'marca-demolicion'; g.visible = false; gH.add(g);
+    const geo = mallaDemuele().geo(), mA = matDisuelve(U, 0xf0f0f0, ROJO);
+    const solido = new THREE.Mesh(geo, matDisuelve(U, 0x141414, 0x6e100c)), aristas = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), mA);
+    const portones = new THREE.LineSegments(lineasPortones().geo(), mA), pol = polvo(geo, 3200, U, null, ROJO);
+    [solido, aristas, portones].forEach(o => { o.renderOrder = 5; g.add(o); }); g.add(pol);
+    MARCA.demolicion = { g, piezas: [], rotulos: [], dur: 4600, durSale: 900,
+      aplica(k) {
+        if (EXIS.demuele) EXIS.demuele.visible = k <= 0.001;
+        U.uRojo.value = suave(tramo(k, 0, 0.18));
+        U.uDis.value = tramo(k, 0.34, 1);
+        solido.visible = aristas.visible = portones.visible = k < 0.999;
+        pol.visible = U.uDis.value > 0 && U.uDis.value < 1;
+      },
+      latido(ms, k) { U.uLatido.value = k > 0.15 && k < 0.4 ? 0.5 + 0.5 * Math.sin(ms / 140) : 0; }
+    };
+  }
+  // slide «El aro», 1: la «o» de «circuito» sobre el predio, donde irá el aro (la misma de la slide «Circuito»)
+  function armaAroConcepto() {
+    const A = G.ANILLO, g = new THREE.Group(); g.name = 'marca-aro-concepto'; g.visible = false; gH.add(g);
+    const lay = disenoAro(MARCAS.aroConcepto ? MARCAS.aroConcepto.texto : 'circuito', AZ_NORTE); lay.tex.dispose();
+    const rm = A.re - lay.grosor / 2, circulo = [];
+    for (let i = 0; i <= 120; i++) { const t = i / 120 * Math.PI * 2; circulo.push([A.u + rm * Math.cos(t), A.v + rm * Math.sin(t)]); }
+    const geo = cinta(circulo, lay.grosor, ALTO_EXISTENTE + 4), m = matC(CIRCUITO, 0.95), aro = new THREE.Mesh(geo, m);
+    const mS = matC(CIRCUITO, 0.08), sombra = new THREE.Mesh(cinta(circulo, lay.grosor, 0.3), mS);
+    aro.renderOrder = 13; sombra.renderOrder = 6; g.add(aro, sombra);
+    MARCA.aroConcepto = { g, rotulos: [], latido() {}, matAro: m, piezas: [
+      { obj: aro, mats: [[m, 0.95]], traza: { g: geo, n: geo.attributes.position.count }, dur: 1500 },
+      { obj: sombra, mats: [[mS, 0.08]], dur: 900, retraso: 700 }
+    ] };
+  }
+  // slide «El aro», 2: el círculo del aro baja hasta el piso y lo de las naves que queda dentro se marca en rojo y se
+  // desintegra; quedan las naves cortadas (G.PIEZAS, como en el visor) con su cara de corte
+  function armaCorteAro() {
+    const A = G.ANILLO, R = G.CORTE, c0 = V3(A.u, A.v, 0), recorte = { x: c0.x, z: c0.z, r: R };
+    const U = uDemo(), g = new THREE.Group(); g.name = 'marca-corte-aro'; g.visible = false; gH.add(g);
+    const geo = mallaNaves().geo(), dentro = new THREE.Group();
+    dentro.add(new THREE.Mesh(geo, matDisuelve(U, 0x141414, 0x6e100c, recorte)), new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), matDisuelve(U, 0xf0f0f0, ROJO, recorte)));
+    dentro.children.forEach(o => { o.renderOrder = 5; });
+    const pol = polvo(geo, 1800, U, recorte, ROJO);
+    g.add(dentro, pol);
+    // la cortina cuelga del aro y baja al piso; su filo marca por dónde pasa el corte
+    const hAro = ALTO_EXISTENTE + 4;
+    const mCor = new THREE.MeshBasicMaterial({ color: CIRCUITO, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+    const cortina = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 1, 160, 1, true).translate(0, 0.5, 0), mCor);
+    const pf = []; for (let i = 0; i <= 160; i++) { const t = i / 160 * Math.PI * 2; pf.push(new THREE.Vector3(Math.cos(t) * R, 0, Math.sin(t) * R)); }
+    const mFilo = new THREE.LineBasicMaterial({ color: CIRCUITO, transparent: true, opacity: 0 }), filo = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pf), mFilo);
+    [cortina, filo].forEach(o => { o.position.copy(c0); o.renderOrder = 8; g.add(o); });
+    // el corte que queda: las aristas de las caras de corte de las naves, en coral
+    const lc = new Lineas();
+    G.PIEZAS.forEach(pz => {
+      const nv = pz.nv, zf = u => nv.alero + (nv.cumbre - nv.alero) * Math.max(0, 1 - Math.abs(u - pz.um) / pz.run), q = pz.pol;
+      q.forEach((a, i) => {
+        const b = q[(i + 1) % q.length]; if (!(a[2] && b[2])) return;
+        lc.seg(W(a[0], a[1], zf(a[0])), W(b[0], b[1], zf(b[0]))); lc.seg(W(a[0], a[1], 0.08), W(b[0], b[1], 0.08));
+        const ant = q[(i - 1 + q.length) % q.length], sig = q[(i + 2) % q.length];
+        if (!ant[2]) lc.seg(W(a[0], a[1], 0.08), W(a[0], a[1], zf(a[0])));
+        if (!sig[2]) lc.seg(W(b[0], b[1], 0.08), W(b[0], b[1], zf(b[0])));
+      });
+    });
+    const mLc = linC(CIRCUITO, 0), corte = new THREE.LineSegments(lc.geo(), mLc); corte.renderOrder = 9; g.add(corte);
+    const matAro = MARCA.aroConcepto && MARCA.aroConcepto.matAro;
+    MARCA.corteAro = { g, piezas: [], rotulos: [], dur: 5200, durSale: 900, retraso: 1500,
+      aplica(k) {
+        // mientras corta, la «o» se vuelve translúcida: debajo de ella está el corte
+        if (matAro && k > 0) { const op = 0.95 * (1 - 0.62 * suave(tramo(k, 0.04, 0.2))); matAro.opacity = marcaK.aroConcepto >= 1 ? op : Math.min(matAro.opacity, op); }
+        const cortado = k >= 0.22;
+        if (EXIS.naves) EXIS.naves.visible = !cortado;
+        if (EXIS.cortadas) EXIS.cortadas.visible = cortado;
+        const yb = hAro * (1 - suave(tramo(k, 0, 0.24)));
+        cortina.position.y = c0.y + yb; cortina.scale.y = Math.max(0.001, hAro - yb); filo.position.y = c0.y + yb + 0.05;
+        mCor.opacity = 0.2 * tramo(k, 0, 0.04) * (1 - tramo(k, 0.8, 1));
+        mFilo.opacity = 0.95 * tramo(k, 0, 0.04) * (1 - tramo(k, 0.3, 0.45));
+        U.uRojo.value = suave(tramo(k, 0.22, 0.36));
+        U.uDis.value = tramo(k, 0.42, 0.97);
+        dentro.visible = cortado && k < 0.999;
+        pol.visible = U.uDis.value > 0 && U.uDis.value < 1;
+        mLc.opacity = 0.9 * tramo(k, 0.85, 1);
+      },
+      latido(ms, k) { U.uLatido.value = k > 0.3 && k < 0.45 ? 0.5 + 0.5 * Math.sin(ms / 140) : 0; }
+    };
+  }
+
   /* ---------- 4. HTML: tarjeta, rótulos, navegación ---------- */
   const capa = document.createElement('div'); capa.className = 'hist-capa'; capa.hidden = true;
   capa.innerHTML = '<div class="hist-rotulos"></div><aside class="hist-tarjeta" aria-live="polite"></aside>' +
     '<nav class="hist-nav" aria-label="Slides de la presentación"><button type="button" class="hist-nav-flecha" data-hist="anterior" aria-label="Slide anterior">‹ Anterior</button>' +
-    '<ol class="hist-nav-lista">' + GUION.map((s, i) => '<li><button type="button" data-hist-ir="' + i + '" title="' + s.titulo + '"><span>' + String(i + 1).padStart(2, '0') + '</span><i class="tt"> ' + s.titulo + '</i></button></li>').join('') + '</ol>' +
+    '<ol class="hist-nav-lista">' + GUION.map((s, i) => (i === 0 || etapaDe(i) !== etapaDe(i - 1) ? '<li class="hist-nav-etapa" aria-hidden="true">Etapa ' + etapaDe(i) + '</li>' : '') +
+      '<li data-etapa="' + etapaDe(i) + '"><button type="button" data-hist-ir="' + i + '" title="' + s.titulo + '"><span>' + String(i + 1).padStart(2, '0') + '</span><i class="tt"> ' + s.titulo + '</i></button></li>').join('') + '</ol>' +
     '<button type="button" class="hist-nav-flecha hist-nav-sigue" data-hist="siguiente" aria-label="Slide siguiente">Siguiente ›</button></nav>' +
     '<div class="hist-carga" role="status">Armando Atlampa…</div>';
   trabajo.appendChild(capa);
@@ -823,8 +1039,7 @@ export async function crea(api) {
       [piso, ed, mallaExistente()].forEach(x => { if (!x.p.length) return; const o = new THREE.Mesh(x.geo(), matImpresa); o.renderOrder = 12; o.frustumCulled = false; g.add(o); });
       const A = G.ANILLO, rm = A.re - lay.grosor / 2, circulo = [];
       for (let i = 0; i <= 120; i++) { const t = i / 120 * Math.PI * 2; circulo.push([A.u + rm * Math.cos(t), A.v + rm * Math.sin(t)]); }
-      const alto = Math.max(...G.NAVES.map(n => n.cumbre), ...((MARCAS.existente && MARCAS.existente.masas) || []).map(x => x.alto)) + 4;
-      const aro = new THREE.Mesh(cinta(circulo, lay.grosor, alto), matO); aro.renderOrder = 13; g.add(aro);
+      const aro = new THREE.Mesh(cinta(circulo, lay.grosor, ALTO_EXISTENTE + 4), matO); aro.renderOrder = 13; g.add(aro);
       g.userData = { clave }; g.visible = false; gH.add(g);
       fondoAro = g;
     }
@@ -976,12 +1191,22 @@ export async function crea(api) {
     const M = MARCA[id]; if (!M) return;
     marcaK[id] = k;
     M.g.visible = k > 0.001;
+    if (M.aplica) M.aplica(Math.max(0, Math.min(1, k)));
     M.piezas.forEach(p => {
       const kk = Math.max(0, Math.min(1, k));
       p.mats.forEach(([m, op]) => { m.opacity = op * kk; });
       if (p.crece) p.obj.scale.set(1, Math.max(0.001, kk), 1);
       if (p.traza && kk < 1) p.traza.g.setDrawRange(0, Infinity);
     });
+  }
+  // las marcas con aplica(k): de donde vayan a donde se pide, cancelando la animación que tuvieran
+  function animaMarca(id, meta, dur, retraso) {
+    const M = MARCA[id];
+    if (M.tw) { tweens = tweens.filter(t => t !== M.tw); M.tw = null; }
+    const de = marcaK[id] || 0;
+    if (de === meta) return;
+    aplicaMarca(id, de);
+    M.tw = anima(dur * Math.abs(meta - de), (k, l) => aplicaMarca(id, de + (meta - de) * l), () => { M.tw = null; }, retraso || 0);
   }
   function latido(ms) {
     if (!activo) { corre = false; return; }
@@ -1011,6 +1236,7 @@ export async function crea(api) {
       const tandas = [armaSuelo, armaCalles, armaExistente, armaLimite];
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
       tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa, armaMercado,
+        armaDemolicion, armaAroConcepto, armaCorteAro,
         () => { mueveCarros(performance.now()); caminan(performance.now()); });
       (function sigue() {
         tandas.shift()();
@@ -1054,6 +1280,7 @@ export async function crea(api) {
     const s = GUION[n], tok = ++irTok, mismo = n === idx;
     idx = n;
     [].forEach.call(capa.querySelectorAll('[data-hist-ir]'), b => b.setAttribute('aria-current', String(+b.getAttribute('data-hist-ir') === n)));
+    [].forEach.call(capa.querySelectorAll('.hist-nav-lista li[data-etapa]'), li => li.classList.toggle('en-etapa', +li.getAttribute('data-etapa') === etapaDe(n)));
     arma().then(() => {
       if (tok !== irTok || !activo) return;
       cargaEl.hidden = true;
@@ -1061,7 +1288,10 @@ export async function crea(api) {
       // lo que sale
       if (!mismo) { quitaTarjeta(); quitaRotulos(); }
       Object.keys(MARCA).forEach(id => {
-        if ((s.marcas || []).includes(id) || !(marcaK[id] > 0)) return;
+        const M = MARCA[id];
+        if ((s.marcas || []).includes(id)) return;
+        if (M.aplica) { if (M.tw || marcaK[id] > 0) animaMarca(id, 0, M.durSale || 800); return; }   // se deshace al revés
+        if (!(marcaK[id] > 0)) return;
         const de = marcaK[id]; anima(450, k => aplicaMarca(id, de * (1 - k)));
       });
       // la colonia se dibuja desde el predio hacia afuera mientras la cámara se aleja
@@ -1102,6 +1332,7 @@ export async function crea(api) {
         (s.marcas || []).forEach(id => {
           const M = MARCA[id]; if (!M) return;
           if (marcaK[id] >= 1) return;
+          if (M.aplica) { animaMarca(id, 1, M.dur || 2000, (s.retrasos && s.retrasos[id]) || M.retraso || 0); return; }
           M.g.visible = true;
           if (M.entra) M.entra();
           M.piezas.forEach(p => {
