@@ -966,7 +966,8 @@ export async function crea(api) {
   function armaAroReal() {
     const A = G.ANILLO, g = new THREE.Group(); g.name = 'marca-aro-real'; g.visible = false; gH.add(g);
     const U = { uDib: { value: new THREE.Vector4(1, 1, 0, 0) }, uDibO: { value: new THREE.Vector3() }, uDibV: { value: new THREE.Vector3(0, 300, 0) } };
-    const real = api.copiaConCanal ? api.copiaConCanal(['aro', 'cinta'], U) : new THREE.Group();
+    // el aro como se ve en el visor: sus piezas y, del Revit, las losas y los muros del aro
+    const real = api.copiaConCanal ? api.copiaConCanal(['aro', 'cinta'].concat(piezasDe(/^revit-cultura-(floors|walls)-.*-aro$/)), U) : new THREE.Group();
     real.visible = false; g.add(real);
     // el barrido: de abajo hacia arriba (y un poco en diagonal) sobre la caja del aro, como se dibuja una axonometría
     const caja = new THREE.Box3().setFromObject(real), t = caja.getSize(new THREE.Vector3()), w = new THREE.Vector3(0.3, 1, 0.3);
@@ -1004,6 +1005,68 @@ export async function crea(api) {
     const de = Object.assign({}, aroEst);
     if (de.op === meta.op && de.sube === meta.sube) return;
     aroTw = anima((c && c.dur) || 1600, k => aplicaAro({ op: de.op + (meta.op - de.op) * k, sube: de.sube + (meta.sube - de.sube) * k }), () => { aroTw = null; }, retraso || 0);
+  }
+
+  /* ---------- 3d. Etapa 2: arte y cultura, en dos tiempos ----------
+     Las piezas del Revit (revit-cultura-*), copiadas con canales propios (api.copiaConCanal): primero las losas
+     salen del aro (plegadas a su nivel, con su color) y se despliegan hacia abajo hasta su lugar, y al final las
+     escaleras; luego se arma lo demás (muros, cancelería y puertas, columnas y barandales, sombrillas) como se
+     arma un uso en el visor, de abajo hacia arriba. */
+  const piezasDe = re => raizG.children.map(o => o.name).filter(n => re.test(n));
+  const canalNuevo = () => ({ uDib: { value: new THREE.Vector4(1, 1, 0, 0) }, uDibO: { value: new THREE.Vector3() }, uDibV: { value: new THREE.Vector3(0, 300, 0) } });
+  function barridoSube(U, obj) {   // como barridoSube del visor: de abajo hacia arriba y un poco en diagonal, sobre la caja de obj
+    const caja = new THREE.Box3().setFromObject(obj), t = caja.getSize(new THREE.Vector3()), w = new THREE.Vector3(0.3, 1, 0.3);
+    U.uDib.value.z = 0; U.uDibO.value.copy(caja.min); U.uDibV.value.copy(w.multiplyScalar(1 / Math.max(1, w.dot(t))));
+  }
+  function armaCanal(U, a) { U.uDib.value.x = Math.min(1, a / 0.7); U.uDib.value.y = Math.max(0, Math.min(1, (a - 0.32) / 0.68)); }
+  function copiaCultura(re, U) {
+    const g = api.copiaConCanal ? api.copiaConCanal(piezasDe(re), U) : new THREE.Group();
+    g.visible = false; return g;
+  }
+  // 1: las plataformas salen del aro y forman la volumetría; al final, las escaleras
+  function armaCulturaVolumen() {
+    const g = new THREE.Group(); g.name = 'marca-cultura-volumen'; g.visible = false; gH.add(g);
+    const UL = canalNuevo(), UE = canalNuevo();
+    const losas = copiaCultura(/^revit-cultura-floors-\d+-entero$/, UL), esc = copiaCultura(/^revit-cultura-stairs(Runs|Landings)-/, UE);
+    g.add(losas, esc);
+    barridoSube(UE, esc);
+    UL.uDib.value.z = 1; UL.uDibO.value.copy(O_ARO); UL.uDibV.value.set(20, 62, 0);   // las líneas, desde el aro hacia afuera
+    const caja = new THREE.Box3().setFromObject(losas), zTop = caja.max.y;   // se pliegan al nivel más alto (bajo el piso del aro)
+    // el color: sale con el del aro y llega al suyo
+    const mAro = api.material('aro'), aAro = api.arista ? api.arista('aro') : null, tintes = [];
+    losas.traverse(x => {
+      if (!x.material) return;
+      if (x.material.isShaderMaterial && x.material.uniforms.uTinta) tintes.push({ c: x.material.uniforms.uTinta.value.clone(), set: c => { x.material.uniforms.uTinta.value.copy(c); }, de: mAro.uniforms.uTinta.value.clone() });
+      else if (x.material.color) tintes.push({ c: x.material.color.clone(), set: c => { x.material.color.copy(c); }, de: aAro ? aAro.color.clone() : x.material.color.clone() });
+    });
+    const tmp = new THREE.Color();
+    MARCA.culturaVolumen = { g, piezas: [], rotulos: [], dur: 6200, durSale: 1400,
+      aplica(k) {
+        losas.visible = k > 0.001;
+        UL.uDib.value.x = suave(tramo(k, 0, 0.3)); UL.uDib.value.y = tramo(k, 0.34, 0.82);
+        const s = Math.max(0.004, suave(tramo(k, 0.28, 0.8)));
+        losas.scale.y = s; losas.position.y = zTop * (1 - s);
+        const c = suave(tramo(k, 0.45, 0.85));
+        tintes.forEach(t => t.set(tmp.copy(t.de).lerp(t.c, c)));
+        esc.visible = k > 0.74;
+        armaCanal(UE, tramo(k, 0.74, 1));
+      },
+      latido() {}
+    };
+  }
+  // 2: lo demás, hasta quedar como en el visor
+  function armaCulturaCompleta() {
+    const g = new THREE.Group(); g.name = 'marca-cultura-completa'; g.visible = false; gH.add(g);
+    const tiempos = [
+      [/^revit-cultura-walls-\d+-entero$/, 0, 0.45],                              // muros
+      [/^revit-cultura-(doors|curtainPanels|curtainMullions)-/, 0.22, 0.62],     // cancelería y puertas
+      [/^revit-cultura-(columns|railings|topRails)-/, 0.38, 0.8],                 // columnas y barandales
+      [/^revit-cultura-roofs-/, 0.6, 1]                                            // sombrillas
+    ].map(([re, a, b]) => { const U = canalNuevo(), c = copiaCultura(re, U); g.add(c); barridoSube(U, c); return { c, U, a, b }; });
+    MARCA.culturaCompleta = { g, piezas: [], rotulos: [], dur: 7000, durSale: 1400,
+      aplica(k) { tiempos.forEach(t => { const a = tramo(k, t.a, t.b); t.c.visible = a > 0; armaCanal(t.U, a); }); },
+      latido() {}
+    };
   }
 
   /* ---------- 4. HTML: tarjeta, rótulos, navegación ---------- */
@@ -1283,7 +1346,7 @@ export async function crea(api) {
       const tandas = [armaSuelo, armaCalles, armaExistente, armaLimite];
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
       tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa, armaMercado,
-        armaDemolicion, armaCorteAro, armaAroO, armaAroReal,
+        armaDemolicion, armaCorteAro, armaAroO, armaAroReal, armaCulturaVolumen, armaCulturaCompleta,
         () => { mueveCarros(performance.now()); caminan(performance.now()); });
       (function sigue() {
         tandas.shift()();
@@ -1328,6 +1391,13 @@ export async function crea(api) {
     idx = n;
     [].forEach.call(capa.querySelectorAll('[data-hist-ir]'), b => b.setAttribute('aria-current', String(+b.getAttribute('data-hist-ir') === n)));
     [].forEach.call(capa.querySelectorAll('.hist-nav-lista li[data-etapa]'), li => li.classList.toggle('en-etapa', +li.getAttribute('data-etapa') === etapaDe(n)));
+    // si los nombres no caben a la izquierda de la brújula, sólo la slide actual lleva el suyo
+    const nav = capa.querySelector('.hist-nav'), hud = document.querySelector('.hud-camara');
+    if (nav) {
+      nav.classList.remove('compacta');
+      const r = nav.getBoundingClientRect(), h = hud ? hud.getBoundingClientRect() : null, lim = h && h.width > 0 ? h.left - 12 : innerWidth - 12;
+      if (r.left < 8 || r.right > lim) nav.classList.add('compacta');
+    }
     arma().then(() => {
       if (tok !== irTok || !activo) return;
       cargaEl.hidden = true;

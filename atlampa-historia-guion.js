@@ -360,7 +360,7 @@ export default [
     tarjeta: {
       kicker: 'Etapa 2 · Demolición',
       titulo: 'Lo que se retira',
-      texto: 'Se demuelen los muros y losas de las construcciones sin valor patrimonial. Se conservan las naves del oriente y las vías de la espuela.',
+      texto: 'Las construcciones sin valor patrimonial se demuelen: sus muros y losas liberan el predio para el proyecto. Se conservan las naves industriales del oriente, con valor patrimonial, y las vías de la espuela.',
       cifras: [
         ['≈ {huellaDemolida} m²', 'de huella que se retira', 'aprox., desde Google Earth'],
         ['{crujias}', 'crujías de nave que se conservan', '≈ {huellaNaves} m²']
@@ -383,7 +383,7 @@ export default [
     tarjeta: {
       kicker: 'Etapa 2 · El aro',
       titulo: 'El circuito, en el proyecto',
-      texto: 'Mantuvimos el concepto de circuito dentro del proyecto: la «o» de «circuito» se convierte en el aro, el eje y el circuito central del conjunto. Lo que queda dentro de su círculo se demuele; las naves se cortan a 47 m del centro y el resto se conserva.',
+      texto: 'El concepto de circuito se mantiene dentro del proyecto: el aro es el eje y el circuito central del conjunto. Para abrirle paso, las naves se cortan en un círculo de 47 m de radio; el resto de las naves se conserva.',
       cifras: [
         ['≈ {corteNaves} m²', 'de nave que se demuele', 'dentro del círculo del aro'],
         ['47 m', 'radio del corte', 'desde el centro del aro']
@@ -395,7 +395,7 @@ export default [
   },
   {
     id: 'aroReal', etapa: 2,
-    titulo: 'El aro del proyecto',
+    titulo: 'Aro del proyecto',
     // cerca del predio: la «o» baja y se adelgaza hasta ser el aro del visor, que se dibuja debajo; la «o» se apaga y
     // la gente empieza a caminar sobre el aro
     camara: { encuadre: [452, 354, 560, 464], az: 37, el: 30, aire: 1.05, lado: 0.26, dur: 3000 },
@@ -405,13 +405,54 @@ export default [
     tarjeta: {
       kicker: 'Etapa 2 · El aro',
       titulo: 'El aro del proyecto',
-      texto: 'La «o» conceptual se vuelve el aro del proyecto: un circuito peatonal elevado que recorre el predio y conecta sus usos.',
+      texto: 'Un circuito peatonal elevado que une todos los usos del conjunto (vivienda, comercio, industria y arte y cultura) y le da una circulación continua a todo el proyecto: se recorre de un uso a otro sin bajar a la calle, y la cinta lo lleva hasta el nivel del suelo.',
       cifras: [
         ['≈ {aroLargo} m', 'de recorrido', 'por el eje del aro'],
         ['{aroAncho} m', 'de ancho', 'radios de 39.5 a 46.55 m'],
         ['+{aroAlto} m', 'nivel del piso del aro']
       ],
       fuente: 'Contexto.3dm (Diag::ring) · visor del proyecto'
+    },
+    rotulos: []
+  },
+  {
+    id: 'culturaVolumen', etapa: 2,
+    titulo: 'Arte y cultura',
+    // las losas de arte y cultura salen del aro (plegadas a su nivel) y se despliegan hasta su lugar; al final, las escaleras
+    camara: { encuadre: [446, 362, 540, 460], az: 37, el: 32, aire: 1.04, lado: 0.26, dur: 2400 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen'],
+    aro: { op: 0.95, sube: 0 },
+    tarjeta: {
+      kicker: 'Etapa 2 · Arte y cultura',
+      titulo: 'Arte y cultura',
+      texto: 'Un edificio escalonado bajo el aro, abierto al patio: planta baja, dos niveles y una azotea a +9.51 por la que pasa el aro. Seis escaleras en X, tipo Vessel, conectan sus plataformas con el circuito.',
+      cifras: [
+        ['1,953 m²', 'de superficie cerrada', 'PB, N1, N2 y azotea'],
+        ['6', 'escaleras en X', 'tipo Vessel, de dos carriles']
+      ],
+      fuente: 'Hoja de plantas de arte y cultura v35 · Revit ArteCultura_Aro_ARQ'
+    },
+    rotulos: []
+  },
+  {
+    id: 'culturaCompleta', etapa: 2,
+    titulo: 'Completo',
+    // lo demás se arma como un uso en el visor: muros, cancelería y puertas, columnas y barandales, sombrillas
+    camara: { encuadre: [446, 362, 540, 460], az: 37, el: 32, aire: 1.04, lado: 0.26, dur: 1200 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta'],
+    aro: { op: 0.95, sube: 0 },
+    tarjeta: {
+      kicker: 'Etapa 2 · Arte y cultura',
+      titulo: 'Qué hay adentro',
+      texto: 'En planta baja y N1, Péndulo (café-librería) y Gandhi (librería). En N2, dos salas de exposición y dos talleres en renta. En la azotea, exposición al aire libre y un café bajo sombrillas tipo Johnson Wax a +15.',
+      cifras: [
+        ['1,278 m²', 'de comercio', 'Péndulo, Gandhi y café'],
+        ['559 m²', 'de cultura', 'salas de exposición'],
+        ['116 m²', 'de talleres', 'dos en renta']
+      ],
+      fuente: 'Hoja de plantas de arte y cultura v35 · Revit ArteCultura_Aro_ARQ'
     },
     rotulos: []
   }
