@@ -1754,7 +1754,7 @@ export async function crea(api) {
      slides: en la primera entra todo el paisaje en una animación (marcas paisajeAgua, paisajePisos y
      paisajeVegetacion, encadenadas con s.retrasos): 1) el agua: los jardines inundables (los anillos de zacatón, caña
      de indias, junco y espigas de agua, en tonos de agua) y los espejos de agua con su fondo; 2) los pisos: la plaza y
-     los andadores con sus juntas, las guarniciones, el pasto navajita, los cuatro pétreos y la tierra de las
+     los andadores (un fondo gris oscuro, sin juntas), las guarniciones, el pasto navajita, los cuatro pétreos y la tierra de las
      arbustivas, cada franja con su contorno; 3) la vegetación: los árboles, las arbustivas (masas oscuras en su verde,
      con muchos puntitos brillantes de flor, del color del boceto: las masas de Burle Marx), los magueyes y las
      cucharillas, los pastos, las plantas del agua. En la segunda, el año: pasan los doce meses (1.5 s cada uno) y cada
@@ -1847,16 +1847,12 @@ export async function crea(api) {
       latido() {}
     };
 
-    // 2 · los pisos: la plaza y los andadores (con sus juntas), las guarniciones y el suelo de cada franja
+    // 2 · los pisos: la plaza y los andadores (un fondo gris oscuro, liso: sin juntas), las guarniciones y el suelo de cada franja
     const g2 = marcaEn(gP, 'paisajePisos'), UPz = canalNuevo(), UPq = canalNuevo();
     radial(UPz, CP, 0, 112); radial(UPq, CP, 0, 100);
-    const plaza = capaPol('plaza', P.piso, ZP, UPz, '#efe7d6', '#77736b', false, 0.055, 'plaza');   // (casi negro, como el suelo del visor)
-    const lj = new Lineas(), J = P.juntas;
-    for (let i = 0; i < J.length; i += 4) lj.seg(W(J[i], J[i + 1], ZP + 0.012), W(J[i + 2], J[i + 3], ZP + 0.012));
-    const gj = new THREE.Group(); ponLineas(gj, lj, 'paisaje-juntas', 0xffffff, null, null);
-    const juntas = conCanal(gj, UPz); pinta(juntas, null, '#2f2d2a');
+    const plaza = capaPol('plaza', P.piso, ZP, UPz, '#ebebea', '#77736b', false, 0.12, 'plaza');   // (ligeramente gris, pero oscuro)
     const guarn = capaPol('guarniciones', P.guarniciones, ZQ + 0.08, UPq, '#f2eee6', '#cfcac0', 0.3, 0.14, 'plaza');
-    g2.add(plaza.obj, juntas, guarn.obj);
+    g2.add(plaza.obj, guarn.obj);
     // el suelo de cada franja, con su contorno del color de lo que va ahí (las franjas del boceto, dibujadas en el piso):
     // los pétreos y el pasto con su color; las arbustivas, tierra
     const SUELO = { 'E-060': ['#c8e07a', 0.16, 'verde'], 'PT-1': ['#ff8a66', 0.2, 'tezontle'], 'PT-2': ['#a8a29c', 0.1, 'tezontle'],
@@ -1986,9 +1982,10 @@ export async function crea(api) {
       aromas.push({ id, mat });
     });
     // el mes: los doce nombres en un atlas (y una fila vacía); se escribe de izquierda a derecha sobre el anterior. Va
-    // grande, proyectado desde la cámara de la slide del año sobre el contexto (el piso y los edificios de alrededor, no
-    // el predio): de frente se lee limpio, sin repetirse, aunque se salga del cuadro. MES.pantalla: dónde va su centro
-    // (0…1, desde la izquierda y desde arriba); MES.alto: la altura de la fila (fracción del alto de la pantalla)
+    // grande e impreso desde arriba sobre el contexto (el piso y los edificios de alrededor, no el predio), como
+    // «circuito»: se dobla con los techos y los muros. Se orienta con la cámara de la slide del año y su centro cae en el
+    // piso donde esa cámara ve MES.pantalla (0…1, desde la izquierda y desde arriba); MES.alto: la altura de la fila en la
+    // pantalla (fracción de su alto)
     const MES = Object.assign({ pantalla: [0.22, 0.6], alto: 0.18 }, MARCAS.paisaje && MARCAS.paisaje.mes);
     const fam = getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() || 'sans-serif';
     const cvM = document.createElement('canvas'), xm = cvM.getContext('2d'), RH = 200, PX = 168, PADM = 24, FILAS = 13;
@@ -1999,15 +1996,19 @@ export async function crea(api) {
     const texM = new THREE.CanvasTexture(cvM); texM.anisotropy = 8;
     const sAnio = GUION.find(s => s.id === 'paisajeAnio'), cA = (sAnio && sAnio.camara && sAnio.camara.centro) ? sAnio.camara : { centro: [505, 405, 4], h: 64, az: 105, el: 46 };
     const aM = cA.az * RAD, eM = cA.el * RAD, dM = new THREE.Vector3(Math.sin(aM) * Math.cos(eM), -Math.sin(eM), -Math.cos(aM) * Math.cos(eM));
-    const exM = new THREE.Vector3().crossVectors(dM, new THREE.Vector3(0, 1, 0)).normalize(), nwM = new THREE.Vector3().crossVectors(exM, dM).normalize();
-    const altoM = MES.alto * 2 * cA.h, anchoM = altoM * cvM.width / RH, cM = V3(...cA.centro), oM = new THREE.Vector3();
+    const rM = new THREE.Vector3().crossVectors(dM, new THREE.Vector3(0, 1, 0)).normalize(), sM = new THREE.Vector3().crossVectors(rM, dM).normalize();   // (la pantalla)
+    const exM = new THREE.Vector3(Math.cos(aM), 0, Math.sin(aM)), nwM = new THREE.Vector3(Math.sin(aM), 0, -Math.cos(aM));   // (el texto, acostado en el piso)
+    // (en la pantalla conserva sus proporciones: a lo alto se estira lo que la cámara lo acorta)
+    const altoS = MES.alto * 2 * cA.h, altoM = altoS / Math.sin(eM), anchoM = altoS * cvM.width / RH, cM = V3(...cA.centro), oM = new THREE.Vector3();
     let aspM = 0;
     function centraMes() {   // (el centro en la pantalla depende de lo ancha que sea)
       const asp = trabajo.clientWidth / Math.max(1, trabajo.clientHeight); if (Math.abs(asp - aspM) < 1e-3) return; aspM = asp;
-      oM.copy(cM).addScaledVector(exM, (MES.pantalla[0] - 0.5) * 2 * cA.h * asp).addScaledVector(nwM, (0.5 - MES.pantalla[1]) * 2 * cA.h);
+      oM.copy(cM).addScaledVector(rM, (MES.pantalla[0] - 0.5) * 2 * cA.h * asp).addScaledVector(sM, (0.5 - MES.pantalla[1]) * 2 * cA.h);
+      oM.addScaledVector(dM, (0.25 - oM.y) / dM.y);   // (hasta el piso)
     }
     centraMes();
     const PR = G.PRED;
+    let zMes = null;
     const uMes = { uMapa: { value: texM }, uO: { value: oM }, uEx: { value: exM }, uNw: { value: nwM }, uAncho: { value: anchoM }, uAlto: { value: altoM },
       uOp: { value: 0 }, uA: { value: 12 }, uB: { value: 0 }, uRev: { value: 0 }, uFilas: { value: FILAS },
       uHueco: { value: new THREE.Vector4(PR[0][0], PR[0][1], PR[2][0], PR[2][1]) }, uCen: { value: new THREE.Vector2(CEN[0], CEN[1]) } };
@@ -2028,16 +2029,20 @@ export async function crea(api) {
       transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8
     });
     {   // dónde cae: el piso (sin el predio) y los edificios del contexto bajo el rectángulo del texto, con margen
-      const ks = [];
-      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([i, j]) => {
-        const p = oM.clone().addScaledVector(exM, i * anchoM * 0.7).addScaledVector(nwM, j * altoM * 0.7), t = (0.25 - p.y) / dM.y;
-        p.addScaledVector(dM, t); ks.push([p.x + CEN[0], CEN[1] - p.z]);
+      const ks = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => {
+        const p = oM.clone().addScaledVector(exM, i * anchoM / 2).addScaledVector(nwM, j * altoM / 2); return [p.x + CEN[0], CEN[1] - p.z];
       });
-      const mg = 40, k = [Math.min(...ks.map(q => q[0])) - mg, Math.min(...ks.map(q => q[1])) - mg, Math.max(...ks.map(q => q[0])) + mg, Math.max(...ks.map(q => q[1])) + mg];
+      const mg = 30, k =[Math.min(...ks.map(q => q[0])) - mg, Math.min(...ks.map(q => q[1])) - mg, Math.max(...ks.map(q => q[0])) + mg, Math.max(...ks.map(q => q[1])) + mg];
       const piso = new Malla(); tapa(piso, api.rect(k[0], k[1], k[2], k[3]), 0.26);
       const ed = new Malla();
       EDIF.forEach(e => { if (e.q.some(p => p[0] > k[0] && p[0] < k[2] && p[1] > k[1] && p[1] < k[3])) prisma(ed, e.q, 0, e.h); });
       [piso, ed].forEach(x => { if (!x.p.length) return; const me = new THREE.Mesh(x.geo(), matMes); me.renderOrder = 12; me.frustumCulled = false; g4.add(me); });
+      // los edificios tapan el piso que queda bajo sus techos (con el foco el contexto se vuelve transparente y el mes
+      // saldría dos veces: en el techo y en el piso): sus copias escriben sólo la profundidad, antes que el mes
+      if (ed.p.length) {
+        zMes = new THREE.Mesh(ed.geo(), new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide }));
+        zMes.renderOrder = 11; zMes.frustumCulled = false; zMes.visible = false; g4.add(zMes);
+      }
     }
 
     // los tiempos de la vegetación y del año tocan los mismos colores: se calculan juntos
@@ -2076,6 +2081,7 @@ export async function crea(api) {
       if (m !== mesVisto) { mesDesde = mesVisto < 0 || m === 0 ? 12 : m - 1; mesVisto = m; }
       uMes.uA.value = mesDesde; uMes.uB.value = m; uMes.uRev.value = t < ANIO_0 ? 0 : Math.min(1.02, tramo(f - m, 0, 0.2) * 1.02);
       uMes.uOp.value = deRegreso || !enAnio ? 0 : 0.9 * tramo(t, ANIO_0 * 0.5, ANIO_0) * (1 - tramo(k4, 0.975, 1));
+      if (zMes) zMes.visible = uMes.uOp.value > 0.001;   // (fuera del año no tapa nada)
     }
     MARCA.paisajeVegetacion = { g: g3, piezas: [], rotulos: [], dur: 6400, durSale: 1400, aplica: paisajeEn, latido() {} };
     // (si se llega a una slide posterior sin pasar por la del año, el año corre rápido: durEn)
@@ -2223,7 +2229,7 @@ export async function crea(api) {
         const abre = k > 0.001;
         sueloVisor.forEach(o => { o.visible = !abre; }); gHu.visible = abre; tapaS.visible = abre && k < 0.2;
         armaCanal(UH, 1 - tramo(k, 0.02, 0.18));
-        PISO_PLAZA.abre = tramo(k, 0.02, 0.18); PISO_PLAZA.pon();   // la plaza (con sus juntas) se abre con el suelo
+        PISO_PLAZA.abre = tramo(k, 0.02, 0.18); PISO_PLAZA.pon();   // la plaza se abre con el suelo
         const s = tramo(k, 0.12, 0.44); sot.visible = caj.visible = s > 0; armaCanal(US, s);
         const r = tramo(k, 0.32, 0.6); ram.visible = r > 0; armaCanal(UR, r);
         const l = tramo(k, 0.48, 0.72); elev.visible = l > 0; armaCanal(UL, l);

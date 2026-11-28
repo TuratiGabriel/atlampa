@@ -20,7 +20,7 @@ Qué sale:
   (en lluvias y en secas) y cómo se dibuja cada planta.
 - manchas, agua: como en el boceto (cada polígono [ext, hoyo, …], simplificado a 3 cm); arboles: centro y radio de copa.
 - piso: la plaza y los andadores (el predio menos los parques, el agua y las naves que no corta el aro), con huecos,
-  y sus juntas (cada 1.8 m, en los ejes del predio); guarniciones: el anillo de 0.20 m de cada parque.
+  liso (sin juntas: así lo pidió Diego); guarniciones: el anillo de 0.20 m de cada parque.
 - plantas: por especie, dónde va cada planta [u, v, escala], repartidas en tresbolillo con su separación.
 - rutas: recorridos de las personas por la plaza y los andadores (sin cruzar muros ni parques); rutasAlto: por los
   pasillos de la vivienda [u0, v0, u1, v1, z] (de atlampa-historia-vivienda.js).
@@ -109,22 +109,6 @@ naves = unary_union([box(*n) for n in NAVES]).difference(Point(ANILLO).buffer(CO
 piso = PRED.difference(parques).difference(naves)
 piso_pols = [p for p in poligonos(piso) if p.area > 4]
 
-# las juntas, cada 1.8 m en los ejes del predio
-P_PISO = prep(piso)
-juntas = []
-PASO = 1.8
-x0, y0, x1, y1 = PRED.bounds
-for eje in (0, 1):
-    t = (x0 if eje == 0 else y0) + PASO
-    while t < (x1 if eje == 0 else y1):
-        ln = LineString([(t, y0), (t, y1)]) if eje == 0 else LineString([(x0, t), (x1, t)])
-        cor = ln.intersection(piso)
-        for s in getattr(cor, 'geoms', [cor]):
-            if isinstance(s, LineString) and s.length > 0.3:
-                (a, b), (c, d) = s.coords[0], s.coords[-1]
-                juntas += [round(a, 2), round(b, 2), round(c, 2), round(d, 2)]
-        t += PASO
-
 # las guarniciones: cada contorno menos su guarnición (0.20 m hacia dentro)
 guarn = [poligono(g['p']) for g in BOC['guarniciones']]
 anillos_g = []
@@ -184,6 +168,7 @@ for g in REV['grupos']:
 obst = unary_union(muros).buffer(0.6)
 libre = PRED.buffer(-0.8).difference(parques.buffer(0.8)).difference(obst)
 P_LIB = prep(libre)
+x0, y0, x1, y1 = PRED.bounds
 rutas = []
 intentos = 0
 while len(rutas) < 70 and intentos < 40000:
@@ -245,7 +230,6 @@ out = {
     'agua': [{'pol': [plano(q) for q in poligonos(p.simplify(0.03))], 'area': a['area']} for a, p in zip(BOC['agua'], agua)],
     'arboles': BOC['arboles'],
     'piso': [plano(p) for p in piso_pols],
-    'juntas': juntas,
     'guarniciones': anillos_g,
     'plantas': plantas,
     'rutas': rutas,
@@ -257,7 +241,7 @@ txt = ('/* El paisaje del Modo historia (etapa 2). Generado por herramientas/pre
        'window.ATLAMPA_HISTORIA_PAISAJE = ' + json.dumps(out, ensure_ascii=False, separators=(',', ':')) + ';\n')
 open(SALIDA, 'w', encoding='utf-8', newline='\n').write(txt)
 cuenta = {k: len(v) // 3 for k, v in plantas.items()}
-print('piso: %d polígonos, %.0f m²; juntas %d; guarniciones %d' % (len(piso_pols), sum(p.area for p in piso_pols), len(juntas) // 4, len(anillos_g)))
+print('piso: %d polígonos, %.0f m²; guarniciones %d' % (len(piso_pols), sum(p.area for p in piso_pols), len(anillos_g)))
 print('plantas', cuenta, 'total', sum(cuenta.values()))
 print('rutas %d (%d intentos); libre %.0f m²; en los pasillos %d; fondos del agua %d' % (len(rutas), intentos, libre.area, len(rutas_alto), len(fondos)))
 print('%s: %.0f KB' % (os.path.basename(SALIDA), os.path.getsize(SALIDA) / 1024))
