@@ -425,7 +425,7 @@ export default [
     camara: { encuadre: [500, 318, 566, 494], az: 300, el: 36, aire: 1.12, lado: 0.26, dur: 2800 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio'],
-    foco: 'comercio',
+    foco: { uso: 'comercio', desde: 'comercio' },
     aro: { op: 0.95, sube: 0 },
     rotulos: []
   },
@@ -436,7 +436,7 @@ export default [
     camara: { encuadre: [500, 318, 566, 494], az: 300, el: 36, aire: 1.12, lado: 0.26, dur: 1200 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho'],
-    foco: 'comercio',
+    foco: { uso: 'comercio', desde: 'comercio' },
     aro: { op: 0.95, sube: 0 },
     rotulos: []
   },
@@ -447,7 +447,7 @@ export default [
     camara: { encuadre: [500, 318, 566, 494], az: 235, el: 24, aire: 1.1, lado: 0.26, dur: 2400 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos'],
-    foco: 'comercio',
+    foco: { uso: 'comercio', desde: 'comercio' },
     aro: { op: 0.95, sube: 0 },
     rotulos: []
   },
@@ -458,7 +458,7 @@ export default [
     camara: { encuadre: [492, 336, 566, 478], az: 80, el: 24, aire: 1.02, lado: 0.26, dur: 2600 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria'],
-    foco: { uso: 'comercio', hasta: 'comercioCanceleria' },
+    foco: { uso: 'comercio', desde: 'comercio', hasta: 'comercioCanceleria' },
     aro: { op: 0.95, sube: 0 },
     rotulos: []
   },
@@ -471,7 +471,7 @@ export default [
     camara: { encuadre: [440, 345, 500, 410], az: 37, el: 34, aire: 1.15, lado: 0.26, dur: 2800 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen'],
-    foco: 'industria',
+    foco: { uso: 'industria', desde: 'industriaVolumen' },
     aro: { op: 0.95, sube: 0 },
     rotulos: []
   },
@@ -483,7 +483,7 @@ export default [
     camara: { encuadre: [440, 345, 500, 410], az: 37, el: 26, aire: 1.15, lado: 0.26, dur: 1400 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios'],
-    foco: 'industria',
+    foco: { uso: 'industria', desde: 'industriaVolumen' },
     aro: { op: 0.95, sube: 0 },
     rotulos: []
   },
@@ -494,7 +494,7 @@ export default [
     camara: { encuadre: [436, 330, 504, 412], az: 130, el: 18, aire: 1.12, lado: 0.26, dur: 2600 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos'],
-    foco: { uso: 'industria', hasta: 'industriaConos' },
+    foco: { uso: 'industria', desde: 'industriaVolumen', hasta: 'industriaConos', suelta: [0.93, 1] },
     aro: { op: 0.95, sube: 0 },
     rotulos: []
   }

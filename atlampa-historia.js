@@ -1073,22 +1073,35 @@ export async function crea(api) {
 
   /* ---------- 3e. Etapa 2: el foco de un uso ----------
      Como al seleccionar un uso en el visor: lo demás se apaga, translúcido al 15 %, y el uso que se arma se sigue
-     viendo igual. s.foco: 'uso' o { uso, hasta: id de una marca } (con hasta, el foco se suelta cuando esa marca
-     termina). FOCO[uso]: los grupos que no se apagan (llevan materiales propios). */
-  const FOCO = {}, FOCO_TENUE = 0.15;
-  let focoK = 0, focoUso = null, focoLista = null;
+     viendo igual. s.foco: 'uso' o { uso, desde, hasta, suelta }: desde (una marca) para que empiece cuando esa marca
+     ya puso las piezas propias del uso (así el uso no se apaga con lo demás); con hasta, el foco se suelta cuando esa
+     marca llega al tramo suelta (por omisión [0.8, 1]). FOCO[uso]: los grupos que no se apagan (llevan materiales
+     propios). Para que sea suave y nada parpadee: se apaga en FOCO_MS, sigue escribiendo la profundidad y lo apagado
+     se dibuja en un orden fijo (de lo lejano a lo cercano, desde la cámara del momento en que empieza). */
+  const FOCO = {}, FOCO_TENUE = 0.15, FOCO_MS = 1600;
+  let focoK = 0, focoUso = null, focoLista = null, focoObjs = null, focoT = 0;
   function focoJunta(uso) {
-    const fuera = new Set(FOCO[uso] || []), vistos = new Set(), lista = [];
+    const fuera = new Set(FOCO[uso] || []), vistos = new Set(), lista = [], objs = [];
+    const pc = api.camara().position, c = new THREE.Vector3();
     (function rec(o) {
       if (fuera.has(o)) return;
-      (Array.isArray(o.material) ? o.material : o.material ? [o.material] : []).forEach(m => {
+      const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+      if (ms.length) {
+        const g = o.geometry;
+        if (g && g.attributes && g.attributes.position) { if (!g.boundingSphere) g.computeBoundingSphere(); c.copy(g.boundingSphere.center).applyMatrix4(o.matrixWorld); }
+        else c.setFromMatrixPosition(o.matrixWorld);
+        objs.push({ o, ro: o.renderOrder, d: c.distanceTo(pc) });
+      }
+      ms.forEach(m => {
         const u = m.uniforms && m.uniforms.uOpacidad, clave = u || m;
         if (vistos.has(clave) || (!u && typeof m.opacity !== 'number')) return;
         vistos.add(clave);
-        lista.push({ m, u, base: u ? u.value : m.opacity, escrito: NaN, tr: m.transparent, dw: m.depthWrite });
+        lista.push({ m, u, base: u ? u.value : m.opacity, escrito: NaN, tr: m.transparent });
       });
       o.children.forEach(rec);
     })(api.escena);
+    objs.sort((p, q) => q.d - p.d).forEach((x, i) => { x.o.renderOrder = x.ro * 100000 + i; });
+    focoObjs = objs;
     return lista;
   }
   function focoSuelta() {
@@ -1096,16 +1109,19 @@ export async function crea(api) {
     focoLista.forEach(e => {
       const cur = e.u ? e.u.value : e.m.opacity;
       if (Math.abs(cur - e.escrito) <= 1e-5) { if (e.u) e.u.value = e.base; else e.m.opacity = e.base; }
-      e.m.transparent = e.tr; e.m.depthWrite = e.dw;
+      e.m.transparent = e.tr;
     });
-    focoLista = null;
+    (focoObjs || []).forEach(x => { x.o.renderOrder = x.ro; });
+    focoLista = focoObjs = null;
   }
   function focoPaso() {
+    const ahora = performance.now(), dt = focoT ? Math.min(100, ahora - focoT) : 16; focoT = ahora;
     const s = GUION[idx], f = s && s.foco, uso = f ? (typeof f === 'string' ? f : f.uso) : null;
-    let meta = uso ? (f.hasta ? 1 - tramo(marcaK[f.hasta] || 0, 0.86, 1) : 1) : 0;
+    let meta = 0;
+    if (uso && (!f.desde || (marcaK[f.desde] || 0) > 0.001)) { const su = f.suelta || [0.8, 1]; meta = f.hasta ? 1 - tramo(marcaK[f.hasta] || 0, su[0], su[1]) : 1; }
     if (uso && uso !== focoUso) { if (focoK < 0.01) { focoSuelta(); focoUso = uso; } else meta = 0; }   // otro uso: primero se suelta el de antes
-    focoK += (meta - focoK) * 0.07;
-    if (Math.abs(meta - focoK) < 0.003) focoK = meta;
+    const paso = quieto.matches ? 1 : dt / FOCO_MS;
+    focoK = meta > focoK ? Math.min(meta, focoK + paso) : Math.max(meta, focoK - paso);
     if (focoK <= 0) { focoSuelta(); return; }
     if (!focoLista) focoLista = focoJunta(focoUso);
     const fac = 1 - (1 - FOCO_TENUE) * suave(focoK);
@@ -1114,7 +1130,7 @@ export async function crea(api) {
       if (Math.abs(cur - e.escrito) > 1e-5) e.base = cur;   // alguien más lo cambió: ésa es la base
       e.escrito = e.base * fac;
       if (e.u) e.u.value = e.escrito; else e.m.opacity = e.escrito;
-      e.m.transparent = true; e.m.depthWrite = false;
+      e.m.transparent = true;
     });
   }
 
@@ -1167,6 +1183,94 @@ export async function crea(api) {
     const paso = (nv.u1 - nv.u0) / nv.n, j = Math.max(0, Math.min(nv.n - 1, Math.floor((u - nv.u0) / paso))), um = nv.u0 + (j + 0.5) * paso;
     return nv.alero + (nv.cumbre - nv.alero) * Math.max(0, 1 - Math.abs(u - um) / (paso / 2));
   }
+  // la cubierta de la nave norte en paneles, como la de la sur: cuatro por crujía (dos por faldón) y diez a lo largo,
+  // a distintas alturas y con una pequeña inclinación; sin lo que queda dentro del aro (sólo para la presentación: en
+  // el Revit esa cubierta va lisa)
+  function panelesNorte() {
+    const nv = G.NAVES.find(n => n.v0 > 407) || G.NAVES[G.NAVES.length - 1], A = G.ANILLO, m = new Malla();
+    const paso = (nv.u1 - nv.u0) / nv.n, FILAS = 10, dv = (nv.v1 - nv.v0) / FILAS, gap = 0.05, canto = 0.22;
+    for (let j = 0; j < nv.n; j++) for (let h = 0; h < 4; h++) for (let r = 0; r < FILAS; r++) {
+      const u0 = nv.u0 + j * paso + h * paso / 4 + gap, u1 = nv.u0 + j * paso + (h + 1) * paso / 4 - gap, v0 = nv.v0 + r * dv + gap, v1 = nv.v0 + (r + 1) * dv - gap;
+      const q = G.menosCirculo(api.rect(u0, v0, u1, v1), [A.u, A.v], G.CORTE); if (!q || q.length < 3) continue;
+      const c = j * 4 + h, off = 0.38 * (((c + 2 * r) % 3) - 1), tv = 0.035 * (((c * 7 + r * 3) % 5) - 2), vc = (v0 + v1) / 2;
+      const zT = (u, v) => zViejo(u, v) - 0.3 + off + tv * (v - vc), zB = (u, v) => zT(u, v) - canto;
+      tapa(m, q, null, zT); tapa(m, q, null, zB, true);
+      api.muros(m, q, Math.min(...q.map(p => zB(p[0], p[1]))), null, zT);
+    }
+    const o = new THREE.Group(); o.name = 'comercio-cubierta-norte'; pon(o, m, 'nave', null, 25); return o;
+  }
+  // las tapas de los vanos: la cancelería y las puertas del Revit pintadas como los muros (en su propio canal U), para
+  // que los muros salgan cerrados y luego se abran
+  function tapaVanos(grupo, muros, U) {
+    let wm = null, wl = null;
+    muros.traverse(x => { if (x.isMesh && !wm) wm = x.material; else if (x.isLineSegments && !wl) wl = x.material; });
+    const pm = wm ? wm.clone() : null;
+    if (pm) { Object.assign(pm.uniforms, U); pm.userData = Object.assign({}, wm.userData); }
+    grupo.traverse(x => {
+      if (x.isMesh && pm) x.material = pm;
+      else if (x.isLineSegments && wl && x.material.color) { x.material.color.copy(wl.color); x.material.opacity = wl.opacity; }
+    });
+    return grupo;
+  }
+  // los vanos de los muros del mercado que no llevan cancelería (las muescas de las fachadas): en cada lado de cada nave
+  // se proyectan los muros del Revit sobre su plano y los huecos que quedan dentro de la silueta del muro (no se llega a
+  // ellos desde arriba ni desde los lados) son los vanos; cada uno, un rectángulo sobre el eje del muro
+  const ladosNaves = () => G.NAVES.map(nv => [[nv.u0, nv.v0], [nv.u1, nv.v0], [nv.u1, nv.v1], [nv.u0, nv.v1]]).flatMap(q => q.map((a, i) => [a, q[(i + 1) % 4]]));
+  const cercaDeLados = (u, v, d) => ladosNaves().some(([a, b]) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy, t = Math.max(0, Math.min(1, ((u - a[0]) * dx + (v - a[1]) * dy) / L2));
+    return Math.hypot(u - a[0] - dx * t, v - a[1] - dy * t) < d;
+  });
+  function vanosMercado() {
+    const Rv = window.ATLAMPA_REVIT || {}, oR = Rv.origen || [0, 0, 0], gm = (Rv.grupos || []).find(r => r.programa === 'comercio' && r.categoria === 'walls');
+    const m = new Malla(); if (!gm) return m;
+    const f = new Float32Array(Rv.buffer, gm.offset, gm.floats), PASO = 0.2, H = 10, NZ = Math.ceil(H / PASO);
+    const enTri = (x, y, A, B, C) => { const s = (p, q, r) => (p[0] - r[0]) * (q[1] - r[1]) - (q[0] - r[0]) * (p[1] - r[1]), p = [x, y], d1 = s(p, A, B), d2 = s(p, B, C), d3 = s(p, C, A); return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)); };
+    ladosNaves().forEach(([a, b]) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy), tx = dx / len, ty = dy / len, nx = -ty, ny = tx;
+      const NS = Math.ceil(len / PASO), cub = new Uint8Array(NS * NZ);
+      let n = 0, suma = 0;
+      for (let t = 0; t < f.length; t += 9) {
+        const P = [0, 1, 2].map(j => { const u = f[t + 3 * j] + oR[0], v = f[t + 3 * j + 1] + oR[1]; return [(u - a[0]) * tx + (v - a[1]) * ty, f[t + 3 * j + 2] + oR[2], (u - a[0]) * nx + (v - a[1]) * ny]; });
+        if (P.some(p => Math.abs(p[2]) > 0.7 || p[0] < -0.5 || p[0] > len + 0.5)) continue;
+        n++; suma += (P[0][2] + P[1][2] + P[2][2]) / 3;
+        const i0 = Math.max(0, Math.floor(Math.min(P[0][0], P[1][0], P[2][0]) / PASO)), i1 = Math.min(NS - 1, Math.floor(Math.max(P[0][0], P[1][0], P[2][0]) / PASO));
+        const j0 = Math.max(0, Math.floor(Math.min(P[0][1], P[1][1], P[2][1]) / PASO)), j1 = Math.min(NZ - 1, Math.floor(Math.max(P[0][1], P[1][1], P[2][1]) / PASO));
+        for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) if (!cub[j * NS + i] && enTri((i + 0.5) * PASO, (j + 0.5) * PASO, P[0], P[1], P[2])) cub[j * NS + i] = 1;
+      }
+      if (n < 4) return;
+      // el arranque del muro (los primeros ZOC m) cuenta como muro: ahí los muros del Revit dejan una rendija corrida que
+      // juntaría todos los vanos con lo de afuera
+      const ZOC = 0.6, jz = Math.round(ZOC / PASO);
+      for (let i = 0; i < NS; i++) for (let j = 0; j < jz; j++) cub[j * NS + i] = 1;
+      const eje = suma / n, fuera = new Uint8Array(NS * NZ), pila = [];
+      const marca = (i, j) => { const k = j * NS + i; if (i < 0 || j < 0 || i >= NS || j >= NZ || cub[k] || fuera[k]) return; fuera[k] = 1; pila.push(k); };
+      for (let i = 0; i < NS; i++) marca(i, NZ - 1);
+      for (let j = 0; j < NZ; j++) { marca(0, j); marca(NS - 1, j); }
+      while (pila.length) { const k = pila.pop(), i = k % NS, j = (k / NS) | 0; marca(i + 1, j); marca(i - 1, j); marca(i, j + 1); marca(i, j - 1); }
+      // cada hueco: sus celdas unidas → su rectángulo
+      const visto = new Uint8Array(NS * NZ), P3 = (s, z) => W(a[0] + s * tx + eje * nx, a[1] + s * ty + eje * ny, z);
+      for (let k0 = 0; k0 < NS * NZ; k0++) {
+        if (cub[k0] || fuera[k0] || visto[k0]) continue;
+        let i0 = NS, i1 = -1, j0 = NZ, j1 = -1, c = 0; const q = [k0]; visto[k0] = 1;
+        while (q.length) {
+          const k = q.pop(), i = k % NS, j = (k / NS) | 0; c++;
+          i0 = Math.min(i0, i); i1 = Math.max(i1, i); j0 = Math.min(j0, j); j1 = Math.max(j1, j);
+          [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]].forEach(([x, y]) => { const kk = y * NS + x; if (x >= 0 && y >= 0 && x < NS && y < NZ && !cub[kk] && !fuera[kk] && !visto[kk]) { visto[kk] = 1; q.push(kk); } });
+        }
+        if (c * PASO * PASO < 0.4) continue;   // (rendijas entre triángulos)
+        const s0 = i0 * PASO, s1 = (i1 + 1) * PASO, z0 = j0 <= jz ? 0 : j0 * PASO, z1 = (j1 + 1) * PASO;   // (los que llegan al arranque, hasta el piso)
+        m.quad(P3(s0, z0), P3(s1, z0), P3(s1, z1), P3(s0, z1));
+      }
+    });
+    return m;
+  }
+  // el canal de las tapas: sus caras salen con los muros (De), luego sus líneas (l: 0…1) y al final se borran (b: 0…1)
+  // desde centro, como lo demolido (lo lejano primero)
+  function vanosEn(U, De, l, b, centro, r0, r1) {
+    if (b > 0) { U.uDib.value.z = 1; U.uDibO.value.copy(centro); U.uDibV.value.set(r0, r1, 0); armaCanal(U, 1 - b); return; }
+    U.uDib.value.z = 0; U.uDibO.value.copy(De.uDibO.value); U.uDibV.value.copy(De.uDibV.value);
+    U.uDib.value.y = De.uDib.value.y; U.uDib.value.x = l;
+  }
   function armaComercio() {
     aplicaEstilo();   // (las copias de lo existente se llevan su estilo)
     const gC = new THREE.Group(); gC.name = 'comercio'; gH.add(gC); FOCO.comercio = [gC];
@@ -1179,15 +1283,19 @@ export async function crea(api) {
       aplica(k) { if (EXIS.cortadas) EXIS.cortadas.visible = k <= 0.001 && (marcaK.corteAro || 0) >= 0.22; },
       latido() {}
     };
-    // 1 · la cubierta: cada pieza (triángulos unidos por sus vértices) sale de la cubierta de hoy y llega a su altura
-    const g1 = marcaEn(gC, 'comercioTecho'), techo = copiaRevit(/^revit-comercio-roofs-/, canalNuevo());
-    techo.visible = true; g1.add(techo);
+    // 1 · la cubierta: primero se dibujan sus líneas sobre la cubierta de hoy (desde el aro hacia afuera); luego cada pieza
+    // (triángulos unidos por sus vértices) se despega y llega a su altura. La nave norte no trae divisiones en el Revit:
+    // se le ponen paneles como los de la sur (panelesNorte)
     const A = G.ANILLO, SEPARA = 2.6, clave = (a, i) => Math.round(a[i] * 50) + ',' + Math.round(a[i + 1] * 50) + ',' + Math.round(a[i + 2] * 50);
+    const UT = canalNuevo(); UT.uDib.value.set(0, 0, 1, 0); UT.uDibO.value.copy(O_ARO); UT.uDibV.value.set(44, 106, 0);
+    const g1 = marcaEn(gC, 'comercioTecho'), techo = new THREE.Group();
+    const techoSur = filtraTri(copiaRevit(/^revit-comercio-roofs-/, UT), (u, v) => v < 407), techoNorte = conCanal(panelesNorte(), UT);
+    techoSur.visible = true; techo.add(techoSur, techoNorte); g1.add(techo);
     const retDe = new Map(), morfs = [], mallas = [], lineas = [];
     techo.traverse(x => { if (x.isMesh) mallas.push(x); else if (x.isLineSegments) lineas.push(x); });
     const morf = (x, ret) => {
       const p = x.geometry.attributes.position, fin = p.array.slice(), ini = new Float32Array(p.count);
-      for (let i = 0; i < p.count; i++) ini[i] = zViejo(fin[3 * i] + CEN[0], CEN[1] - fin[3 * i + 2]);
+      for (let i = 0; i < p.count; i++) ini[i] = zViejo(fin[3 * i] + CEN[0], CEN[1] - fin[3 * i + 2]) + 0.06;   // (un poco arriba: que las líneas se vean sobre la de hoy)
       morfs.push({ p, fin, ini, ret, otro: x.geometry.attributes.aOtro || null });
     };
     mallas.forEach(x => {
@@ -1222,17 +1330,31 @@ export async function crea(api) {
     const tT = tintes(techo), tH = tintes(murosHoy), hM = tH.find(t => !t.arista), hL = tH.find(t => t.arista);
     tT.forEach(t => { t.de = (t.arista ? hL : hM) ? (t.arista ? hL : hM).base.clone() : t.base.clone(); });
     const pinta = k => tT.forEach(t => t.c.copy(t.de).lerp(t.base, k));
-    MARCA.comercioTecho = { g: g1, piezas: [], rotulos: [], dur: 6500, durSale: 1500,
-      aplica(k) { techoHoy.visible = k <= 0.001; morfa(k); pinta(suave(tramo(k, 0.25, 0.95))); },
+    MARCA.comercioTecho = { g: g1, piezas: [], rotulos: [], dur: 8000, durSale: 1500,
+      aplica(k) {
+        const entra = k >= 0.3, km = tramo(k, 0.32, 1);
+        UT.uDib.value.x = suave(tramo(k, 0, 0.3)); UT.uDib.value.y = entra ? 1 : 0;   // las líneas primero; la cubierta, cuando ya están
+        techoHoy.visible = !entra; morfa(km); pinta(suave(tramo(km, 0.1, 0.9)));
+      },
       latido() {}
     };
-    // 2 · los vanos: los muros de hoy se borran (de abajo hacia arriba) mientras se dibujan los del proyecto y la celosía
-    const g2 = marcaEn(gC, 'comercioVanos'), UV = canalNuevo(), vanos = new THREE.Group();
+    // 2 · los vanos: los muros de hoy se borran (de abajo hacia arriba) mientras se dibujan los del proyecto, con la celosía
+    // y con sus vanos todavía tapados; luego se dibujan las líneas de cada vano y ese espacio se borra desde el aro, como
+    // se borra lo demolido
+    const g2 = marcaEn(gC, 'comercioVanos'), UV = canalNuevo(), UPa = canalNuevo(), vanos = new THREE.Group();
     const muros = copiaRevit(/^revit-comercio-walls-/, UV), celosia = filtraTri(copiaRevit(/^revit-comercio-curtain(Panels|Mullions)-/, UV), esCelosia);
-    muros.visible = celosia.visible = true; vanos.add(muros, celosia); g2.add(vanos);
+    // las tapas: los vanos de las fachadas (vanosMercado) y, en las caras que cortó el aro, su cancelería pintada como muro
+    const parches = new THREE.Group(), hoyos = new THREE.Group(), mv = vanosMercado(); hoyos.name = 'comercio-vanos';
+    if (mv.p.length) { pon(hoyos, mv, 'nave', null, 25); parches.add(conCanal(hoyos, UPa)); }
+    const caras = tapaVanos(filtraTri(copiaRevit(/^revit-comercio-(curtainPanels|doors)-/, UPa), (u, v) => !esCelosia(u, v) && !cercaDeLados(u, v, 0.9)), muros, UPa);
+    caras.visible = true; parches.add(caras);
+    muros.visible = celosia.visible = parches.visible = true; vanos.add(muros, celosia); g2.add(vanos, parches);
     barridoSube(UV, vanos); barridoBaja(UMv, UV);
-    MARCA.comercioVanos = { g: g2, piezas: [], rotulos: [], dur: 6000, durSale: 1400,
-      aplica(k) { const a = tramo(k, 0.04, 0.84); vanos.visible = a > 0; armaCanal(UV, a); armaCanal(UMv, 1 - tramo(k, 0.12, 0.92)); murosHoy.visible = k < 0.999; },
+    MARCA.comercioVanos = { g: g2, piezas: [], rotulos: [], dur: 8000, durSale: 1500,
+      aplica(k) {
+        const a = tramo(k, 0.02, 0.45); vanos.visible = a > 0; armaCanal(UV, a); armaCanal(UMv, 1 - tramo(k, 0.08, 0.5)); murosHoy.visible = k < 0.5;
+        vanosEn(UPa, UV, tramo(k, 0.48, 0.64), tramo(k, 0.67, 1), O_ARO, 44, 106); parches.visible = a > 0 && k < 0.999;
+      },
       latido() {}
     };
     // 3 · los pisos y la cancelería (con la de las caras que cortó el aro)
@@ -1294,20 +1416,30 @@ export async function crea(api) {
     function volumenEn() {
       const k1 = marcaK.industriaVolumen || 0, k2 = marcaK.industriaPatios || 0, partido = k2 > 0.001;
       armaCanal(UA, tramo(k1, 0, 1));
-      gMasa.visible = !partido; gQuita.visible = partido && k2 < 0.42; gQueda.visible = partido && k2 < 0.9;
-      armaCanal(UR, 1 - tramo(k2, 0.14, 0.42));
-      armaCanal(UQ, 1 - tramo(k2, 0.4, 0.9));
-      const r = suave(tramo(k2, 0, 0.12)) * (k2 < 0.14 ? pulso : 1);
+      gMasa.visible = !partido; gQuita.visible = partido && k2 < 0.3; gQueda.visible = partido && k2 < 0.56;
+      armaCanal(UR, 1 - tramo(k2, 0.1, 0.3));
+      armaCanal(UQ, 1 - tramo(k2, 0.3, 0.56));
+      const r = suave(tramo(k2, 0, 0.08)) * (k2 < 0.1 ? pulso : 1);
       tq.forEach(t => { t.c.copy(t.base).lerp(rojoC, r); if (t.g != null) t.m.uniforms.uGris.value = t.g + (0.42 - t.g) * r; });
     }
     MARCA.industriaVolumen = { g: g1, piezas: [], rotulos: [], dur: 4200, durSale: 1400, aplica: volumenEn, latido() {} };
-    // 2 · se quitan los módulos (patios y planta baja libre) y queda el edificio, con sus vanos y su vidrio
-    const g2 = marcaEn(gI, 'industriaPatios'), UE = canalNuevo();
-    const edif = copiaRevit(/^revit-industria-(walls|floors|windows|doors|curtainPanels)-/, UE); edif.visible = true; g2.add(edif);
-    barridoSube(UE, edif);
-    MARCA.industriaPatios = { g: g2, piezas: [], rotulos: [], dur: 7000, durSale: 1600,
-      aplica(k) { volumenEn(); const a = tramo(k, 0.42, 1); edif.visible = a > 0; armaCanal(UE, a); },
-      latido(ms, k) { pulso = k > 0.08 && k < 0.14 ? 0.82 + 0.18 * Math.sin(ms / 130) : 1; if (k > 0.08 && k < 0.14) volumenEn(); }
+    // 2 · se quitan los módulos (patios y planta baja libre) y queda el edificio: sus muros y losas salen con los vanos
+    // de las ventanas tapados; luego se dibujan las líneas de cada ventana, ese espacio se borra (desde el centro de la
+    // industria, como lo demolido) y al final entra el vidrio
+    const g2 = marcaEn(gI, 'industriaPatios'), UE = canalNuevo(), UPi = canalNuevo(), UG = canalNuevo();
+    const edif = copiaRevit(/^revit-industria-(walls|floors)-/, UE), vidrio = copiaRevit(/^revit-industria-(windows|doors|curtainPanels)-/, UG);
+    const parches = tapaVanos(copiaRevit(/^revit-industria-(windows|doors|curtainPanels)-/, UPi), edif, UPi);
+    edif.visible = vidrio.visible = parches.visible = true; g2.add(edif, parches, vidrio);
+    barridoSube(UE, edif); barridoSube(UG, vidrio);
+    const CI = V3(...P(D.x0 + nI * D.dx / 2, D.y0 + nJ * D.dy / 2), 0);
+    MARCA.industriaPatios = { g: g2, piezas: [], rotulos: [], dur: 9500, durSale: 1600,
+      aplica(k) {
+        volumenEn();
+        const a = tramo(k, 0.3, 0.56); edif.visible = a > 0; armaCanal(UE, a);
+        vanosEn(UPi, UE, tramo(k, 0.58, 0.7), tramo(k, 0.72, 0.9), CI, 0, 34); parches.visible = a > 0 && k < 0.9;
+        const v = tramo(k, 0.86, 1); vidrio.visible = v > 0; armaCanal(UG, v);
+      },
+      latido(ms, k) { pulso = k > 0.05 && k < 0.1 ? 0.82 + 0.18 * Math.sin(ms / 130) : 1; if (k > 0.05 && k < 0.1) volumenEn(); }
     };
     // 3 · los conos de luz y el sol del 21 de diciembre
     const g3 = marcaEn(gI, 'industriaConos'), UK = canalNuevo();
@@ -1339,8 +1471,8 @@ export async function crea(api) {
     // el sol
     const cv = document.createElement('canvas'); cv.width = cv.height = 64;
     { const x = cv.getContext('2d'); x.fillStyle = 'rgba(255,211,77,.18)'; x.beginPath(); x.arc(32, 32, 30, 0, 7); x.fill(); x.fillStyle = '#ffe9a8'; x.beginPath(); x.arc(32, 32, 13, 0, 7); x.fill(); }
-    const mSol = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: 0, depthWrite: false, sizeAttenuation: false });
-    const sol = new THREE.Sprite(mSol); sol.scale.set(0.05, 0.05, 1);
+    const mSol = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: 0, depthWrite: false });
+    const sol = new THREE.Sprite(mSol); sol.scale.set(6, 6, 1);   // (en metros: la vista es axonométrica)
     // la luz: los rayos que llegan a la boca de cada cono y la columna de luz que baja hasta el piso (a través del
     // edificio: es un diagrama), con su mancha en el piso
     const nC = conosLuz.length, posR = new Float32Array(nC * 6), gR = new THREE.BufferGeometry(); gR.setAttribute('position', new THREE.BufferAttribute(posR, 3));
@@ -1357,8 +1489,8 @@ export async function crea(api) {
     [lArco, lHz, sol, rayos].forEach(o => { o.renderOrder = 11; });
     g3.add(lArco, lHz, sol, rayos, luces);
     let solK = 0;
-    function ponSol(ms) {
-      const h = h0 + (h1 - h0) * ((ms % 16000) / 16000), q = G.solEn(DIA, h), alt = Math.max(1, q.alt);
+    function ponSol(t) {   // t: 0, cuando sale … 1, cuando se pone
+      const h = h0 + (h1 - h0) * t, q = G.solEn(DIA, h), alt = Math.max(1, q.alt);
       sol.position.copy(V3(...enCielo(alt, q.az)));
       const d = dirSol(alt, q.az), L = 9;
       conosLuz.forEach((c, i) => {
@@ -1369,15 +1501,17 @@ export async function crea(api) {
       const s = Math.sin(alt * RAD);
       mRayo.opacity = 0.75 * solK; mCol.opacity = (0.06 + 0.22 * s) * solK; mMan.opacity = (0.1 + 0.35 * s) * solK; mSol.opacity = solK;
     }
-    const qMed = G.solEn(DIA, 12), pMed = enCielo(qMed.alt, qMed.az, 6);
-    MARCA.industriaConos = { g: g3, piezas: [], rotulos: [{ u: pMed[0], v: pMed[1], z: pMed[2], texto: '21 de diciembre', sub: 'recorrido del sol en invierno', tipo: 'calle', retraso: 3800 }],
-      dur: 7600, durSale: 1500,
+    // los conos; el arco se traza; el sol lo recorre una vez, de que sale a que se pone; luego el diagrama se va (y la
+    // slide suelta el foco: foco.suelta)
+    MARCA.industriaConos = { g: g3, piezas: [], rotulos: [], dur: 17000, durSale: 1600,
       aplica(k) {
-        const a = tramo(k, 0, 0.5); conos.visible = a > 0; armaCanal(UK, a);
-        const t = tramo(k, 0.42, 0.78); arco.setDrawRange(0, Math.ceil(horas.length * t)); mArco.opacity = 0.9 * Math.min(1, t * 4); mHz.opacity = 0.16 * t;
-        solK = tramo(k, 0.7, 1); ponSol(performance.now());
+        const a = tramo(k, 0, 0.16); conos.visible = a > 0; armaCanal(UK, a);
+        const t = tramo(k, 0.14, 0.26), fuera = 1 - tramo(k, 0.84, 0.92);
+        arco.setDrawRange(0, Math.ceil(horas.length * t)); mArco.opacity = 0.9 * Math.min(1, t * 4) * fuera; mHz.opacity = 0.16 * t * fuera;
+        solK = tramo(k, 0.24, 0.3) * fuera; ponSol(tramo(k, 0.28, 0.84));
+        lArco.visible = lHz.visible = mArco.opacity > 0.002; sol.visible = rayos.visible = luces.visible = solK > 0.002;
       },
-      latido(ms) { if (solK > 0) ponSol(quieto.matches ? 0 : ms); }
+      latido() {}
     };
   }
 
