@@ -22,6 +22,7 @@ function cargaScript(src) {
 export async function crea(api) {
   if (!window.ATLAMPA_HISTORIA_DATOS) await cargaScript(conV('atlampa-historia-datos.js'));
   if (!window.ATLAMPA_HISTORIA_VIVIENDA) await cargaScript(conV('atlampa-historia-vivienda.js'));   // (herramientas/prepara-vivienda-historia.py)
+  if (!window.ATLAMPA_HISTORIA_PAISAJE) await cargaScript(conV('atlampa-historia-paisaje.js'));   // (herramientas/prepara-paisaje-historia.py)
   const guionMod = await import(conV('./atlampa-historia-guion.js'));
   const GUION = guionMod.default, MARCAS = guionMod.MARCAS;
   const etapaDe = i => (GUION[i] && GUION[i].etapa) || 1;   // etapa de la presentación (la 1 por omisión)
@@ -936,7 +937,7 @@ export async function crea(api) {
   // sube (s.aro: { op, sube, dur }); sin s.aro, no está. Sube translúcida para dejar ver el predio y luego baja a
   // su lugar, opaca: así se lee que la «o» es el aro.
   const matO = new THREE.MeshBasicMaterial({ color: CIRCUITO, transparent: true, opacity: 0, side: THREE.DoubleSide });
-  let aroO = null, aroEst = { op: 0, sube: 0 }, aroTw = null, aroForma = null;
+  let aroO = null, aroEst = { op: 0, sube: 0, o: 0 }, aroTw = null, aroForma = null;
   function armaAroO() {
     const A = G.ANILLO, lay = disenoAro('circuito', AZ_NORTE); lay.tex.dispose();   // el grosor de las letras de la palabra
     const circ = r => { const c = []; for (let i = 0; i <= 120; i++) { const t = i / 120 * Math.PI * 2; c.push([A.u + r * Math.cos(t), A.v + r * Math.sin(t)]); } return c; };
@@ -956,7 +957,8 @@ export async function crea(api) {
     p.needsUpdate = true; aroO.geometry.computeBoundingSphere();
   }
   // la opacidad de la «o»: la de la slide, y se apaga cuando el aro del proyecto ya está (marca aroReal)
-  const opAro = () => aroEst.op * (1 - tramo(marcaK.aroReal || 0, 0.55, 0.9));
+  // (aro.o: 1 la vuelve a encender sobre el aro del proyecto, como la «o» de «circuito» en la slide final)
+  const opAro = () => aroEst.op * Math.max(aroEst.o || 0, 1 - tramo(marcaK.aroReal || 0, 0.55, 0.9));
   function aplicaAro(e) {
     aroEst = e;
     if (!aroO) return;
@@ -1003,11 +1005,11 @@ export async function crea(api) {
     };
   }
   function ponAro(c, retraso) {
-    const meta = { op: c ? (c.op == null ? 0.95 : c.op) : 0, sube: (c && c.sube) || 0 };
+    const meta = { op: c ? (c.op == null ? 0.95 : c.op) : 0, sube: (c && c.sube) || 0, o: (c && c.o) || 0 };
     if (aroTw) { tweens = tweens.filter(t => t !== aroTw); aroTw = null; }
-    const de = Object.assign({}, aroEst);
-    if (de.op === meta.op && de.sube === meta.sube) return;
-    aroTw = anima((c && c.dur) || 1600, k => aplicaAro({ op: de.op + (meta.op - de.op) * k, sube: de.sube + (meta.sube - de.sube) * k }), () => { aroTw = null; }, retraso || 0);
+    const de = Object.assign({ o: 0 }, aroEst);
+    if (de.op === meta.op && de.sube === meta.sube && de.o === meta.o) return;
+    aroTw = anima((c && c.dur) || 1600, k => aplicaAro({ op: de.op + (meta.op - de.op) * k, sube: de.sube + (meta.sube - de.sube) * k, o: de.o + (meta.o - de.o) * k }), () => { aroTw = null; }, retraso || 0);
   }
 
   /* ---------- 3d. Etapa 2: arte y cultura, en dos tiempos ----------
@@ -1076,11 +1078,12 @@ export async function crea(api) {
      Como al seleccionar un uso en el visor: lo demás se apaga, translúcido al 15 %, y el uso que se arma se sigue
      viendo igual. s.foco: 'uso' o { uso, desde, hasta, suelta }: desde (una marca) para que empiece cuando esa marca
      ya puso las piezas propias del uso (así el uso no se apaga con lo demás); con hasta, el foco se suelta cuando esa
-     marca llega al tramo suelta (por omisión [0.8, 1]). FOCO[uso]: los grupos que no se apagan (llevan materiales
+     marca llega al tramo suelta (por omisión [0.8, 1]); tenue: a cuánto se apaga lo demás (por omisión FOCO_TENUE).
+     FOCO[uso]: los grupos que no se apagan (llevan materiales
      propios). Para que sea suave y nada parpadee: se apaga en FOCO_MS, sigue escribiendo la profundidad y lo apagado
      se dibuja en un orden fijo (de lo lejano a lo cercano, desde la cámara del momento en que empieza). */
   const FOCO = {}, FOCO_TENUE = 0.15, FOCO_MS = 1600;
-  let focoK = 0, focoUso = null, focoLista = null, focoObjs = null, focoT = 0;
+  let focoK = 0, focoUso = null, focoLista = null, focoObjs = null, focoT = 0, focoTen = FOCO_TENUE;
   function focoJunta(uso) {
     const fuera = new Set(FOCO[uso] || []), vistos = new Set(), lista = [], objs = [];
     const pc = api.camara().position, c = new THREE.Vector3();
@@ -1121,11 +1124,12 @@ export async function crea(api) {
     let meta = 0;
     if (uso && (!f.desde || (marcaK[f.desde] || 0) > 0.001)) { const su = f.suelta || [0.8, 1]; meta = f.hasta ? 1 - tramo(marcaK[f.hasta] || 0, su[0], su[1]) : 1; }
     if (uso && uso !== focoUso) { if (focoK < 0.01) { focoSuelta(); focoUso = uso; } else meta = 0; }   // otro uso: primero se suelta el de antes
+    if (uso && uso === focoUso) focoTen = f.tenue != null ? f.tenue : FOCO_TENUE;   // (foco.tenue: qué tanto se apaga lo demás; se suelta con el mismo)
     const paso = quieto.matches ? 1 : dt / FOCO_MS;
     focoK = meta > focoK ? Math.min(meta, focoK + paso) : Math.max(meta, focoK - paso);
     if (focoK <= 0) { focoSuelta(); return; }
     if (!focoLista) focoLista = focoJunta(focoUso);
-    const fac = 1 - (1 - FOCO_TENUE) * suave(focoK);
+    const fac = 1 - (1 - focoTen) * suave(focoK);
     focoLista.forEach(e => {
       const cur = e.u ? e.u.value : e.m.opacity;
       if (Math.abs(cur - e.escrito) > 1e-5) e.base = cur;   // alguien más lo cambió: ésa es la base
@@ -1744,6 +1748,482 @@ export async function crea(api) {
     };
   }
 
+  /* ---------- 3j. Etapa 2: el paisaje ----------
+     El Boceto 01d de Atlampa Landscape (Diego, 2026-11-28), en cuatro slides: 1) el agua: los jardines inundables
+     (los anillos de zacatón, caña de indias, junco y espigas de agua, en tonos de agua) y los espejos de agua; 2) los
+     pisos: la plaza y los andadores con sus juntas, las guarniciones, el pasto navajita, los cuatro pétreos y la tierra
+     de las arbustivas; 3) la vegetación con los colores del boceto (las masas de Burle Marx): los árboles de croquis,
+     las arbustivas, los magueyes y las cucharillas, los pastos, las plantas del agua y sus flores; 4) el año: pasan los
+     doce meses (3 s cada uno) y cada franja toma el color de su follaje (más verde en lluvias, pajizo en secas),
+     florece en sus meses (los de la rueda de floración del paquete) y las aromáticas en flor llevan un halo de su
+     color que respira; los inundables se llenan de agua en lluvias. El mes va escrito sobre una azotea del contexto
+     (proyectado desde arriba, como «circuito») y se reescribe al cambiar. Al terminar el año se suelta el foco.
+     Datos: atlampa-historia-paisaje.js (herramientas/prepara-paisaje-historia.py). */
+  const tPunto = (() => {   // un punto redondo y suave (flores, flujos)
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const x = c.getContext('2d'), gr = x.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.92)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 32, 32);
+    return new THREE.CanvasTexture(c);
+  })();
+  function puntos(pts, c, px, aditivo) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    const m = new THREE.PointsMaterial({ color: c, size: px || 4, sizeAttenuation: false, map: tPunto, transparent: true, opacity: 0, depthWrite: false, alphaTest: 0.02 });
+    if (aditivo) m.blending = THREE.AdditiveBlending;
+    const o = new THREE.Points(g, m); o.renderOrder = 9; o.frustumCulled = false;
+    return { obj: o, mat: m, geo: g };
+  }
+  function radial(U, c, r0, r1) { U.uDib.value.z = 1; U.uDibO.value.copy(c); U.uDibV.value.set(r0, r1, 0); }
+  // las copias llevan materiales propios: las caras toman el color con uTinta (liso) y las líneas el suyo; devuelve
+  // los colores (para cambiarlos después)
+  function pinta(obj, cara, linea, gris) {
+    const r = { caras: [], lineas: [] };
+    obj.traverse(x => {
+      const m = x.material; if (!m) return;
+      if (m.uniforms && m.uniforms.uTinta) {
+        if (cara == null) return;
+        m.uniforms.uTinta.value.set(cara); if (m.uniforms.uModo) m.uniforms.uModo.value = 1;
+        if (m.uniforms.uGris) m.uniforms.uGris.value = gris == null ? 0.9 : gris;
+        if (m.uniforms.uGrano) m.uniforms.uGrano.value = 0;
+        r.caras.push(m.uniforms.uTinta.value);
+      } else if (m.color && (linea || cara) != null) { m.color.set(linea || cara); r.lineas.push(m.color); }
+    });
+    return r;
+  }
+  // un polígono [ext, hoyo, …] (anillos planos [u, v, …]) como tapa a la altura z, con su contorno y sus costados
+  function tapaPol(m, pol, z, lin, alto) {
+    const [ext, ...hoyos] = pol.map(r => pares(r)), e = api.ccw(ext), todos = e.concat(...hoyos);
+    THREE.ShapeUtils.triangulateShape(e.map(q => new THREE.Vector2(q[0], q[1])), hoyos.map(h => h.map(q => new THREE.Vector2(q[0], q[1]))))
+      .forEach(t => m.tri(...t.map(k => W(todos[k][0], todos[k][1], z))));
+    [e].concat(hoyos).forEach(r => {
+      if (alto) api.muros(m, r, z - alto, z);
+      if (lin) lin.poli(r.map(q => W(q[0], q[1], z + 0.01)), true);
+    });
+  }
+  // polígonos de un color en el canal U (copias propias)
+  function capaPol(nombre, pols, z, U, cara, linea, alto, gris) {
+    const m = new Malla(), l = linea ? new Lineas() : null;
+    pols.forEach(p => tapaPol(m, p, z, l, alto));
+    const g = new THREE.Group(); g.name = 'paisaje-' + nombre;
+    if (m.p.length) pon(g, m, 'plaza', null, false, l || undefined);
+    const c = conCanal(g, U);
+    return Object.assign({ obj: c }, pinta(c, cara, linea, gris));
+  }
+  const LLUVIA = [0, 0, 0, 0.05, 0.3, 0.85, 1, 1, 1, 0.85, 0.45, 0.1];   // qué tanto llueve en cada mes (0 secas … 1 lluvias)
+  const FLOR_MES = { M: 1, X: 1, S: 1, r: 0.45, '.': 0 };
+  // el valor del mes f (0 enero … 11.99 diciembre), con el cambio al final de cada mes
+  const enMes = (a, f) => { const i = Math.floor(f) % 12, j = (i + 1) % 12, t = f - Math.floor(f); return a[i] + (a[j] - a[i]) * suave(tramo(t, 0.7, 1)); };
+  const DUR_ANIO = 38000, MES_MS = 3000, ANIO_0 = 900;   // el año: entra (0.9 s), doce meses de 3 s y sale
+  const PISO_PLAZA = { abre: 0, pon() {} };
+  function armaPaisaje() {
+    const P = window.ATLAMPA_HISTORIA_PAISAJE; if (!P) return;
+    const gP = new THREE.Group(); gP.name = 'paisaje'; gH.add(gP); FOCO.paisaje = [gP];
+    const ESP = P.especies, ZP = 0.21, ZQ = 0.34, ZI = 0.16, ZA = 0.1;   // la plaza, los parques, los inundables, el agua
+    const azarV = G.aleatorio(28), CP = V3(503.5, 405.3, 0);   // (el centro del predio: de ahí se dibuja todo hacia afuera)
+    Object.values(ESP).forEach(e => { e.mv = e.m.split('').map(c => FLOR_MES[c] || 0); });
+
+    // 1 · el agua: los anillos inundables (en tonos de agua) y los espejos
+    const g1 = marcaEn(gP, 'paisajeAgua'), UA = canalNuevo(), UE = canalNuevo();
+    radial(UA, CP, 0, 100); radial(UE, CP, 0, 100);
+    const AGUA = { 'E-009': '#7db4ea', 'E-005': '#3d86c8', 'E-013': '#a3cde6', 'E-065': '#bcdbe6' };
+    const inund = {};
+    Object.keys(AGUA).forEach(id => {
+      inund[id] = capaPol('inundable-' + id, P.manchas.filter(m => m.id === id).flatMap(m => m.pol), ZI, UA, AGUA[id], '#d6ebff', 0.12);
+      g1.add(inund[id].obj);
+    });
+    const espejos = capaPol('espejos', P.agua.flatMap(a => a.pol), ZA, UE, '#2a6fbe', '#c4e2ff', 0.1);
+    g1.add(espejos.obj);
+    MARCA.paisajeAgua = { g: g1, piezas: [], rotulos: [], dur: 5200, durSale: 1200,
+      aplica(k) { armaCanal(UA, tramo(k, 0, 0.8)); armaCanal(UE, tramo(k, 0.25, 1)); },
+      latido() {}
+    };
+
+    // 2 · los pisos: la plaza y los andadores (con sus juntas), las guarniciones y el suelo de cada franja
+    const g2 = marcaEn(gP, 'paisajePisos'), UPz = canalNuevo(), UPq = canalNuevo();
+    radial(UPz, CP, 0, 112); radial(UPq, CP, 0, 100);
+    const plaza = capaPol('plaza', P.piso, ZP, UPz, '#b9b2a4', '#d9d3c6', false, 0.78);
+    const lj = new Lineas(), J = P.juntas;
+    for (let i = 0; i < J.length; i += 4) lj.seg(W(J[i], J[i + 1], ZP + 0.012), W(J[i + 2], J[i + 3], ZP + 0.012));
+    const gj = new THREE.Group(); ponLineas(gj, lj, 'paisaje-juntas', 0xffffff, null, null);
+    const juntas = conCanal(gj, UPz); pinta(juntas, null, '#8e887c');
+    const guarn = capaPol('guarniciones', P.guarniciones, ZQ + 0.08, UPq, '#e2ddd2', '#f4f1ea', 0.3, 0.85);
+    g2.add(plaza.obj, juntas, guarn.obj);
+    const SUELO = { tierra: '#5d4b3b', 'E-060': '#a3b464' }, porSuelo = {};
+    P.manchas.forEach(m => { if (AGUA[m.id]) return; const k = /^PT-/.test(m.id) || m.id === 'E-060' ? m.id : 'tierra'; (porSuelo[k] = porSuelo[k] || []).push(...m.pol); });
+    const suelos = {};
+    Object.keys(porSuelo).forEach(k => {
+      suelos[k] = capaPol('suelo-' + k, porSuelo[k], ZQ, UPq, SUELO[k] || P.petreos[k].color, null, false, 0.92);
+      g2.add(suelos[k].obj);
+    });
+    // (la plaza se abre con el suelo cuando se muestra el estacionamiento: PISO_PLAZA.abre, de 0 a 1)
+    PISO_PLAZA.pon = () => armaCanal(UPz, Math.min(tramo(marcaK.paisajePisos || 0, 0, 0.7), 1 - PISO_PLAZA.abre));
+    MARCA.paisajePisos = { g: g2, piezas: [], rotulos: [], dur: 5600, durSale: 1200,
+      aplica(k) { PISO_PLAZA.pon(); armaCanal(UPq, tramo(k, 0.3, 1)); },
+      latido() {}
+    };
+
+    // 3 · la vegetación: cada especie en su franja, con su forma, y sus flores
+    const g3 = marcaEn(gP, 'paisajeVegetacion'), UV = canalNuevo(), UT = canalNuevo();
+    radial(UV, CP, 0, 100); radial(UT, CP, 0, 100);
+    const geoDomo = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+    const hojas = (n, alto, ancho, abre) => {   // n hojas que salen del centro (alto, ancho y apertura relativos a 1)
+      const p = [];
+      for (let i = 0; i < n; i++) {
+        const a = i / n * 2 * Math.PI + (i % 2) * 0.3, h = alto[i % alto.length], ca = Math.cos(a), sa = Math.sin(a), w = ancho;
+        const mx = ca * abre * 0.55, mz = sa * abre * 0.55;
+        p.push(0, 0, 0, mx - sa * w, h * 0.5, mz + ca * w, ca * abre, h, sa * abre);
+        p.push(0, 0, 0, ca * abre, h, sa * abre, mx + sa * w, h * 0.5, mz - ca * w);
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.computeVertexNormals(); return g;
+    };
+    const geoRoseta = hojas(10, [1, 0.62], 0.12, 1), geoCana = hojas(5, [1, 0.8, 0.9], 0.2, 0.42);
+    const M4 = new THREE.Matrix4(), Q4 = new THREE.Quaternion(), S4 = new THREE.Vector3(), P4 = new THREE.Vector3();
+    const VEG = {};
+    Object.keys(P.plantas).forEach(id => {
+      const e = ESP[id], L = P.plantas[id], n = L.length / 3; if (!n) return;
+      const z0 = AGUA[id] ? ZI : ZQ, V = VEG[id] = { e, caras: [], lineas: [], crece: [], flores: null, quiote: null };
+      const g = new THREE.Group(); g.name = 'paisaje-' + id;
+      const fl = [], ql = new Lineas();
+      if (e.forma === 'domo' || e.forma === 'roseta' || e.forma === 'cana') {
+        const geo = e.forma === 'domo' ? geoDomo : e.forma === 'roseta' ? geoRoseta : geoCana;
+        const im = new THREE.InstancedMesh(geo, material('arbusto'), n); im.frustumCulled = false;
+        for (let i = 0, j = 0; i < L.length; i += 3, j++) {
+          const u = L[i], v = L[i + 1], s = L[i + 2], r = e.sep * (e.forma === 'domo' ? 0.6 : 0.5) * s, h = e.alto * s, w = W(u, v, z0);
+          Q4.setFromAxisAngle(EJE, azarV() * Math.PI * 2);
+          M4.compose(P4.set(w[0], w[1], w[2]), Q4, S4.set(r, h, r)); im.setMatrixAt(j, M4);
+          if (e.forma === 'domo') for (let q = 0; q < 3; q++) { const a = azarV() * Math.PI * 2, rr = r * 0.55 * azarV(); fl.push(...W(u + Math.cos(a) * rr, v + Math.sin(a) * rr, z0 + h * (0.86 - 0.4 * rr * rr / (r * r)) + 0.05)); }
+          if (e.forma === 'roseta') {   // el quiote (la vara de la flor) y sus flores arriba
+            const hq = h + (id === 'E-055' ? 3.4 : 1.7) * s;
+            ql.seg(W(u, v, z0 + h * 0.4), W(u, v, z0 + hq));
+            for (let q = 0; q < 6; q++) { const a = q / 6 * 2 * Math.PI, zz = z0 + hq - 0.9 * q / 6; fl.push(...W(u + Math.cos(a) * 0.35, v + Math.sin(a) * 0.35, zz)); }
+          }
+        }
+        im.instanceMatrix.needsUpdate = true;
+        g.add(im);
+      } else {   // pastos, juncos y espigas: trazos
+        const l = new Lineas(), hojasN = e.forma === 'pasto' ? 5 : e.forma === 'junco' ? 4 : 3;
+        for (let i = 0; i < L.length; i += 3) {
+          const u = L[i], v = L[i + 1], s = L[i + 2], h = e.alto * s, w = e.sep * (e.forma === 'pasto' ? 0.38 : 0.16);
+          for (let b = 0; b < hojasN; b++) {
+            const a = azarV() * Math.PI * 2, r = w * (0.4 + 0.6 * azarV()), tu = u + Math.cos(a) * r, tv = v + Math.sin(a) * r, tz = z0 + h * (0.72 + 0.28 * azarV());
+            l.seg(W(u + Math.cos(a) * r * 0.15, v + Math.sin(a) * r * 0.15, z0), W(tu, tv, tz));
+            if (e.forma === 'espiga' || (e.forma === 'junco' && b === 0) || (e.forma === 'pasto' && b < 2)) fl.push(...W(tu, tv, tz + 0.04));
+          }
+        }
+        ponLineas(g, l, 'paisaje-' + id, 0xffffff, null, null);
+      }
+      const c = conCanal(g, UV); g3.add(c);
+      const pc = pinta(c, e.boceto || e.follaje, e.boceto || e.follaje, 0.92);
+      V.caras = pc.caras; V.lineas = pc.lineas;
+      if (e.forma === 'domo' || e.forma === 'roseta' || e.forma === 'cana') V.crece.push(c);
+      if (fl.length && e.mv.some(x => x > 0)) { V.flores = puntos(fl, e.flor, e.forma === 'domo' ? 4.2 : 3.4); g3.add(V.flores.obj); }
+      if (ql.p.length && e.mv.some(x => x > 0)) {
+        const mq = new THREE.LineBasicMaterial({ color: e.flor, transparent: true, opacity: 0 }), lq = new THREE.LineSegments(ql.geo(), mq);
+        lq.frustumCulled = false; g3.add(lq); V.quiote = mq;
+      }
+    });
+    // los árboles: de croquis (los del visor), uno por especie, que se tiñen con su flor
+    const ARB = window.Atlampa3D && window.Atlampa3D.ARBOLES_TEX, TILE = { 'E-046': 0, 'E-047': 1, 'E-052': 2 }, arboles = {};
+    if (ARB) Object.keys(TILE).forEach(id => {
+      const L = P.arboles.filter(a => a.id === id); if (!L.length) return;
+      const mat = api.matAtlas(ARB.tex, ARB.N, 1, UT), b = api.mallaAtlas(L.length, mat);
+      L.forEach((t, i) => {
+        const p = W(t.c[0], t.c[1], ZQ), H = ESP[id].alto * (0.9 + 0.2 * azarV());
+        b.aPos.setXYZ(i, p[0], p[1], p[2]); b.aEsc.setXY(i, ARB.ancho * H, ARB.alto * H); b.aTile.setX(i, TILE[id]); b.aVolt.setX(i, i % 2 ? 1 : -1);
+      });
+      ['aPos', 'aEsc', 'aTile', 'aVolt'].forEach(k => { b[k].needsUpdate = true; });
+      mat.uniforms.uTinta.value.set(ESP[id].follaje || '#7f9a5a'); mat.uniforms.uPlano.value = 0.42;   // (sobre el fondo oscuro: la copa con su verde)
+      b.malla.renderOrder = 7; g3.add(b.malla); arboles[id] = { mat, base: mat.uniforms.uTinta.value.clone() };
+    });
+
+    // 4 · el año: los halos de las aromáticas y el mes escrito sobre el contexto
+    const g4 = marcaEn(gP, 'paisajeAnio');
+    const HALO_V = /* glsl */`attribute float aH; varying float vH; void main() { vH = aH; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+    const HALO_F = /* glsl */`uniform vec3 uColor; uniform float uOp; varying float vH; void main() { float a = uOp * pow(1.0 - vH, 1.7); gl_FragColor = vec4(uColor * a, a); }`;
+    const halos = [];
+    Object.keys(ESP).filter(id => ESP[id].tags.includes('aroma')).forEach(id => {
+      const pols = P.manchas.filter(m => m.id === id).flatMap(m => m.pol); if (!pols.length) return;
+      const pos = [], hh = [], Z0 = ZQ + 0.25, ALTO = 3.2;
+      pols.forEach(pol => {
+        const [ext, ...hoyos] = pol.map(r => pares(r)), e = api.ccw(ext), todos = e.concat(...hoyos);
+        e.forEach((a, i) => {   // el velo: sube por el borde y se desvanece
+          const b = e[(i + 1) % e.length];
+          [[a, 0], [b, 0], [b, 1], [a, 0], [b, 1], [a, 1]].forEach(([q, h]) => { pos.push(...W(q[0], q[1], Z0 + h * ALTO)); hh.push(h); });
+        });
+        const tri = THREE.ShapeUtils.triangulateShape(e.map(q => new THREE.Vector2(q[0], q[1])), hoyos.map(h => h.map(q => new THREE.Vector2(q[0], q[1]))));
+        [0.12, 0.34, 0.56].forEach(h => tri.forEach(t => t.forEach(k => { pos.push(...W(todos[k][0], todos[k][1], Z0 + h * ALTO)); hh.push(h); })));   // y unas capas por dentro
+      });
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aH', new THREE.Float32BufferAttribute(hh, 1));
+      const mat = new THREE.ShaderMaterial({ vertexShader: HALO_V, fragmentShader: HALO_F, uniforms: { uColor: { value: new THREE.Color(ESP[id].flor) }, uOp: { value: 0 } },
+        transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+      const o = new THREE.Mesh(geo, mat); o.renderOrder = 10; o.frustumCulled = false; g4.add(o);
+      halos.push({ id, mat });
+    });
+    // el mes: los doce nombres en un atlas (y una fila vacía); se escribe de izquierda a derecha sobre el anterior
+    // va en la azotea más grande del contexto dentro de MES.zona [u0, v0, u1, v1], de frente a la cámara (MES.az), al
+    // tamaño que cabe (proyectado desde arriba sólo sobre esa azotea: así se lee limpio, sin repetirse en el piso)
+    const MES = (MARCAS.paisaje && MARCAS.paisaje.mes) || { zona: [430, 494, 565, 575], az: 105 };
+    const fam = getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() || 'sans-serif';
+    const cvM = document.createElement('canvas'), xm = cvM.getContext('2d'), RH = 200, PX = 168, PADM = 24, FILAS = 13;
+    xm.font = '300 ' + PX + 'px ' + fam;
+    cvM.width = Math.ceil(Math.max(...P.meses.map(t => xm.measureText(t).width))) + 2 * PADM; cvM.height = FILAS * RH;
+    xm.font = '300 ' + PX + 'px ' + fam; xm.textBaseline = 'middle'; xm.textAlign = 'center'; xm.fillStyle = '#ffffff';
+    P.meses.forEach((t, i) => xm.fillText(t, cvM.width / 2, i * RH + RH * 0.54));
+    const texM = new THREE.CanvasTexture(cvM); texM.anisotropy = 8;
+    const aM = MES.az * RAD, exM = new THREE.Vector3(Math.cos(aM), 0, Math.sin(aM)), nwM = new THREE.Vector3(Math.sin(aM), 0, -Math.cos(aM));
+    const ZM = MES.zona, areaQ = q => Math.abs(q.reduce((s, p, i) => { const r = q[(i + 1) % q.length]; return s + p[0] * r[1] - r[0] * p[1]; }, 0)) / 2;
+    const techo = EDIF.filter(e => { const cu = e.q.reduce((s, p) => s + p[0], 0) / e.q.length, cv = e.q.reduce((s, p) => s + p[1], 0) / e.q.length; return cu > ZM[0] && cu < ZM[2] && cv > ZM[1] && cv < ZM[3]; })
+      .sort((a, b) => areaQ(b.q) - areaQ(a.q))[0];
+    let oM = V3(ZM[0], ZM[1], 0), anchoM = 1, altoM = 1;
+    if (techo) {
+      const xs = techo.q.map(p => V3(p[0], p[1], 0).dot(exM)), ys = techo.q.map(p => V3(p[0], p[1], 0).dot(nwM));
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      altoM = Math.min(0.62 * (y1 - y0), 0.86 * (x1 - x0) * RH / cvM.width); anchoM = altoM * cvM.width / RH;
+      oM = exM.clone().multiplyScalar((x0 + x1) / 2).addScaledVector(nwM, (y0 + y1) / 2);
+    }
+    const uMes = { uMapa: { value: texM }, uO: { value: oM }, uEx: { value: exM }, uNw: { value: nwM }, uAncho: { value: anchoM }, uAlto: { value: altoM },
+      uOp: { value: 0 }, uA: { value: 12 }, uB: { value: 0 }, uRev: { value: 0 }, uFilas: { value: FILAS } };
+    const matMes = new THREE.ShaderMaterial({
+      uniforms: uMes,
+      vertexShader: /* glsl */`varying vec3 vW; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+      fragmentShader: /* glsl */`uniform sampler2D uMapa; uniform vec3 uO; uniform vec3 uEx; uniform vec3 uNw; uniform float uAncho; uniform float uAlto;
+        uniform float uOp; uniform float uA; uniform float uB; uniform float uRev; uniform float uFilas; varying vec3 vW;
+        void main() {
+          vec3 d = vW - uO; vec2 uv = vec2(dot(d, uEx) / uAncho + 0.5, dot(d, uNw) / uAlto + 0.5);
+          if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) discard;
+          float fila = uv.x < uRev ? uB : uA;
+          vec4 c = texture2D(uMapa, vec2(uv.x, 1.0 - (fila + 1.0 - uv.y) / uFilas)); if (c.a < 0.03) discard;
+          float borde = smoothstep(0.0, 0.012, abs(uv.x - uRev));   // la pluma: donde va escribiendo, un poco más tenue
+          gl_FragColor = vec4(c.rgb, c.a * uOp * mix(0.55, 1.0, borde));
+        }`,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8
+    });
+    if (techo) { const az = new Malla(); tapa(az, techo.q, techo.h + 0.03); const me = new THREE.Mesh(az.geo(), matMes); me.renderOrder = 12; me.frustumCulled = false; g4.add(me); }
+
+    // los tiempos de la vegetación y del año tocan los mismos colores: se calculan juntos
+    const C1 = new THREE.Color(), C2 = new THREE.Color(), C3 = new THREE.Color(), SECO = new THREE.Color('#a39a72');
+    const TIERRA_H = new THREE.Color('#6b6a55'), NAV = [new THREE.Color('#bcae7c'), new THREE.Color('#8fae52'), new THREE.Color(SUELO['E-060'])];
+    let respira = 1, mesVisto = -1, mesDesde = 12, kAntes = 0, deRegreso = false;
+    function paisajeEn() {
+      const k3 = marcaK.paisajeVegetacion || 0, k4 = marcaK.paisajeAnio || 0, t = k4 * DUR_ANIO;
+      if (k4 < kAntes - 1e-6) deRegreso = true; else if (k4 > kAntes + 1e-6) deRegreso = false;   // al regresar, el año se rebobina sin el mes
+      kAntes = k4;
+      const enAnio = !!(GUION[idx] && GUION[idx].id === 'paisajeAnio');   // (el mes y los halos, sólo en su slide)
+      const a = tramo(t, 0, ANIO_0), f = Math.min(11.999, Math.max(0, (t - ANIO_0) / MES_MS)), ll = enMes(LLUVIA, f);
+      armaCanal(UV, tramo(k3, 0, 0.75)); armaCanal(UT, tramo(k3, 0.25, 0.95));
+      const cr = Math.max(0.001, suave(tramo(k3, 0.08, 0.8))), fl0 = tramo(k3, 0.72, 1);
+      Object.keys(VEG).forEach(id => {
+        const V = VEG[id], e = V.e, fl = enMes(e.mv, f);
+        V.crece.forEach(o => { o.scale.y = cr; });
+        // el follaje de la temporada (pajizo en secas) y, en las masas en flor, el color de su flor
+        C1.set(e.follaje); C2.set(e.seco || e.follaje); if (!e.seco) C2.lerp(SECO, 0.3);
+        C2.lerp(C1, ll);
+        if (e.forma === 'domo' || e.forma === 'roseta') C2.lerp(C3.set(e.flor), 0.55 * fl);
+        C1.set(e.boceto || e.follaje).lerp(C2, a);
+        V.caras.forEach(c => c.copy(C1)); V.lineas.forEach(c => c.copy(C1));
+        const of = fl0 * (1 - a + a * fl);
+        if (V.flores) { V.flores.mat.opacity = of; V.flores.obj.visible = of > 0.003; }
+        if (V.quiote) V.quiote.opacity = 0.9 * fl0 * a * fl;   // (el quiote sólo en sus meses)
+      });
+      Object.keys(arboles).forEach(id => { const A = arboles[id]; A.mat.uniforms.uTinta.value.copy(A.base).lerp(C3.set(ESP[id].flor), 0.8 * enMes(ESP[id].mv, f) * a); });
+      // los inundables se llenan en lluvias; el pasto navajita reverdece
+      Object.keys(inund).forEach(id => { C1.set(AGUA[id]); C2.copy(TIERRA_H).lerp(C1, ll); C1.lerp(C2, a); inund[id].caras.forEach(c => c.copy(C1)); });
+      if (suelos['E-060']) { C2.copy(NAV[0]).lerp(NAV[1], ll); C1.copy(NAV[2]).lerp(C2, a); suelos['E-060'].caras.forEach(c => c.copy(C1)); }
+      halos.forEach(h => { h.mat.uniforms.uOp.value = enAnio ? 0.34 * enMes(ESP[h.id].mv, f) * a * respira * (1 - tramo(k4, 0.975, 1)) : 0; });
+      // el mes: se escribe sobre el anterior
+      const m = Math.floor(f);
+      if (m !== mesVisto) { mesDesde = mesVisto < 0 || m === 0 ? 12 : m - 1; mesVisto = m; }
+      uMes.uA.value = mesDesde; uMes.uB.value = m; uMes.uRev.value = t < ANIO_0 ? 0 : Math.min(1.02, tramo(f - m, 0, 0.2) * 1.02);
+      uMes.uOp.value = deRegreso || !enAnio ? 0 : 0.9 * tramo(t, ANIO_0 * 0.5, ANIO_0) * (1 - tramo(k4, 0.975, 1));
+    }
+    MARCA.paisajeVegetacion = { g: g3, piezas: [], rotulos: [], dur: 7500, durSale: 1400, aplica: paisajeEn, latido() {} };
+    // (si se llega a una slide posterior sin pasar por la del año, el año corre rápido: durEn)
+    MARCA.paisajeAnio = { g: g4, piezas: [], rotulos: [], dur: DUR_ANIO, durEn: s => s.id === 'paisajeAnio' ? DUR_ANIO : 2400, durSale: 1600, aplica: paisajeEn,
+      latido(ms) { if (!halos.length) return; respira = quieto.matches ? 1 : 0.72 + 0.28 * Math.sin(ms / 850); paisajeEn(); }
+    };
+  }
+
+  /* ---------- 3k. Etapa 2: el estacionamiento ----------
+     Una slide (Diego, 2026-11-28): el suelo del predio se abre (se borra desde el centro) y queda sólo el
+     estacionamiento; lo demás, en el foco, muy tenue. Los cuatro sótanos (losas, contorno y cajones), en gris; las
+     entradas y las helicoidales, en ámbar; los elevadores que bajan hasta el último sótano, en cian. Luego los flujos:
+     los coches entran por la calle, bajan por un carril de la helicoidal y suben por el otro; las personas van de los
+     cajones a los elevadores y suben al conjunto. Datos: atlampa-estacionamiento.js (los del visor). */
+  function armaEstacionamiento() {
+    const E = window.ATLAMPA_ESTACIONAMIENTO; if (!E || !E.bloques) return;
+    const gE = new THREE.Group(); gE.name = 'estacionamiento'; gH.add(gE); FOCO.estacionamiento = [gE];
+    const g = marcaEn(gE, 'estacionamiento'), N = E.sotanos, e = E.entrepiso, FONDO = -N * e;
+    const AMBAR = '#ffb02e', CIAN = '#4fd3ff', GU = G.GU, GF = G.GF, CP = V3(503.5, 405.3, 0);
+    // el suelo: el del visor se cambia por uno con el hueco del predio y una tapa que se borra desde el centro
+    const raizSitio = raizG.children.find(o => o.name === 'sitio');
+    const sueloVisor = raizSitio ? raizSitio.children.filter(o => o.material && o.material.userData && o.material.userData.papel === 'suelo') : [];
+    const mH = new Malla(); api.tapaHueco(mH, api.rect(S.u0, S.v0, S.u1, S.v1), G.PRED, 0);
+    const gHu = new THREE.Group(); gHu.name = 'estacionamiento-suelo'; pon(gHu, mH, 'suelo', null, false); gHu.visible = false; gH.add(gHu);
+    const UH = canalNuevo(); radial(UH, CP, 0, 102);
+    const mT = new Malla(); tapa(mT, G.PRED, 0.004);
+    const gT = new THREE.Group(); pon(gT, mT, 'suelo', null, false);
+    const tapaS = conCanal(gT, UH); tapaS.visible = false; gH.add(tapaS);
+    // la excavación y los sótanos (de arriba hacia abajo)
+    const US = canalNuevo(); US.uDib.value.z = 0; US.uDibO.value.set(0, 0.6, 0); US.uDibV.value.set(0, -1 / (0.6 - FONDO), 0);
+    const ms = new Malla(), ls = new Lineas(), lc = new Lineas();
+    for (let k = 1; k <= N; k++) {
+      const z = -k * e;
+      E.bloques.forEach(b => {
+        const pl = pares(b.planta); tapa(ms, pl, z);
+        ls.poli(pl.map(q => W(q[0], q[1], z + 0.02)), true);
+        b.cajones.forEach(c => lc.poli((c.length === 8 ? pares(c) : api.rect(c[0], c[1], c[2], c[3])).map(q => W(q[0], q[1], z + 0.03)), true));
+      });
+    }
+    E.bloques.forEach(b => { const pl = pares(b.planta); pl.forEach((q, i) => { if (i % 6 === 0) ls.seg(W(q[0], q[1], 0), W(q[0], q[1], FONDO)); }); });
+    G.PRED.forEach((q, i) => { const r = G.PRED[(i + 1) % 4]; ls.poli([W(q[0], q[1], 0), W(r[0], r[1], 0), W(r[0], r[1], FONDO - 0.4), W(q[0], q[1], FONDO - 0.4)], true); });
+    const gS = new THREE.Group(); pon(gS, ms, 'est', null, false, ls);
+    const sot = conCanal(gS, US); pinta(sot, '#a7b2bc', '#e4ebf0', 0.62);
+    sot.traverse(x => { const m = x.material; if (m && m.uniforms && m.uniforms.uOpacidad) { m.uniforms.uOpacidad.value = 0.34; m.transparent = true; m.depthWrite = false; } });
+    const gC = new THREE.Group(); ponLineas(gC, lc, 'est-cajones', 0xffffff, null, null);
+    const caj = conCanal(gC, US); pinta(caj, null, '#b9c4cc');
+    g.add(sot, caj);
+    // las entradas (de la calle a la boca de cada helicoidal) y las helicoidales: una vuelta por sótano, dos carriles
+    const RI = 6.7, RE = 10.95, RAD_ = Math.PI / 180, calleN = (GU.n + GF.n) / 2, calleS = (GU.s + GF.s) / 2;
+    const arco = (c, r, a0, a1) => Array.from({ length: 25 }, (_, i) => { const a = (a0 + (a1 - a0) * i / 24) * RAD_; return [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r]; });
+    const angV = (c, r, v) => Math.asin(Math.max(-1, Math.min(1, (v - c[1]) / r))) / RAD_;
+    const rutas = [];   // { bloque, entra: [u, v]… (de la calle a la boca), sale: (de la boca a la calle), rEntra, rSale }
+    E.rampas.forEach(r => {
+      const c = r.c;
+      if (r.bloque === 'norte') {
+        const vb = c[1] + 5.3, cA = [c[0] + RI - RE, vb], ent = arco(cA, RE, angV(cA, RE, GU.n), 0), cB = [c[0] + 2 * RE, vb], sal = arco(cB, RE, 180, 180 - angV(cB, RE, GU.n));
+        rutas.push({ r, entra: [[ent[0][0], calleN], ...ent, [c[0] + RI, c[1]]], sale: [[c[0] + RE, c[1]], [c[0] + RE, vb], ...sal, [sal[sal.length - 1][0], calleN]], rEntra: RI, rSale: RE });
+      } else {
+        const vb = c[1] - 5.2, cA = [c[0] + 2 * RE, vb], ent = arco(cA, RE, 180 - angV(cA, RE, GU.s), 180), cB = [c[0] + RI - RE, vb], sal = arco(cB, RE, 0, angV(cB, RE, GU.s));
+        rutas.push({ r, entra: [[ent[0][0], calleS], ...ent, [c[0] + RE, c[1]]], sale: [[c[0] + RI, c[1]], [c[0] + RI, vb], ...sal, [sal[sal.length - 1][0], calleS]], rEntra: RE, rSale: RI });
+      }
+    });
+    const UR = canalNuevo(); UR.uDib.value.z = 0; UR.uDibO.value.set(0, 0.6, 0); UR.uDibV.value.set(0, -1 / (0.6 - FONDO), 0);
+    const mr = new Malla(), lr = new Lineas(), ANCHO = 3.8;
+    const cinta = (p, z) => {
+      const nr = p.map((q, i) => { const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)], du = b[0] - a[0], dv = b[1] - a[1], d = Math.hypot(du, dv) || 1; return [-dv / d, du / d]; });
+      const iz = p.map((q, i) => W(q[0] + nr[i][0] * ANCHO / 2, q[1] + nr[i][1] * ANCHO / 2, z)), de = p.map((q, i) => W(q[0] - nr[i][0] * ANCHO / 2, q[1] - nr[i][1] * ANCHO / 2, z));
+      for (let i = 1; i < p.length; i++) mr.quad(de[i - 1], de[i], iz[i], iz[i - 1]);
+      lr.poli(iz); lr.poli(de);
+    };
+    rutas.forEach(R => { cinta(R.entra, 0.27); cinta(R.sale, 0.27); });
+    const helice = (r, rad, t) => { const giro = r.bloque === 'norte' ? -1 : 1, a = giro * t * 2 * Math.PI; return [r.c[0] + Math.cos(a) * rad, r.c[1] + Math.sin(a) * rad, -t * e]; };
+    E.rampas.forEach(r => (r.carriles || [r.r]).forEach(cr => {
+      const PASOS = 64 * N;
+      for (let i = 0; i < PASOS; i++) {
+        const t0 = N * i / PASOS, t1 = N * (i + 1) / PASOS, a0 = helice(r, cr[0], t0), b0 = helice(r, cr[1], t0), a1 = helice(r, cr[0], t1), b1 = helice(r, cr[1], t1);
+        mr.quad(W(...a0), W(...b0), W(...b1), W(...a1));
+        lr.seg(W(...a0), W(...a1)); lr.seg(W(...b0), W(...b1));
+      }
+    }));
+    const gR = new THREE.Group(); pon(gR, mr, 'rampa', null, false, lr);
+    const ram = conCanal(gR, UR); pinta(ram, AMBAR, '#ffd88a', 0.8);
+    g.add(ram);
+    // los elevadores: del último sótano a lo más alto, con cada nivel
+    const tope = (window.ATLAMPA_REVIT && window.ATLAMPA_REVIT.viviendaMaxZ) || 46.9;
+    const UL = canalNuevo(); UL.uDib.value.z = 0; UL.uDibO.value.set(0, FONDO, 0); UL.uDibV.value.set(0, 1 / (tope - FONDO), 0);
+    const me = new Malla(), le = new Lineas(), niveles = [];
+    for (let k = N; k >= 1; k--) niveles.push(-k * e);
+    niveles.push(0.2); for (let k = 0; k < 12; k++) niveles.push(10.6431 + k * 3.3);
+    (E.elevadores || []).forEach(el => {
+      const pol = pares(el.pol); prisma(me, pol, FONDO, tope);
+      niveles.filter(z => z < tope).forEach(z => le.poli(pol.map(q => W(q[0], q[1], z)), true));
+      pol.forEach(q => le.seg(W(q[0], q[1], FONDO), W(q[0], q[1], tope)));
+    });
+    const gL = new THREE.Group(); pon(gL, me, 'est', null, false, le);
+    const elev = conCanal(gL, UL); pinta(elev, CIAN, '#bff1ff', 0.75);
+    elev.traverse(x => { const m = x.material; if (m && m.uniforms && m.uniforms.uOpacidad) { m.uniforms.uOpacidad.value = 0.5; m.transparent = true; m.depthWrite = false; } });
+    g.add(elev);
+    // los flujos: puntos que recorren caminos 3D
+    function flujo(caminos, o) {
+      const items = [], az = G.aleatorio(o.semilla || 3);
+      caminos.forEach(pts => {
+        const acc = [0]; for (let j = 1; j < pts.length; j++) acc.push(acc[j - 1] + pts[j].distanceTo(pts[j - 1]));
+        const L = acc[acc.length - 1], n = Math.max(1, Math.round(L / o.cada));
+        for (let k = 0; k < n; k++) items.push({ pts, acc, L, s0: (k + 0.6 * az()) * L / n, v: o.vel * (0.85 + 0.3 * az()) });
+      });
+      const pu = puntos(new Array(items.length * 3).fill(0), o.color, o.px, true), pos = pu.geo.attributes.position;
+      pu.obj.renderOrder = 13;
+      function mueve(ms) {
+        const t = ms / 1000;
+        items.forEach((it, i) => {
+          let s = it.s0 + it.v * t; s = ((s % it.L) + it.L) % it.L;
+          let j = 1; while (j < it.acc.length - 1 && it.acc[j] < s) j++;
+          const a = it.pts[j - 1], b = it.pts[j], f = (s - it.acc[j - 1]) / ((it.acc[j] - it.acc[j - 1]) || 1);
+          pos.setXYZ(i, a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f);
+        });
+        pos.needsUpdate = true;
+      }
+      mueve(0);
+      return Object.assign(pu, { mueve });
+    }
+    const Z_F = 0.55, coches = [];
+    rutas.forEach(R => {
+      const r = R.r, baja = [], sube = [];
+      for (let i = 0; i <= 48 * N; i++) { const h = helice(r, R.rEntra, N * i / (48 * N)); baja.push(V3(h[0], h[1], h[2] + Z_F)); }
+      for (let i = 48 * N; i >= 0; i--) { const h = helice(r, R.rSale, N * i / (48 * N)); sube.push(V3(h[0], h[1], h[2] + Z_F)); }
+      coches.push(R.entra.map(q => V3(q[0], q[1], Z_F)).concat(baja, sube, R.sale.map(q => V3(q[0], q[1], Z_F))));
+    });
+    const fC = flujo(coches, { color: '#fff0c4', px: 7, cada: 11, vel: 6.5, semilla: 5 });   // (claros: se leen sobre el ámbar)
+    // las personas: de los cajones de cada sótano al elevador más cercano, y arriba hasta el conjunto
+    const gente = [];
+    (E.elevadores || []).forEach(el => {
+      const pol = pares(el.pol), cu = pol.reduce((s, q) => s + q[0], 0) / 4, cv = pol.reduce((s, q) => s + q[1], 0) / 4;
+      const b = E.bloques.find(x => x.nombre === el.bloque) || E.bloques[0], pl = pares(b.planta);
+      const bu = pl.reduce((s, q) => s + q[0], 0) / pl.length, bv = pl.reduce((s, q) => s + q[1], 0) / pl.length, d = Math.hypot(bu - cu, bv - cv) || 1;
+      for (let k = 1; k <= N; k++) {
+        const z = -k * e + Z_F, du = (bu - cu) / d * 16, dv = (bv - cv) / d * 16;
+        gente.push([V3(cu + du, cv + dv, z), V3(cu, cv, z), V3(cu, cv, 0.2 + Z_F), V3(cu, cv, tope - 2)]);
+      }
+    });
+    const fP = flujo(gente, { color: '#e6fbff', px: 5.5, cada: 7, vel: 2.4, semilla: 9 });
+    g.add(fC.obj, fP.obj);
+    MARCA.estacionamiento = { g, piezas: [], rotulos: [], dur: 15000, durSale: 1600,
+      aplica(k) {
+        const abre = k > 0.001;
+        sueloVisor.forEach(o => { o.visible = !abre; }); gHu.visible = abre; tapaS.visible = abre && k < 0.2;
+        armaCanal(UH, 1 - tramo(k, 0.02, 0.18));
+        PISO_PLAZA.abre = tramo(k, 0.02, 0.18); PISO_PLAZA.pon();   // la plaza (con sus juntas) se abre con el suelo
+        const s = tramo(k, 0.12, 0.44); sot.visible = caj.visible = s > 0; armaCanal(US, s);
+        const r = tramo(k, 0.32, 0.6); ram.visible = r > 0; armaCanal(UR, r);
+        const l = tramo(k, 0.48, 0.72); elev.visible = l > 0; armaCanal(UL, l);
+        const f = tramo(k, 0.7, 0.86); fC.mat.opacity = 0.95 * f; fP.mat.opacity = 0.95 * f; fC.obj.visible = fP.obj.visible = f > 0.002;
+      },
+      latido(ms) { if (fC.obj.visible && !quieto.matches) { fC.mueve(ms); fP.mueve(ms); } }
+    };
+  }
+
+  /* ---------- 3l. El cierre: el proyecto completo y las personas ----------
+     Diego, 2026-11-28: la última slide muestra todo el proyecto con «circuito» escrito sobre el contexto (su «o» es el
+     aro: aro.o) y personas caminando por todo el desarrollo: por la plaza y los andadores (prepara-paisaje-historia.py)
+     y por la banqueta del predio (en el aro ya caminan desde la slide «El aro»: aroReal). */
+  function armaCierre() {
+    const P = window.ATLAMPA_HISTORIA_PAISAJE;
+    const g = marcaEn(gH, 'cierre'), az = G.aleatorio(41);
+    const persona = (p, vel) => {
+      const acc = [0]; for (let j = 1; j < p.length; j++) acc.push(acc[j - 1] + Math.hypot(p[j][0] - p[j - 1][0], p[j][1] - p[j - 1][1]));
+      return { p, acc, L: acc[acc.length - 1], lado: (az() - 0.5) * 1.6, s0: az() * acc[acc.length - 1] * 2, vel: vel * (0.8 + 0.4 * az()) * (az() < 0.5 ? 1 : -1),
+        tile: FIG.camina[Math.floor(az() * FIG.camina.length)], esc: PESC * (0.9 + 0.2 * az()) };
+    };
+    const suelo = [];
+    if (P) P.rutas.forEach(r => { const n = 2 + (az() < 0.5 ? 1 : 0); for (let k = 0; k < n; k++) suelo.push(persona([[r[0], r[1]], [r[2], r[3]]], 1.3)); });
+    const GU = G.GU, esq = [[GU.o, GU.s], [GU.e, GU.s], [GU.e, GU.n], [GU.o, GU.n]], mitad = G.PRED.map((q, i) => [(q[0] + esq[i][0]) / 2, (q[1] + esq[i][1]) / 2]);
+    for (let k = 0; k < 26; k++) suelo.push(persona(mitad.concat([mitad[0]]), 1.3));
+    const malla = (lista, z) => {
+      const mat = api.matAtlas(FIG.tex, FIG.N, FIG.POSES, canalNuevo()); mat.transparent = true; mat.uniforms.uOpacidad.value = 0;
+      mat.uniforms.uTinta.value.set('#2a2826');   // (oscuras: se leen sobre el piso claro de la plaza)
+      const PMx = api.mallaAtlas(Math.max(1, lista.length), mat);
+      lista.forEach((q, i) => { PMx.aEsc.setXY(i, FIG.ancho * q.esc, FIG.alto * q.esc); PMx.aTile.setX(i, q.tile); });
+      PMx.malla.geometry.instanceCount = lista.length; PMx.z = z; PMx.malla.renderOrder = 14;
+      g.add(PMx.malla); return { PM: PMx, mat, lista };
+    };
+    const capas = [malla(suelo, 0.25)];
+    MARCA.cierre = { g, piezas: [], rotulos: [], dur: 2600, durSale: 900,
+      aplica(k) { capas.forEach(c => { c.mat.uniforms.uOpacidad.value = k; }); },
+      latido(ms) { if (!quieto.matches) capas.forEach(c => mueveGente(c.lista, c.PM, ms)); }
+    };
+    capas.forEach(c => mueveGente(c.lista, c.PM, 0));
+  }
+
   /* ---------- 4. HTML: tarjeta, rótulos, navegación ---------- */
   const capa = document.createElement('div'); capa.className = 'hist-capa'; capa.hidden = true;
   capa.innerHTML = '<div class="hist-rotulos"></div><aside class="hist-tarjeta" aria-live="polite"></aside>' +
@@ -1796,24 +2276,31 @@ export async function crea(api) {
   // la palabra impresa sobre la volumetría: una proyección desde arriba sobre el piso y sobre copias
   // de los edificios que caen debajo (techos y muros), así que se dobla con ellos
   const matImpresa = new THREE.ShaderMaterial({
-    uniforms: { uMapa: { value: null }, uO: { value: new THREE.Vector3() }, uEx: { value: new THREE.Vector3() }, uNw: { value: new THREE.Vector3() }, uAncho: { value: 1 }, uAlto: { value: 1 }, uOp: { value: 0 } },
+    uniforms: { uMapa: { value: null }, uO: { value: new THREE.Vector3() }, uEx: { value: new THREE.Vector3() }, uNw: { value: new THREE.Vector3() }, uAncho: { value: 1 }, uAlto: { value: 1 }, uOp: { value: 0 },
+      uHueco: { value: new THREE.Vector4(1, 1, 0, 0) }, uCen: { value: new THREE.Vector2(CEN[0], CEN[1]) } },
     vertexShader: /* glsl */`varying vec3 vW;
       void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
-    fragmentShader: /* glsl */`uniform sampler2D uMapa; uniform vec3 uO; uniform vec3 uEx; uniform vec3 uNw; uniform float uAncho; uniform float uAlto; uniform float uOp; varying vec3 vW;
+    fragmentShader: /* glsl */`uniform sampler2D uMapa; uniform vec3 uO; uniform vec3 uEx; uniform vec3 uNw; uniform float uAncho; uniform float uAlto; uniform float uOp;
+      uniform vec4 uHueco; uniform vec2 uCen; varying vec3 vW;
       void main() {
         vec3 d = vW - uO; vec2 uv = vec2(dot(d, uEx) / uAncho + 0.5, dot(d, uNw) / uAlto + 0.5);
         if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) discard;
+        vec2 p = vec2(vW.x + uCen.x, uCen.y - vW.z);   // (u, v): sobre el predio no se imprime si se pide (existente: 'contexto')
+        if (p.x > uHueco.x && p.x < uHueco.z && p.y > uHueco.y && p.y < uHueco.w) discard;
         vec4 c = texture2D(uMapa, uv); if (c.a < 0.03) discard;
         gl_FragColor = vec4(c.rgb, c.a * uOp);
       }`,
     transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8
   });
   // (la «o» no se imprime: es el aro, que levita sobre lo existente; ver aroO)
-  // existente: 'cortado' imprime sobre lo que queda después de la demolición y del corte del aro
+  // existente: 'cortado' imprime sobre lo que queda después de la demolición y del corte del aro; 'contexto', sólo sobre
+  // el contexto (el piso y los edificios de alrededor, no sobre el predio: ahí ya está el proyecto)
   function ponImpresa(lay, existente) {
     const U = matImpresa.uniforms;
     if (U.uMapa.value && U.uMapa.value !== lay.tex) U.uMapa.value.dispose();
     U.uMapa.value = lay.tex; U.uO.value.copy(lay.c); U.uEx.value.copy(lay.ex); U.uNw.value.copy(lay.nw); U.uAncho.value = lay.ancho; U.uAlto.value = lay.alto;
+    const PR = G.PRED;
+    if (existente === 'contexto') U.uHueco.value.set(PR[0][0], PR[0][1], PR[2][0], PR[2][1]); else U.uHueco.value.set(1, 1, 0, 0);
     const clave = lay.caja.map(Math.round).join(',') + '|' + (existente || '');
     if (!fondoAro || fondoAro.userData.clave !== clave) {
       if (fondoAro) { fondoAro.children.forEach(o => o.geometry.dispose()); gH.remove(fondoAro); }
@@ -1821,7 +2308,7 @@ export async function crea(api) {
       const piso = new Malla(); tapa(piso, api.rect(k[0] - m, k[1] - m, k[2] + m, k[3] + m), 0.25);
       const ed = new Malla();
       EDIF.forEach(e => { if (e.q.some(p => p[0] > k[0] - m && p[0] < k[2] + m && p[1] > k[1] - m && p[1] < k[3] + m)) prisma(ed, e.q, 0, e.h); });
-      [piso, ed, existente === 'cortado' ? mallaNavesCortadas() : mallaExistente()].forEach(x => { if (!x.p.length) return; const o = new THREE.Mesh(x.geo(), matImpresa); o.renderOrder = 12; o.frustumCulled = false; g.add(o); });
+      [piso, ed, existente === 'contexto' ? new Malla() : existente === 'cortado' ? mallaNavesCortadas() : mallaExistente()].forEach(x => { if (!x.p.length) return; const o = new THREE.Mesh(x.geo(), matImpresa); o.renderOrder = 12; o.frustumCulled = false; g.add(o); });
       g.userData = { clave }; g.visible = false; gH.add(g);
       fondoAro = g;
     }
@@ -2023,6 +2510,7 @@ export async function crea(api) {
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
       tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa, armaMercado,
         armaDemolicion, armaCorteAro, armaAroO, armaAroReal, armaCulturaVolumen, armaCulturaCompleta, armaComercio, armaIndustria, armaVivienda,
+        armaPaisaje, armaEstacionamiento, armaCierre,
         () => { mueveCarros(performance.now()); caminan(performance.now()); });
       (function sigue() {
         tandas.shift()();
@@ -2129,7 +2617,7 @@ export async function crea(api) {
         (s.marcas || []).forEach(id => {
           const M = MARCA[id]; if (!M) return;
           if (marcaK[id] >= 1) return;
-          if (M.aplica) { animaMarca(id, 1, M.dur || 2000, (s.retrasos && s.retrasos[id]) || M.retraso || 0); return; }
+          if (M.aplica) { animaMarca(id, 1, (M.durEn ? M.durEn(s) : M.dur) || 2000, (s.retrasos && s.retrasos[id]) || M.retraso || 0); return; }
           M.g.visible = true;
           if (M.entra) M.entra();
           M.piezas.forEach(p => {
@@ -2183,7 +2671,7 @@ export async function crea(api) {
   function sale(av) {
     if (!activo) return;
     ++irTok; tweens = []; volando = false;
-    quitaTarjeta(); quitaRotulos(); ponFondo(null); fondo3D.visible = false; matFondo.opacity = 0; aroTw = null; aplicaAro({ op: 0, sube: 0 });
+    quitaTarjeta(); quitaRotulos(); ponFondo(null); fondo3D.visible = false; matFondo.opacity = 0; aroTw = null; aplicaAro({ op: 0, sube: 0, o: 0 });
     activo = false;
     focoK = 0; focoSuelta();
     gH.visible = false; capa.hidden = true; document.body.classList.remove('hist-activo');
