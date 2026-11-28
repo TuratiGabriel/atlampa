@@ -21,6 +21,7 @@ function cargaScript(src) {
 
 export async function crea(api) {
   if (!window.ATLAMPA_HISTORIA_DATOS) await cargaScript(conV('atlampa-historia-datos.js'));
+  if (!window.ATLAMPA_HISTORIA_VIVIENDA) await cargaScript(conV('atlampa-historia-vivienda.js'));   // (herramientas/prepara-vivienda-historia.py)
   const guionMod = await import(conV('./atlampa-historia-guion.js'));
   const GUION = guionMod.default, MARCAS = guionMod.MARCAS;
   const etapaDe = i => (GUION[i] && GUION[i].etapa) || 1;   // etapa de la presentación (la 1 por omisión)
@@ -1516,6 +1517,231 @@ export async function crea(api) {
     };
   }
 
+  /* ---------- 3i. Etapa 2: la vivienda ----------
+     El proceso de diseño (Diego, 2026-11-27): 1) dos volumetrías orgánicas que se doblan y se moldean según el sol de
+     invierno y de verano (sus curvas de nivel, una por nivel, y luego sus caras); 2) el recorrido del sol del 21 de
+     diciembre y, sobre la superficie, el diagrama cuadriculado de las horas de sol (azul claro: casi nada; amarillo:
+     intermedias; rojo fuerte: muchas), que se va llenando mientras el sol avanza; 3) la volumetría se llena de módulos
+     (con los pisos extra, que no estaban en ella) y se quitan, en rojo, los que no convenían; 4) los módulos dejan paso
+     al edificio del Revit, con las ventanas tapadas, y se arman las ventanas, los pasillos y los núcleos (desde la
+     planta baja). Al terminar se suelta el foco. Datos: atlampa-historia-vivienda.js
+     (herramientas/prepara-vivienda-historia.py). */
+  // el cuadro de cada fragmento (como en prepara-vivienda-historia.py: según hacia dónde mira la cara, en el marco de la
+  // torre) y su color según las horas de sol acumuladas (uTex: 0…1 de las horas del día), con la cuadrícula encima
+  const VERT_HORAS = /* glsl */`
+    varying vec3 vP; varying vec3 vN;
+    void main() { vP = position; vN = normal; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  const FRAG_HORAS = /* glsl */`
+    uniform sampler2D uTex; uniform vec2 uTam; uniform float uBase; uniform vec2 uO; uniform vec2 uEje; uniform vec3 uMin;
+    uniform vec3 uS; uniform vec3 uN; uniform float uB[6]; uniform vec2 uCen; uniform vec3 uLuz; uniform float uOp; uniform float uRej;
+    varying vec3 vP; varying vec3 vN;
+    float raya(float c) { float w = fwidth(c); float d = abs(fract(c + 0.5) - 0.5); return 1.0 - smoothstep(0.035 - w * 0.5, 0.035 + w, d); }
+    vec3 rampa(float h) {
+      vec3 c0 = vec3(0.80, 0.90, 1.0), c1 = vec3(1.0, 0.87, 0.34), c2 = vec3(1.0, 0.5, 0.2), c3 = vec3(0.78, 0.07, 0.06);
+      return h < 0.45 ? mix(c0, c1, h / 0.45) : h < 0.75 ? mix(c1, c2, (h - 0.45) / 0.3) : mix(c2, c3, (h - 0.75) / 0.25);
+    }
+    void main() {
+      vec3 n = normalize(cross(dFdx(vP), dFdy(vP))); if (dot(n, vN) < 0.0) n = -n;
+      vec2 bj = vec2(-uEje.y, uEje.x), p = vec2(vP.x + uCen.x, uCen.y - vP.z) - uO, nh = vec2(n.x, -n.z);
+      float na = dot(nh, uEje), nb = dot(nh, bj), nz = n.y;
+      vec3 f = (vec3(dot(p, uEje), dot(p, bj), vP.y) - uMin) / uS, i = clamp(floor(f), vec3(0.0), uN - 1.0);
+      float k; vec2 g;
+      if (abs(nz) >= max(abs(na), abs(nb))) { k = (nz > 0.0 ? uB[0] : uB[1]) + i.x + i.y * uN.x; g = f.xy; }
+      else if (abs(nb) >= abs(na)) { k = (nb > 0.0 ? uB[2] : uB[3]) + i.x + i.z * uN.x; g = f.xz; }
+      else { k = (na > 0.0 ? uB[4] : uB[5]) + i.y + i.z * uN.y; g = f.yz; }
+      k += uBase;
+      float h = texture2D(uTex, vec2((mod(k, uTam.x) + 0.5) / uTam.x, (floor(k / uTam.x) + 0.5) / uTam.y)).r;
+      float lam = clamp(dot(n, normalize(uLuz)) * 0.5 + 0.5, 0.0, 1.0);
+      vec3 col = rampa(h) * (0.8 + 0.2 * lam);
+      col = mix(col, col * 0.42, max(raya(g.x), raya(g.y)) * uRej);
+      gl_FragColor = vec4(col, uOp);
+    }`;
+  function armaVivienda() {
+    const D = window.ATLAMPA_HISTORIA_VIVIENDA; if (!D) return;
+    const gV = new THREE.Group(); gV.name = 'vivienda'; gH.add(gV); FOCO.vivienda = [gV];
+    const ZB = D.modulos.z0, PASO = D.modulos.paso;
+    // un canal que entra de abajo hacia arriba y sale de abajo hacia arriba (lo de abajo se va primero)
+    const dosBarridos = (U, obj) => {
+      barridoSube(U, obj); const sube = [U.uDibO.value.clone(), U.uDibV.value.clone()];
+      const B = canalNuevo(); barridoBaja(B, U); const baja = [B.uDibO.value.clone(), B.uDibV.value.clone()];
+      return entra => { const [o, v] = entra ? sube : baja; U.uDib.value.z = 0; U.uDibO.value.copy(o); U.uDibV.value.copy(v); };
+    };
+
+    // 1 · las volumetrías orgánicas, con sus curvas de nivel (una por nivel de la vivienda)
+    const g1 = marcaEn(gV, 'viviendaVolumen'), UO = canalNuevo(), orgs = new THREE.Group();
+    const torres = D.torres.map(T => {
+      const o = T.o, n = T.v.length / 3, pos = new Float32Array(T.v.length), uvz = new Float32Array(T.v.length);
+      for (let i = 0; i < n; i++) {
+        const u = o[0] + T.v[3 * i] / 100, v = o[1] + T.v[3 * i + 1] / 100, z = o[2] + T.v[3 * i + 2] / 100;
+        uvz[3 * i] = u; uvz[3 * i + 1] = v; uvz[3 * i + 2] = z; pos.set(W(u, v, z), 3 * i);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(T.f); geo.computeVertexNormals();
+      const lin = new Lineas(), F = T.f;
+      let zMax = -Infinity; for (let i = 2; i < uvz.length; i += 3) zMax = Math.max(zMax, uvz[i]);
+      for (let c = ZB + PASO; c < zMax; c += PASO) for (let t = 0; t < F.length; t += 3) {
+        const q = [];
+        for (let j = 0; j < 3; j++) {
+          const a = 3 * F[t + j], b = 3 * F[t + (j + 1) % 3], za = uvz[a + 2], zb = uvz[b + 2];
+          if ((za - c) * (zb - c) < 0) { const s = (c - za) / (zb - za); q.push(W(uvz[a] + (uvz[b] - uvz[a]) * s, uvz[a + 1] + (uvz[b + 1] - uvz[a + 1]) * s, c)); }
+        }
+        if (q.length === 2) lin.seg(q[0], q[1]);
+      }
+      const g = new THREE.Group(); g.name = 'vivienda-organica'; pon(g, geo, 'modulo', null, false, lin);
+      orgs.add(conCanal(g, UO));
+      return { T, geo };
+    });
+    g1.add(orgs);
+    const barreO = dosBarridos(UO, orgs);
+
+    // 2 · el sol del 21 de diciembre y las horas de sol de cada cuadro
+    const g2 = marcaEn(gV, 'viviendaSol');
+    const S = D.sol.muestras, DT = D.sol.dt, HDIA = D.sol.h1 - D.sol.h0;
+    let nCel = 0; const bases = D.torres.map(T => { const b = nCel; nCel += T.marco.total; return b; });
+    const TW = 256, TH = Math.ceil(nCel / TW), datos = new Uint8Array(TW * TH), cum = new Float32Array(nCel * (S + 1));
+    D.torres.forEach((T, t) => T.celdas.forEach((s, i) => {
+      const c = (bases[t] + i) * (S + 1); let a = 0;
+      for (let j = 0; j < S; j++) { cum[c + j] = a; a += s ? (+s[j]) / 9 * DT : 0; }
+      cum[c + S] = a;
+    }));
+    const tex = new THREE.DataTexture(datos, TW, TH, THREE.RedFormat, THREE.UnsignedByteType);
+    tex.minFilter = tex.magFilter = THREE.NearestFilter; tex.needsUpdate = true;
+    let horaHecha = -1;
+    function horasHasta(t) {   // t: 0, cuando sale el sol … 1, cuando se pone
+      if (Math.abs(t - horaHecha) < 1e-4) return;
+      horaHecha = t;
+      const x = t * S, s0 = Math.min(S - 1, Math.floor(x)), f = x - s0;
+      for (let i = 0; i < nCel; i++) { const c = i * (S + 1), h = cum[c + s0] + (cum[c + s0 + 1] - cum[c + s0]) * f; datos[i] = Math.min(255, Math.round(h / HDIA * 255)); }
+      tex.needsUpdate = true;
+    }
+    const uLuz = material('modulo').uniforms.uLuz, uOp = { value: 0 }, uRej = { value: 0 };
+    const horas = new THREE.Group();
+    torres.forEach(({ T, geo }, t) => {
+      const M = T.marco;
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: VERT_HORAS, fragmentShader: FRAG_HORAS, transparent: true, side: THREE.FrontSide,
+        polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2,
+        uniforms: { uTex: { value: tex }, uTam: { value: new THREE.Vector2(TW, TH) }, uBase: { value: bases[t] }, uO: { value: new THREE.Vector2(T.o[0], T.o[1]) },
+          uEje: { value: new THREE.Vector2(Math.cos(M.ang), Math.sin(M.ang)) }, uMin: { value: new THREE.Vector3(M.amin, M.bmin, M.zmin) },
+          uS: { value: new THREE.Vector3(M.SA, M.SB, M.SZ) }, uN: { value: new THREE.Vector3(M.nA, M.nB, M.nZ) }, uB: { value: M.base.slice() },
+          uCen: { value: new THREE.Vector2(CEN[0], CEN[1]) }, uLuz, uOp, uRej }
+      });
+      const me = new THREE.Mesh(geo, mat); me.renderOrder = 3; horas.add(me);
+    });
+    // el arco del día, el horizonte (en la base de la vivienda) y el sol, alrededor de las dos torres
+    const cg = Math.cos(G.GIRO), sg = Math.sin(G.GIRO), RS = 66;
+    const C0 = [D.torres.reduce((s, T) => s + T.o[0], 0) / D.torres.length, D.torres.reduce((s, T) => s + T.o[1], 0) / D.torres.length];
+    const enCielo = (alt, az) => { const c = Math.cos(alt * RAD), E = c * Math.sin(az * RAD), N = c * Math.cos(az * RAD); return [C0[0] + RS * (E * cg - N * sg), C0[1] + RS * (E * sg + N * cg), ZB + RS * Math.sin(alt * RAD)]; };
+    const DIA = G.diaDelAno(new Date(2026, 11, 21)), muestrasArco = [];
+    for (let h = D.sol.h0; h <= D.sol.h1 + 1e-6; h += 1 / 12) muestrasArco.push(G.solEn(DIA, h));
+    const arco = new THREE.BufferGeometry().setFromPoints(muestrasArco.map(q => V3(...enCielo(Math.max(0, q.alt), q.az))));
+    const mArco = new THREE.LineBasicMaterial({ color: 0xffcf6b, transparent: true, opacity: 0 }), lArco = new THREE.Line(arco, mArco);
+    const hz = []; for (let i = 0; i <= 120; i++) hz.push(V3(C0[0] + RS * Math.cos(i / 60 * Math.PI), C0[1] + RS * Math.sin(i / 60 * Math.PI), ZB));
+    const mHz = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }), lHz = new THREE.Line(new THREE.BufferGeometry().setFromPoints(hz), mHz);
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    { const x = cv.getContext('2d'); x.fillStyle = 'rgba(255,211,77,.18)'; x.beginPath(); x.arc(32, 32, 30, 0, 7); x.fill(); x.fillStyle = '#ffe9a8'; x.beginPath(); x.arc(32, 32, 13, 0, 7); x.fill(); }
+    const mSol = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: 0, depthWrite: false });
+    const sol = new THREE.Sprite(mSol); sol.scale.set(8, 8, 1);
+    [lArco, lHz, sol].forEach(o => { o.renderOrder = 11; });
+    g2.add(horas, lArco, lHz, sol);
+
+    // 3 · los módulos: los que quedan (con los pisos extra) y los que se quitan
+    const Md = D.modulos, gm = Md.giro * RAD, cm = Math.cos(gm), sm = Math.sin(gm), E = 0.04;
+    const huella = (u, v) => [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => { const a = x * (Md.a / 2 - E), b = y * (Md.b / 2 - E); return [u + a * cm - b * sm, v + a * sm + b * cm]; });
+    const cajas = lista => {
+      const m = new Malla();
+      lista.forEach(([u, v, n]) => { const z0 = ZB + n * PASO; prisma(m, huella(u, v), z0 + E, z0 + Md.alto - E); });
+      const o = new THREE.Group(); o.name = 'vivienda-modulos'; pon(o, m, 'modulo', null, 25); return o;
+    };
+    const g3 = marcaEn(gV, 'viviendaModulos'), UQ = canalNuevo(), UX = canalNuevo();
+    const gQueda = conCanal(cajas(Md.quedan), UQ), gQuita = conCanal(cajas(Md.quitan), UX);
+    g3.add(gQueda, gQuita);
+    const barreQ = dosBarridos(UQ, gQueda);
+    barridoSube(UX, gQueda);   // (entran junto con los que quedan; se quitan de arriba hacia abajo)
+    const tq = tintes(gQuita), rojoC = new THREE.Color(ROJO);
+    let pulso = 1;
+
+    // 4 · el edificio del Revit (muros y losas, sin los núcleos ni los pasillos), las ventanas, los pasillos y los núcleos
+    const enNucleo = (u, v) => D.nucleos.some(b => u > b[0] - 0.4 && u < b[2] + 0.4 && v > b[1] - 0.4 && v < b[3] + 0.4);
+    function losas(clase) {   // las losas del Revit, partidas en prepara-vivienda-historia.py: 'losa' o 'pasillo'
+      const m = new Malla();
+      D.losas.forEach(L => L[clase].forEach(pol => {
+        const [ext, ...hoyos] = pol.map(r => pares(r)), e = api.ccw(ext), todos = e.concat(...hoyos);
+        THREE.ShapeUtils.triangulateShape(e.map(q => new THREE.Vector2(q[0], q[1])), hoyos.map(h => h.map(q => new THREE.Vector2(q[0], q[1])))).forEach(t => {
+          m.tri(...t.map(k => W(todos[k][0], todos[k][1], L.z[1])));
+          m.tri(...[t[0], t[2], t[1]].map(k => W(todos[k][0], todos[k][1], L.z[0])));
+        });
+        [e].concat(hoyos).forEach(r => api.muros(m, r, L.z[0], L.z[1]));
+      }));
+      const o = new THREE.Group(); o.name = 'vivienda-' + clase; pon(o, m, 'modulo', null, 25); return o;
+    }
+    const g4 = marcaEn(gV, 'viviendaEdificio');
+    const UE = canalNuevo(), UPi = canalNuevo(), UG = canalNuevo(), UP = canalNuevo(), UN = canalNuevo();
+    const muros = filtraTri(copiaRevit(/^revit-vivienda-walls-/, UE), (u, v) => !enNucleo(u, v));
+    const edif = new THREE.Group(); edif.add(muros, conCanal(losas('losa'), UE)); muros.visible = true;
+    const tapas = tapaVanos(copiaRevit(/^revit-vivienda-(windows|doors)-/, UPi), muros, UPi);
+    const vidrio = copiaRevit(/^revit-vivienda-(windows|doors)-/, UG);
+    const pasillos = conCanal(losas('pasillo'), UP);
+    const nucleos = filtraTri(copiaRevit(/^revit-vivienda-walls-/, UN), (u, v) => enNucleo(u, v));
+    tapas.visible = vidrio.visible = nucleos.visible = true;
+    g4.add(edif, tapas, vidrio, pasillos, nucleos);
+    barridoSube(UE, edif); barridoSube(UG, vidrio); barridoSube(UP, pasillos); barridoSube(UN, nucleos);
+    const CV = V3(C0[0], C0[1], 0);
+
+    // los tiempos tocan los mismos grupos: se calculan juntos
+    function viviendaEn() {
+      const k1 = marcaK.viviendaVolumen || 0, k2 = marcaK.viviendaSol || 0, k3 = marcaK.viviendaModulos || 0, k4 = marcaK.viviendaEdificio || 0;
+      // la volumetría: se dibuja (1) y se borra cuando los módulos ya la envuelven (3), lo de abajo primero
+      const fuera = tramo(k3, 0.3, 0.46);
+      barreO(fuera <= 0); armaCanal(UO, fuera > 0 ? 1 - fuera : tramo(k1, 0, 1)); orgs.visible = k1 > 0.001 && fuera < 1;
+      // el diagrama de horas: entra en azul claro con su cuadrícula y se llena mientras el sol avanza; se va con los módulos
+      uOp.value = tramo(k2, 0, 0.12) * (1 - tramo(k3, 0.26, 0.4)); uRej.value = tramo(k2, 0.05, 0.16);
+      horas.visible = uOp.value > 0.002;
+      horasHasta(tramo(k2, 0.2, 0.86));
+      // los módulos: entran todos alrededor de la volumetría (primero sus líneas, que dejan verla; luego sus caras, de
+      // abajo hacia arriba); los que no convenían se ponen rojos y se quitan (de arriba hacia abajo); los que quedan
+      // dejan paso al edificio (4), lo de abajo primero
+      const lq = tramo(k3, 0, 0.26), cq = tramo(k3, 0.2, 0.46);
+      barreQ(k4 <= 0.001);
+      if (k4 > 0.001) armaCanal(UQ, 1 - tramo(k4, 0.04, 0.3)); else { UQ.uDib.value.x = lq; UQ.uDib.value.y = cq; }
+      gQueda.visible = lq > 0 && k4 < 0.3;
+      if (k3 < 0.6) { UX.uDib.value.x = lq; UX.uDib.value.y = cq; } else armaCanal(UX, 1 - tramo(k3, 0.6, 0.92));
+      gQuita.visible = lq > 0 && k3 < 0.92;
+      const r = suave(tramo(k3, 0.48, 0.58)) * (k3 > 0.48 && k3 < 0.6 ? pulso : 1);
+      tq.forEach(t => { t.c.copy(t.base).lerp(rojoC, r); if (t.g != null) t.m.uniforms.uGris.value = t.g + (0.42 - t.g) * r; });
+    }
+    MARCA.viviendaVolumen = { g: g1, piezas: [], rotulos: [], dur: 6500, durSale: 1400, aplica: viviendaEn, latido() {} };
+    let solK = 0;
+    MARCA.viviendaSol = { g: g2, piezas: [], rotulos: [], dur: 16000, durSale: 1600,
+      aplica(k) {
+        viviendaEn();
+        // el arco se traza; el sol lo recorre una vez, de que sale a que se pone; luego el arco y el sol se van y queda
+        // el diagrama
+        const t = tramo(k, 0.03, 0.18), fuera = 1 - tramo(k, 0.88, 0.97);
+        arco.setDrawRange(0, Math.ceil(muestrasArco.length * t)); mArco.opacity = 0.9 * Math.min(1, t * 4) * fuera; mHz.opacity = 0.16 * t * fuera;
+        solK = tramo(k, 0.16, 0.22) * fuera;
+        const q = G.solEn(DIA, D.sol.h0 + HDIA * tramo(k, 0.2, 0.86));
+        sol.position.copy(V3(...enCielo(Math.max(2, q.alt), q.az))); mSol.opacity = solK;
+        lArco.visible = lHz.visible = mArco.opacity > 0.002; sol.visible = solK > 0.002;
+      },
+      latido() {}
+    };
+    MARCA.viviendaModulos = { g: g3, piezas: [], rotulos: [], dur: 11000, durSale: 1600, aplica: viviendaEn,
+      latido(ms, k) { pulso = k > 0.52 && k < 0.6 ? 0.82 + 0.18 * Math.sin(ms / 130) : 1; if (k > 0.52 && k < 0.6) viviendaEn(); }
+    };
+    MARCA.viviendaEdificio = { g: g4, piezas: [], rotulos: [], dur: 16000, durSale: 1600,
+      aplica(k) {
+        viviendaEn();
+        const a = tramo(k, 0.02, 0.3); edif.visible = a > 0; armaCanal(UE, a);
+        vanosEn(UPi, UE, tramo(k, 0.32, 0.42), tramo(k, 0.44, 0.58), CV, 0, 100); tapas.visible = a > 0 && k < 0.58;
+        const v = tramo(k, 0.54, 0.68); vidrio.visible = v > 0; armaCanal(UG, v);
+        const p = tramo(k, 0.62, 0.8); pasillos.visible = p > 0; armaCanal(UP, p);
+        const n = tramo(k, 0.72, 0.92); nucleos.visible = n > 0; armaCanal(UN, n);
+      },
+      latido() {}
+    };
+  }
+
   /* ---------- 4. HTML: tarjeta, rótulos, navegación ---------- */
   const capa = document.createElement('div'); capa.className = 'hist-capa'; capa.hidden = true;
   capa.innerHTML = '<div class="hist-rotulos"></div><aside class="hist-tarjeta" aria-live="polite"></aside>' +
@@ -1794,7 +2020,7 @@ export async function crea(api) {
       const tandas = [armaSuelo, armaCalles, armaExistente, armaLimite];
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
       tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa, armaMercado,
-        armaDemolicion, armaCorteAro, armaAroO, armaAroReal, armaCulturaVolumen, armaCulturaCompleta, armaComercio, armaIndustria,
+        armaDemolicion, armaCorteAro, armaAroO, armaAroReal, armaCulturaVolumen, armaCulturaCompleta, armaComercio, armaIndustria, armaVivienda,
         () => { mueveCarros(performance.now()); caminan(performance.now()); });
       (function sigue() {
         tandas.shift()();
