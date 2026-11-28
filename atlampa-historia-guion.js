@@ -443,21 +443,13 @@ export default [
   {
     id: 'comercioVanos', etapa: 2,
     titulo: 'Mercado · vanos',
-    // los vanos de los muros y la celosía de la nave norte
+    // los vanos de los muros y la celosía de la nave norte; cuando se acaban de abrir los vanos entran la cancelería
+    // (también la de las caras que cortó el aro) y los pisos (Diego, 2026-11-27: antes era otra slide); al final se
+    // suelta el foco
     camara: { encuadre: [500, 318, 566, 494], az: 235, el: 24, aire: 1.1, lado: 0.26, dur: 2400 },
     capas: { colonia: true, coches: true, limite: true },
-    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos'],
-    foco: { uso: 'comercio', desde: 'comercio' },
-    aro: { op: 0.95, sube: 0 },
-    rotulos: []
-  },
-  {
-    id: 'comercioCanceleria', etapa: 2,
-    titulo: 'Mercado · cancelería',
-    // la cancelería (también en las caras que cortó el aro) y los pisos; al final se suelta el foco
-    camara: { encuadre: [492, 336, 566, 478], az: 80, el: 24, aire: 1.02, lado: 0.26, dur: 2600 },
-    capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria'],
+    retrasos: { comercioCanceleria: 6400 },
     foco: { uso: 'comercio', desde: 'comercio', hasta: 'comercioCanceleria' },
     aro: { op: 0.95, sube: 0 },
     rotulos: []
