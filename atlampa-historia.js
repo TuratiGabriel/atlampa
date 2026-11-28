@@ -1755,12 +1755,13 @@ export async function crea(api) {
      paisajeVegetacion, encadenadas con s.retrasos): 1) el agua: los jardines inundables (los anillos de zacatón, caña
      de indias, junco y espigas de agua, en tonos de agua) y los espejos de agua con su fondo; 2) los pisos: la plaza y
      los andadores con sus juntas, las guarniciones, el pasto navajita, los cuatro pétreos y la tierra de las
-     arbustivas, cada franja con su contorno; 3) la vegetación con los colores del boceto (las masas de Burle Marx): los
-     árboles, las arbustivas, los magueyes y las cucharillas, los pastos, las plantas del agua y sus flores. En la
-     segunda, el año: pasan los doce meses (2.4 s cada uno) y cada franja toma el color de su follaje (más verde en lluvias, pajizo en secas),
-     florece en sus meses (los de la rueda de floración del paquete) y las aromáticas en flor llevan un halo de su
-     color que respira; los inundables se llenan de agua en lluvias. El mes va escrito sobre una azotea del contexto
-     (proyectado desde arriba, como «circuito») y se reescribe al cambiar. Al terminar el año se suelta el foco.
+     arbustivas, cada franja con su contorno; 3) la vegetación: los árboles, las arbustivas (masas oscuras en su verde,
+     con muchos puntitos brillantes de flor, del color del boceto: las masas de Burle Marx), los magueyes y las
+     cucharillas, los pastos, las plantas del agua. En la segunda, el año: pasan los doce meses (1.5 s cada uno) y cada
+     franja toma el color de su follaje (más verde en lluvias, pajizo en secas), florece en sus meses (los de la rueda
+     de floración del paquete; los puntitos, del color de su flor) y sobre las aromáticas en flor suben despacio unos
+     puntitos de su color (el aroma); los inundables se llenan de agua en lluvias. El mes va escrito en grande sobre el
+     contexto (proyectado desde la cámara de la slide) y se reescribe al cambiar. Al terminar el año se suelta el foco.
      Datos: atlampa-historia-paisaje.js (herramientas/prepara-paisaje-historia.py). */
   const tPunto = (() => {   // un punto redondo y suave (flores, flujos)
     const c = document.createElement('canvas'); c.width = c.height = 32;
@@ -1816,7 +1817,7 @@ export async function crea(api) {
   const FLOR_MES = { M: 1, X: 1, S: 1, r: 0.45, '.': 0 };
   // el valor del mes f (0 enero … 11.99 diciembre), con el cambio al final de cada mes
   const enMes = (a, f) => { const i = Math.floor(f) % 12, j = (i + 1) % 12, t = f - Math.floor(f); return a[i] + (a[j] - a[i]) * suave(tramo(t, 0.7, 1)); };
-  const DUR_ANIO = 30800, MES_MS = 2400, ANIO_0 = 900;   // el año: entra (0.9 s), doce meses de 2.4 s y sale
+  const DUR_ANIO = 20000, MES_MS = 1500, ANIO_0 = 900;   // el año: entra (0.9 s), doce meses de 1.5 s y sale
   const PISO_PLAZA = { abre: 0, pon() {} };
   function armaPaisaje() {
     const P = window.ATLAMPA_HISTORIA_PAISAJE; if (!P) return;
@@ -1849,12 +1850,12 @@ export async function crea(api) {
     // 2 · los pisos: la plaza y los andadores (con sus juntas), las guarniciones y el suelo de cada franja
     const g2 = marcaEn(gP, 'paisajePisos'), UPz = canalNuevo(), UPq = canalNuevo();
     radial(UPz, CP, 0, 112); radial(UPq, CP, 0, 100);
-    const plaza = capaPol('plaza', P.piso, ZP, UPz, '#efe7d6', '#cfc8b8', false, 0.12, 'plaza');
+    const plaza = capaPol('plaza', P.piso, ZP, UPz, '#efe7d6', '#77736b', false, 0.055, 'plaza');   // (casi negro, como el suelo del visor)
     const lj = new Lineas(), J = P.juntas;
     for (let i = 0; i < J.length; i += 4) lj.seg(W(J[i], J[i + 1], ZP + 0.012), W(J[i + 2], J[i + 3], ZP + 0.012));
     const gj = new THREE.Group(); ponLineas(gj, lj, 'paisaje-juntas', 0xffffff, null, null);
-    const juntas = conCanal(gj, UPz); pinta(juntas, null, '#3d3a35');
-    const guarn = capaPol('guarniciones', P.guarniciones, ZQ + 0.08, UPq, '#f2eee6', '#f4f1ea', 0.3, 0.26, 'plaza');
+    const juntas = conCanal(gj, UPz); pinta(juntas, null, '#2f2d2a');
+    const guarn = capaPol('guarniciones', P.guarniciones, ZQ + 0.08, UPq, '#f2eee6', '#cfcac0', 0.3, 0.14, 'plaza');
     g2.add(plaza.obj, juntas, guarn.obj);
     // el suelo de cada franja, con su contorno del color de lo que va ahí (las franjas del boceto, dibujadas en el piso):
     // los pétreos y el pasto con su color; las arbustivas, tierra
@@ -1903,7 +1904,8 @@ export async function crea(api) {
           const u = L[i], v = L[i + 1], s = L[i + 2], r = e.sep * (e.forma === 'domo' ? 0.6 : 0.5) * s, h = e.alto * s, w = W(u, v, z0);
           Q4.setFromAxisAngle(EJE, azarV() * Math.PI * 2);
           M4.compose(P4.set(w[0], w[1], w[2]), Q4, S4.set(r, h, r)); im.setMatrixAt(j, M4);
-          if (e.forma === 'domo') for (let q = 0; q < 3; q++) { const a = azarV() * Math.PI * 2, rr = r * 0.55 * azarV(); fl.push(...W(u + Math.cos(a) * rr, v + Math.sin(a) * rr, z0 + h * (0.86 - 0.4 * rr * rr / (r * r)) + 0.05)); }
+          // las flores: puntitos sobre la copa del domo (como los del visor)
+          if (e.forma === 'domo') for (let q = 0; q < 7; q++) { const a = azarV() * Math.PI * 2, rr = r * 0.85 * Math.sqrt(azarV()); fl.push(...W(u + Math.cos(a) * rr, v + Math.sin(a) * rr, z0 + h * Math.sqrt(Math.max(0, 1 - rr * rr / (r * r))) + 0.04)); }
           if (e.forma === 'roseta') {   // el quiote (la vara de la flor) y sus flores arriba
             const hq = h + (id === 'E-055' ? 3.4 : 1.7) * s;
             ql.seg(W(u, v, z0 + h * 0.4), W(u, v, z0 + hq));
@@ -1925,10 +1927,19 @@ export async function crea(api) {
         ponLineas(g, l, 'paisaje-' + id, 0xffffff, null, null);
       }
       const c = conCanal(g, UV); g3.add(c);
-      const pc = pinta(c, e.boceto || e.follaje, e.boceto || e.follaje, 0.24);   // (las masas, más oscuras: como los arbustos del visor)
+      // como en el visor: las masas oscuras en su verde (el color lo dan los puntitos de las flores) y los pastos con su
+      // color del boceto
+      const masa = e.forma === 'domo' || e.forma === 'roseta' || e.forma === 'cana';
+      V.base = masa ? e.follaje : (e.boceto || e.follaje);
+      const pc = pinta(c, V.base, V.base, 0.2);
       V.caras = pc.caras; V.lineas = pc.lineas;
-      if (e.forma === 'domo' || e.forma === 'roseta' || e.forma === 'cana') V.crece.push(c);
-      if (fl.length && e.mv.some(x => x > 0)) { V.flores = puntos(fl, e.flor, e.forma === 'domo' ? 4.2 : 3.4); g3.add(V.flores.obj); }
+      if (masa) V.crece.push(c);
+      if (fl.length && e.mv.some(x => x > 0)) {
+        // puntitos claros y brillantes (sumados a lo de atrás): con el color del boceto y, en el año, el de su flor
+        V.flores = puntos(fl, e.flor, e.forma === 'domo' ? 2.8 : 2.4, true); g3.add(V.flores.obj);
+        const claro = c => new THREE.Color(c).lerp(new THREE.Color(1, 1, 1), 0.16);
+        V.cBoceto = claro(e.boceto || e.flor); V.cFlor = claro(e.flor);
+      }
       if (ql.p.length && e.mv.some(x => x > 0)) {
         const mq = new THREE.LineBasicMaterial({ color: e.flor, transparent: true, opacity: 0 }), lq = new THREE.LineSegments(ql.geo(), mq);
         lq.frustumCulled = false; g3.add(lq); V.quiote = mq;
@@ -1948,33 +1959,37 @@ export async function crea(api) {
       b.malla.renderOrder = 7; g3.add(b.malla); arboles[id] = { mat, base: mat.uniforms.uTinta.value.clone() };
     });
 
-    // 4 · el año: los halos de las aromáticas y el mes escrito sobre el contexto
+    // 4 · el año: el aroma de las aromáticas en flor (puntitos de su color que suben despacio sobre su franja, muy
+    // sutiles) y el mes escrito sobre el contexto
     const g4 = marcaEn(gP, 'paisajeAnio');
-    const HALO_V = /* glsl */`attribute float aH; varying float vH; void main() { vH = aH; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-    const HALO_F = /* glsl */`uniform vec3 uColor; uniform float uOp; varying float vH; void main() { float a = uOp * pow(1.0 - vH, 1.7); gl_FragColor = vec4(uColor * a, a); }`;
-    const halos = [];
+    const AROMA_V = /* glsl */`attribute float aFase; uniform float uT; uniform float uPx; varying float vA;
+      void main() {
+        float s = fract(uT / 6.5 + aFase), f = aFase * 40.0;   // cada punto sube 2.4 m en 6.5 s, con un vaivén
+        vec3 p = position + vec3(sin(uT * 0.7 + f) * 0.35, s * 2.4, cos(uT * 0.6 + f * 1.3) * 0.35);
+        vA = sin(s * 3.14159);
+        gl_PointSize = uPx; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }`;
+    const AROMA_F = /* glsl */`uniform vec3 uColor; uniform float uOp; varying float vA;
+      void main() { vec2 c = gl_PointCoord - 0.5; float r = dot(c, c); if (r > 0.25) discard; float a = uOp * vA * (1.0 - r * 4.0); gl_FragColor = vec4(uColor * a, a); }`;
+    const aromas = [], uTiempo = { value: 0 };
     Object.keys(ESP).filter(id => ESP[id].tags.includes('aroma')).forEach(id => {
-      const pols = P.manchas.filter(m => m.id === id).flatMap(m => m.pol); if (!pols.length) return;
-      const pos = [], hh = [], Z0 = ZQ + 0.25, ALTO = 3.2;
-      pols.forEach(pol => {
-        const [ext, ...hoyos] = pol.map(r => pares(r)), e = api.ccw(ext), todos = e.concat(...hoyos);
-        e.forEach((a, i) => {   // el velo: sube por el borde y se desvanece
-          const b = e[(i + 1) % e.length];
-          [[a, 0], [b, 0], [b, 1], [a, 0], [b, 1], [a, 1]].forEach(([q, h]) => { pos.push(...W(q[0], q[1], Z0 + h * ALTO)); hh.push(h); });
-        });
-        const tri = THREE.ShapeUtils.triangulateShape(e.map(q => new THREE.Vector2(q[0], q[1])), hoyos.map(h => h.map(q => new THREE.Vector2(q[0], q[1]))));
-        [0.12, 0.34, 0.56].forEach(h => tri.forEach(t => t.forEach(k => { pos.push(...W(todos[k][0], todos[k][1], Z0 + h * ALTO)); hh.push(h); })));   // y unas capas por dentro
-      });
-      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aH', new THREE.Float32BufferAttribute(hh, 1));
-      const mat = new THREE.ShaderMaterial({ vertexShader: HALO_V, fragmentShader: HALO_F, uniforms: { uColor: { value: new THREE.Color(ESP[id].flor) }, uOp: { value: 0 } },
-        transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
-      const o = new THREE.Mesh(geo, mat); o.renderOrder = 10; o.frustumCulled = false; g4.add(o);
-      halos.push({ id, mat });
+      const L = P.plantas[id]; if (!L || !L.length) return;
+      const pos = [], fase = [];
+      for (let i = 0; i < L.length; i += 3) for (let q = 0; q < 2; q++) {   // dos por planta, desde lo alto de la planta
+        pos.push(...W(L[i] + (azarV() - 0.5) * 0.8, L[i + 1] + (azarV() - 0.5) * 0.8, ZQ + ESP[id].alto * 0.7)); fase.push(azarV());
+      }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aFase', new THREE.Float32BufferAttribute(fase, 1));
+      const mat = new THREE.ShaderMaterial({ vertexShader: AROMA_V, fragmentShader: AROMA_F,
+        uniforms: { uColor: { value: new THREE.Color(ESP[id].flor).lerp(new THREE.Color(1, 1, 1), 0.3) }, uOp: { value: 0 }, uT: uTiempo, uPx: { value: 3.2 * (window.devicePixelRatio || 1) } },
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      const o = new THREE.Points(geo, mat); o.renderOrder = 10; o.frustumCulled = false; g4.add(o);
+      aromas.push({ id, mat });
     });
-    // el mes: los doce nombres en un atlas (y una fila vacía); se escribe de izquierda a derecha sobre el anterior
-    // va en la azotea más grande del contexto dentro de MES.zona [u0, v0, u1, v1], de frente a la cámara (MES.az), al
-    // tamaño que cabe (proyectado desde arriba sólo sobre esa azotea: así se lee limpio, sin repetirse en el piso)
-    const MES = (MARCAS.paisaje && MARCAS.paisaje.mes) || { zona: [430, 494, 565, 575], az: 105 };
+    // el mes: los doce nombres en un atlas (y una fila vacía); se escribe de izquierda a derecha sobre el anterior. Va
+    // grande, proyectado desde la cámara de la slide del año sobre el contexto (el piso y los edificios de alrededor, no
+    // el predio): de frente se lee limpio, sin repetirse, aunque se salga del cuadro. MES.pantalla: dónde va su centro
+    // (0…1, desde la izquierda y desde arriba); MES.alto: la altura de la fila (fracción del alto de la pantalla)
+    const MES = Object.assign({ pantalla: [0.22, 0.6], alto: 0.18 }, MARCAS.paisaje && MARCAS.paisaje.mes);
     const fam = getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() || 'sans-serif';
     const cvM = document.createElement('canvas'), xm = cvM.getContext('2d'), RH = 200, PX = 168, PADM = 24, FILAS = 13;
     xm.font = '300 ' + PX + 'px ' + fam;
@@ -1982,27 +1997,29 @@ export async function crea(api) {
     xm.font = '300 ' + PX + 'px ' + fam; xm.textBaseline = 'middle'; xm.textAlign = 'center'; xm.fillStyle = '#ffffff';
     P.meses.forEach((t, i) => xm.fillText(t, cvM.width / 2, i * RH + RH * 0.54));
     const texM = new THREE.CanvasTexture(cvM); texM.anisotropy = 8;
-    const aM = MES.az * RAD, exM = new THREE.Vector3(Math.cos(aM), 0, Math.sin(aM)), nwM = new THREE.Vector3(Math.sin(aM), 0, -Math.cos(aM));
-    const ZM = MES.zona, areaQ = q => Math.abs(q.reduce((s, p, i) => { const r = q[(i + 1) % q.length]; return s + p[0] * r[1] - r[0] * p[1]; }, 0)) / 2;
-    const techo = EDIF.filter(e => { const cu = e.q.reduce((s, p) => s + p[0], 0) / e.q.length, cv = e.q.reduce((s, p) => s + p[1], 0) / e.q.length; return cu > ZM[0] && cu < ZM[2] && cv > ZM[1] && cv < ZM[3]; })
-      .sort((a, b) => areaQ(b.q) - areaQ(a.q))[0];
-    let oM = V3(ZM[0], ZM[1], 0), anchoM = 1, altoM = 1;
-    if (techo) {
-      const xs = techo.q.map(p => V3(p[0], p[1], 0).dot(exM)), ys = techo.q.map(p => V3(p[0], p[1], 0).dot(nwM));
-      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-      altoM = Math.min(0.62 * (y1 - y0), 0.86 * (x1 - x0) * RH / cvM.width); anchoM = altoM * cvM.width / RH;
-      oM = exM.clone().multiplyScalar((x0 + x1) / 2).addScaledVector(nwM, (y0 + y1) / 2);
+    const sAnio = GUION.find(s => s.id === 'paisajeAnio'), cA = (sAnio && sAnio.camara && sAnio.camara.centro) ? sAnio.camara : { centro: [505, 405, 4], h: 64, az: 105, el: 46 };
+    const aM = cA.az * RAD, eM = cA.el * RAD, dM = new THREE.Vector3(Math.sin(aM) * Math.cos(eM), -Math.sin(eM), -Math.cos(aM) * Math.cos(eM));
+    const exM = new THREE.Vector3().crossVectors(dM, new THREE.Vector3(0, 1, 0)).normalize(), nwM = new THREE.Vector3().crossVectors(exM, dM).normalize();
+    const altoM = MES.alto * 2 * cA.h, anchoM = altoM * cvM.width / RH, cM = V3(...cA.centro), oM = new THREE.Vector3();
+    let aspM = 0;
+    function centraMes() {   // (el centro en la pantalla depende de lo ancha que sea)
+      const asp = trabajo.clientWidth / Math.max(1, trabajo.clientHeight); if (Math.abs(asp - aspM) < 1e-3) return; aspM = asp;
+      oM.copy(cM).addScaledVector(exM, (MES.pantalla[0] - 0.5) * 2 * cA.h * asp).addScaledVector(nwM, (0.5 - MES.pantalla[1]) * 2 * cA.h);
     }
+    centraMes();
+    const PR = G.PRED;
     const uMes = { uMapa: { value: texM }, uO: { value: oM }, uEx: { value: exM }, uNw: { value: nwM }, uAncho: { value: anchoM }, uAlto: { value: altoM },
-      uOp: { value: 0 }, uA: { value: 12 }, uB: { value: 0 }, uRev: { value: 0 }, uFilas: { value: FILAS } };
+      uOp: { value: 0 }, uA: { value: 12 }, uB: { value: 0 }, uRev: { value: 0 }, uFilas: { value: FILAS },
+      uHueco: { value: new THREE.Vector4(PR[0][0], PR[0][1], PR[2][0], PR[2][1]) }, uCen: { value: new THREE.Vector2(CEN[0], CEN[1]) } };
     const matMes = new THREE.ShaderMaterial({
       uniforms: uMes,
       vertexShader: /* glsl */`varying vec3 vW; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
       fragmentShader: /* glsl */`uniform sampler2D uMapa; uniform vec3 uO; uniform vec3 uEx; uniform vec3 uNw; uniform float uAncho; uniform float uAlto;
-        uniform float uOp; uniform float uA; uniform float uB; uniform float uRev; uniform float uFilas; varying vec3 vW;
+        uniform float uOp; uniform float uA; uniform float uB; uniform float uRev; uniform float uFilas; uniform vec4 uHueco; uniform vec2 uCen; varying vec3 vW;
         void main() {
           vec3 d = vW - uO; vec2 uv = vec2(dot(d, uEx) / uAncho + 0.5, dot(d, uNw) / uAlto + 0.5);
           if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) discard;
+          vec2 p = vec2(vW.x + uCen.x, uCen.y - vW.z); if (p.x > uHueco.x && p.x < uHueco.z && p.y > uHueco.y && p.y < uHueco.w) discard;   // (no sobre el predio)
           float fila = uv.x < uRev ? uB : uA;
           vec4 c = texture2D(uMapa, vec2(uv.x, 1.0 - (fila + 1.0 - uv.y) / uFilas)); if (c.a < 0.03) discard;
           float borde = smoothstep(0.0, 0.012, abs(uv.x - uRev));   // la pluma: donde va escribiendo, un poco más tenue
@@ -2010,17 +2027,28 @@ export async function crea(api) {
         }`,
       transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8
     });
-    if (techo) { const az = new Malla(); tapa(az, techo.q, techo.h + 0.03); const me = new THREE.Mesh(az.geo(), matMes); me.renderOrder = 12; me.frustumCulled = false; g4.add(me); }
+    {   // dónde cae: el piso (sin el predio) y los edificios del contexto bajo el rectángulo del texto, con margen
+      const ks = [];
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([i, j]) => {
+        const p = oM.clone().addScaledVector(exM, i * anchoM * 0.7).addScaledVector(nwM, j * altoM * 0.7), t = (0.25 - p.y) / dM.y;
+        p.addScaledVector(dM, t); ks.push([p.x + CEN[0], CEN[1] - p.z]);
+      });
+      const mg = 40, k = [Math.min(...ks.map(q => q[0])) - mg, Math.min(...ks.map(q => q[1])) - mg, Math.max(...ks.map(q => q[0])) + mg, Math.max(...ks.map(q => q[1])) + mg];
+      const piso = new Malla(); tapa(piso, api.rect(k[0], k[1], k[2], k[3]), 0.26);
+      const ed = new Malla();
+      EDIF.forEach(e => { if (e.q.some(p => p[0] > k[0] && p[0] < k[2] && p[1] > k[1] && p[1] < k[3])) prisma(ed, e.q, 0, e.h); });
+      [piso, ed].forEach(x => { if (!x.p.length) return; const me = new THREE.Mesh(x.geo(), matMes); me.renderOrder = 12; me.frustumCulled = false; g4.add(me); });
+    }
 
     // los tiempos de la vegetación y del año tocan los mismos colores: se calculan juntos
     const C1 = new THREE.Color(), C2 = new THREE.Color(), C3 = new THREE.Color(), SECO = new THREE.Color('#a39a72');
     const TIERRA_H = new THREE.Color('#d2b088'), NAV = [new THREE.Color('#e6d39a'), new THREE.Color('#b8e46e'), new THREE.Color(SUELO['E-060'][0])];
-    let respira = 1, mesVisto = -1, mesDesde = 12, kAntes = 0, deRegreso = false;
+    let mesVisto = -1, mesDesde = 12, kAntes = 0, deRegreso = false;
     function paisajeEn() {
       const k3 = marcaK.paisajeVegetacion || 0, k4 = marcaK.paisajeAnio || 0, t = k4 * DUR_ANIO;
       if (k4 < kAntes - 1e-6) deRegreso = true; else if (k4 > kAntes + 1e-6) deRegreso = false;   // al regresar, el año se rebobina sin el mes
       kAntes = k4;
-      const enAnio = !!(GUION[idx] && GUION[idx].id === 'paisajeAnio');   // (el mes y los halos, sólo en su slide)
+      const enAnio = !!(GUION[idx] && GUION[idx].id === 'paisajeAnio');   // (el mes y el aroma, sólo en su slide)
       const a = tramo(t, 0, ANIO_0), f = Math.min(11.999, Math.max(0, (t - ANIO_0) / MES_MS)), ll = enMes(LLUVIA, f);
       armaCanal(UV, tramo(k3, 0, 0.75)); armaCanal(UT, tramo(k3, 0.25, 0.95));
       const cr = Math.max(0.001, suave(tramo(k3, 0.08, 0.8))), fl0 = tramo(k3, 0.72, 1);
@@ -2030,19 +2058,20 @@ export async function crea(api) {
         // el follaje de la temporada (pajizo en secas) y, en las masas en flor, el color de su flor
         C1.set(e.follaje); C2.set(e.seco || e.follaje); if (!e.seco) C2.lerp(SECO, 0.3);
         C2.lerp(C1, ll);
-        if (e.forma === 'domo' || e.forma === 'roseta') C2.lerp(C3.set(e.flor), 0.55 * fl);
-        C1.set(e.boceto || e.follaje).lerp(C2, a);
+        if (e.forma === 'domo' || e.forma === 'roseta') C2.lerp(C3.set(e.flor), 0.25 * fl);
+        C1.set(V.base).lerp(C2, a);
         V.caras.forEach(c => c.copy(C1)); V.lineas.forEach(c => c.copy(C1));
         const of = fl0 * (1 - a + a * fl);
-        if (V.flores) { V.flores.mat.opacity = of; V.flores.obj.visible = of > 0.003; }
+        if (V.flores) { V.flores.mat.opacity = of; V.flores.obj.visible = of > 0.003; V.flores.mat.color.copy(V.cBoceto).lerp(V.cFlor, a); }
         if (V.quiote) V.quiote.opacity = 0.9 * fl0 * a * fl;   // (el quiote sólo en sus meses)
       });
       Object.keys(arboles).forEach(id => { const A = arboles[id]; A.mat.uniforms.uTinta.value.copy(A.base).lerp(C3.set(ESP[id].flor), 0.8 * enMes(ESP[id].mv, f) * a); });
       // los inundables se llenan en lluvias; el pasto navajita reverdece
       Object.keys(inund).forEach(id => { C1.set(AGUA[id]); C2.copy(TIERRA_H).lerp(C1, ll); C1.lerp(C2, a); inund[id].caras.forEach(c => c.copy(C1)); });
       if (suelos['E-060']) { C2.copy(NAV[0]).lerp(NAV[1], ll); C1.copy(NAV[2]).lerp(C2, a); suelos['E-060'].caras.forEach(c => c.copy(C1)); }
-      halos.forEach(h => { h.mat.uniforms.uOp.value = enAnio ? 0.34 * enMes(ESP[h.id].mv, f) * a * respira * (1 - tramo(k4, 0.975, 1)) : 0; });
+      aromas.forEach(h => { h.mat.uniforms.uOp.value = enAnio ? 0.55 * enMes(ESP[h.id].mv, f) * a * (1 - tramo(k4, 0.975, 1)) : 0; });
       // el mes: se escribe sobre el anterior
+      if (enAnio) centraMes();
       const m = Math.floor(f);
       if (m !== mesVisto) { mesDesde = mesVisto < 0 || m === 0 ? 12 : m - 1; mesVisto = m; }
       uMes.uA.value = mesDesde; uMes.uB.value = m; uMes.uRev.value = t < ANIO_0 ? 0 : Math.min(1.02, tramo(f - m, 0, 0.2) * 1.02);
@@ -2051,7 +2080,7 @@ export async function crea(api) {
     MARCA.paisajeVegetacion = { g: g3, piezas: [], rotulos: [], dur: 6400, durSale: 1400, aplica: paisajeEn, latido() {} };
     // (si se llega a una slide posterior sin pasar por la del año, el año corre rápido: durEn)
     MARCA.paisajeAnio = { g: g4, piezas: [], rotulos: [], dur: DUR_ANIO, durEn: s => s.id === 'paisajeAnio' ? DUR_ANIO : 2400, durSale: 1600, aplica: paisajeEn,
-      latido(ms) { if (!halos.length) return; respira = quieto.matches ? 1 : 0.72 + 0.28 * Math.sin(ms / 850); paisajeEn(); }
+      latido(ms) { if (!aromas.length) return; if (!quieto.matches) uTiempo.value = ms / 1000; paisajeEn(); }
     };
   }
 
