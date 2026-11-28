@@ -47,6 +47,27 @@ export const MARCAS = {
     // portones de la calle interior, en Fresno y en Sabino (también se demuelen)
     portones: { v0: 396.6, v1: 417.5, alto: 3.2 }
   },
+  // Etapa 2 · la industria se arma desde su retícula: módulos de 5.5 × 4 m (los de los chacuacos del Revit), en dos
+  // niveles. Se parte del rectángulo completo y se quitan los módulos que no están en el proyecto (patios y bordes).
+  // Ejes girados: x a lo largo de giro (grados) desde origen. filas: de la fila de arriba (la más al norte, j = 9) a la
+  // de abajo (j = 0); '#' = módulo del proyecto, '.' = se quita. Sacado de la cubierta del Revit (2026-11-27).
+  // pbAbierta: [[i, j], …] módulos que se quitan sólo en planta baja (por confirmar con Diego).
+  industria: {
+    origen: [449.396, 360.185], giro: -9.9992, x0: -3.15, y0: -12.8, dx: 5.5, dy: 4, niveles: [0, 3.06, 6.2],
+    filas: [
+      '..####..',
+      '######..',
+      '###.###.',
+      '###...#.',
+      '#######.',
+      '..#.###.',
+      '..#.###.',
+      '.##.#.##',
+      '.#######',
+      '.#####..'
+    ],
+    pbAbierta: []
+  },
   // Booklet p. 68: franjas sobre el derecho de vía de la antigua espuela
   // (Crisantema, "Las Vías"), georreferidas con el límite de la colonia.
   asentamientos: {
@@ -390,6 +411,88 @@ export default [
     camara: { encuadre: [462, 360, 570, 468], az: 'norte', el: 27, aire: 1.12, lado: 0.26, dur: 1200 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta'],
+    aro: { op: 0.95, sube: 0 },
+    rotulos: []
+  },
+
+  /* Comercio y mercado: las naves que se conservan. foco: lo demás se apaga, como al seleccionar un uso en el visor;
+     con foco.hasta, el foco se suelta cuando termina esa marca. */
+  {
+    id: 'comercio', etapa: 2,
+    titulo: 'Mercado',
+    // las naves resaltadas: lo demás, oscuro y translúcido
+    camara: { encuadre: [500, 318, 566, 494], az: 300, el: 36, aire: 1.12, lado: 0.26, dur: 2800 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio'],
+    foco: 'comercio',
+    aro: { op: 0.95, sube: 0 },
+    rotulos: []
+  },
+  {
+    id: 'comercioTecho', etapa: 2,
+    titulo: 'Mercado · cubierta',
+    // la cubierta se separa de los muros y se secciona a distintas alturas
+    camara: { encuadre: [500, 318, 566, 494], az: 300, el: 36, aire: 1.12, lado: 0.26, dur: 1200 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho'],
+    foco: 'comercio',
+    aro: { op: 0.95, sube: 0 },
+    rotulos: []
+  },
+  {
+    id: 'comercioVanos', etapa: 2,
+    titulo: 'Mercado · vanos',
+    // los vanos de los muros y la celosía de la nave norte
+    camara: { encuadre: [500, 318, 566, 494], az: 235, el: 24, aire: 1.1, lado: 0.26, dur: 2400 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos'],
+    foco: 'comercio',
+    aro: { op: 0.95, sube: 0 },
+    rotulos: []
+  },
+  {
+    id: 'comercioCanceleria', etapa: 2,
+    titulo: 'Mercado · cancelería',
+    // la cancelería (también en las caras que cortó el aro) y los pisos; al final se suelta el foco
+    camara: { encuadre: [492, 336, 566, 478], az: 80, el: 24, aire: 1.02, lado: 0.26, dur: 2600 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria'],
+    foco: { uso: 'comercio', hasta: 'comercioCanceleria' },
+    aro: { op: 0.95, sube: 0 },
+    rotulos: []
+  },
+
+  /* Industria: la retícula de módulos (MARCAS.industria) */
+  {
+    id: 'industria', etapa: 2,
+    titulo: 'Industria',
+    // lo demás se apaga y aparece la retícula completa de módulos
+    camara: { encuadre: [440, 345, 500, 410], az: 37, el: 34, aire: 1.15, lado: 0.26, dur: 2800 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaModulos'],
+    foco: 'industria',
+    aro: { op: 0.95, sube: 0 },
+    rotulos: []
+  },
+  {
+    id: 'industriaPatios', etapa: 2,
+    titulo: 'Industria · patios',
+    // se quitan los módulos de los patios y los bordes; queda el edificio, con sus vanos y su vidrio
+    camara: { encuadre: [440, 345, 500, 410], az: 37, el: 40, aire: 1.15, lado: 0.26, dur: 1400 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaModulos', 'industriaPatios'],
+    foco: 'industria',
+    aro: { op: 0.95, sube: 0 },
+    rotulos: []
+  },
+  {
+    id: 'industriaConos', etapa: 2,
+    titulo: 'Industria · luz',
+    // los conos de luz y el recorrido del sol del 21 de diciembre; al final se suelta el foco
+    camara: { encuadre: [436, 330, 504, 412], az: 130, el: 18, aire: 1.12, lado: 0.26, dur: 2600 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaModulos', 'industriaPatios', 'industriaConos'],
+    foco: { uso: 'industria', hasta: 'industriaConos' },
     aro: { op: 0.95, sube: 0 },
     rotulos: []
   }

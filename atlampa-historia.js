@@ -179,7 +179,8 @@ export async function crea(api) {
   function mallaDemuele() { const m = new Malla(); EXI.piezas.forEach(p => mallaPieza(m, p)); return m; }
   function mallaExistente() { const m = mallaNaves(); EXI.piezas.forEach(p => mallaPieza(m, p)); return m; }
   // las naves que se conservan, ya cortadas por el aro (las mismas piezas del visor: G.PIEZAS), con su cara de corte
-  function mallaNavesCortadas() {
+  // (sinTecho / sinMuros: sólo una de las dos partes, para el mercado de la etapa 2)
+  function mallaNavesCortadas(sinTecho, sinMuros) {
     const m = new Malla(), e = 1e-3;
     G.PIEZAS.forEach(pz => {
       const nv = pz.nv, L = pz.L, zf = u => nv.alero + (nv.cumbre - nv.alero) * Math.max(0, 1 - Math.abs(u - pz.um) / pz.run);
@@ -187,8 +188,8 @@ export async function crea(api) {
         (Math.abs(a[1] - L.v0) < e && Math.abs(b[1] - L.v0) < e) || (Math.abs(a[1] - L.v1) < e && Math.abs(b[1] - L.v1) < e);
       [true, false].forEach(izq => {
         const h = G.cortaU(pz.pol, pz.um, izq); if (!h) return;
-        tapa(m, h, 0, u => zf(u));
-        api.muros(m, h, 0, 0, u => zf(u), (a, b) => borde(a, b) || !!(a[2] && b[2]));
+        if (!sinTecho) tapa(m, h, 0, u => zf(u));
+        if (!sinMuros) api.muros(m, h, 0, 0, u => zf(u), (a, b) => borde(a, b) || !!(a[2] && b[2]));
       });
     });
     return m;
@@ -917,7 +918,7 @@ export async function crea(api) {
       aplica(k) {
         const cortado = k >= 0.22;
         if (EXIS.naves) EXIS.naves.visible = !cortado;
-        if (EXIS.cortadas) EXIS.cortadas.visible = cortado;
+        if (EXIS.cortadas) EXIS.cortadas.visible = cortado && !(marcaK.comercio > 0.001);   // (con el mercado, van sus propias naves)
         if (EXIS.dentro) EXIS.dentro.visible = cortado && k < 0.999;
         const yb = hAro * (1 - suave(tramo(k, 0, 0.24)));
         cortina.position.y = c0.y + yb; cortina.scale.y = Math.max(0.001, hAro - yb); filo.position.y = c0.y + yb + 0.05;
@@ -1020,7 +1021,7 @@ export async function crea(api) {
     U.uDib.value.z = 0; U.uDibO.value.copy(caja.min); U.uDibV.value.copy(w.multiplyScalar(1 / Math.max(1, w.dot(t))));
   }
   function armaCanal(U, a) { U.uDib.value.x = Math.min(1, a / 0.7); U.uDib.value.y = Math.max(0, Math.min(1, (a - 0.32) / 0.68)); }
-  function copiaCultura(re, U) {
+  function copiaRevit(re, U) {
     const g = api.copiaConCanal ? api.copiaConCanal(piezasDe(re), U) : new THREE.Group();
     g.visible = false; return g;
   }
@@ -1028,7 +1029,7 @@ export async function crea(api) {
   function armaCulturaVolumen() {
     const g = new THREE.Group(); g.name = 'marca-cultura-volumen'; g.visible = false; gH.add(g);
     const UL = canalNuevo(), UE = canalNuevo();
-    const losas = copiaCultura(/^revit-cultura-floors-\d+-entero$/, UL), esc = copiaCultura(/^revit-cultura-stairs(Runs|Landings)-/, UE);
+    const losas = copiaRevit(/^revit-cultura-floors-\d+-entero$/, UL), esc = copiaRevit(/^revit-cultura-stairs(Runs|Landings)-/, UE);
     g.add(losas, esc);
     barridoSube(UE, esc);
     UL.uDib.value.z = 1; UL.uDibO.value.copy(O_ARO); UL.uDibV.value.set(20, 62, 0);   // las líneas, desde el aro hacia afuera
@@ -1063,10 +1064,304 @@ export async function crea(api) {
       [/^revit-cultura-(doors|curtainPanels|curtainMullions)-/, 0.22, 0.62],     // cancelería y puertas
       [/^revit-cultura-(columns|railings|topRails)-/, 0.38, 0.8],                 // columnas y barandales
       [/^revit-cultura-roofs-/, 0.6, 1]                                            // sombrillas
-    ].map(([re, a, b]) => { const U = canalNuevo(), c = copiaCultura(re, U); g.add(c); barridoSube(U, c); return { c, U, a, b }; });
+    ].map(([re, a, b]) => { const U = canalNuevo(), c = copiaRevit(re, U); g.add(c); barridoSube(U, c); return { c, U, a, b }; });
     MARCA.culturaCompleta = { g, piezas: [], rotulos: [], dur: 7000, durSale: 1400,
       aplica(k) { tiempos.forEach(t => { const a = tramo(k, t.a, t.b); t.c.visible = a > 0; armaCanal(t.U, a); }); },
       latido() {}
+    };
+  }
+
+  /* ---------- 3e. Etapa 2: el foco de un uso ----------
+     Como al seleccionar un uso en el visor: lo demás se apaga, translúcido al 15 %, y el uso que se arma se sigue
+     viendo igual. s.foco: 'uso' o { uso, hasta: id de una marca } (con hasta, el foco se suelta cuando esa marca
+     termina). FOCO[uso]: los grupos que no se apagan (llevan materiales propios). */
+  const FOCO = {}, FOCO_TENUE = 0.15;
+  let focoK = 0, focoUso = null, focoLista = null;
+  function focoJunta(uso) {
+    const fuera = new Set(FOCO[uso] || []), vistos = new Set(), lista = [];
+    (function rec(o) {
+      if (fuera.has(o)) return;
+      (Array.isArray(o.material) ? o.material : o.material ? [o.material] : []).forEach(m => {
+        const u = m.uniforms && m.uniforms.uOpacidad, clave = u || m;
+        if (vistos.has(clave) || (!u && typeof m.opacity !== 'number')) return;
+        vistos.add(clave);
+        lista.push({ m, u, base: u ? u.value : m.opacity, escrito: NaN, tr: m.transparent, dw: m.depthWrite });
+      });
+      o.children.forEach(rec);
+    })(api.escena);
+    return lista;
+  }
+  function focoSuelta() {
+    if (!focoLista) return;
+    focoLista.forEach(e => {
+      const cur = e.u ? e.u.value : e.m.opacity;
+      if (Math.abs(cur - e.escrito) <= 1e-5) { if (e.u) e.u.value = e.base; else e.m.opacity = e.base; }
+      e.m.transparent = e.tr; e.m.depthWrite = e.dw;
+    });
+    focoLista = null;
+  }
+  function focoPaso() {
+    const s = GUION[idx], f = s && s.foco, uso = f ? (typeof f === 'string' ? f : f.uso) : null;
+    let meta = uso ? (f.hasta ? 1 - tramo(marcaK[f.hasta] || 0, 0.86, 1) : 1) : 0;
+    if (uso && uso !== focoUso) { if (focoK < 0.01) { focoSuelta(); focoUso = uso; } else meta = 0; }   // otro uso: primero se suelta el de antes
+    focoK += (meta - focoK) * 0.07;
+    if (Math.abs(meta - focoK) < 0.003) focoK = meta;
+    if (focoK <= 0) { focoSuelta(); return; }
+    if (!focoLista) focoLista = focoJunta(focoUso);
+    const fac = 1 - (1 - FOCO_TENUE) * suave(focoK);
+    focoLista.forEach(e => {
+      const cur = e.u ? e.u.value : e.m.opacity;
+      if (Math.abs(cur - e.escrito) > 1e-5) e.base = cur;   // alguien más lo cambió: ésa es la base
+      e.escrito = e.base * fac;
+      if (e.u) e.u.value = e.escrito; else e.m.opacity = e.escrito;
+      e.m.transparent = true; e.m.depthWrite = false;
+    });
+  }
+
+  /* ---------- 3f. Etapa 2: utilidades para armar un uso ---------- */
+  function marcaEn(padre, id) { const g = new THREE.Group(); g.name = 'marca-' + id; g.visible = false; padre.add(g); return g; }
+  // una copia de obj (mallas puestas con pon) con materiales propios en el canal U
+  function conCanal(obj, U) { const c = api.copiaConCanal ? api.copiaConCanal([obj], U) : obj; c.visible = true; return c; }
+  // deja en cada malla (y sus aristas) los triángulos (segmentos) cuyo centro cumple pred(u, v, z)
+  function filtraTri(grupo, pred) {
+    grupo.traverse(x => {
+      const n = x.isLineSegments ? 2 : x.isMesh ? 3 : 0; if (!n || !x.geometry) return;
+      const g0 = x.geometry.index ? x.geometry.toNonIndexed() : x.geometry, P = g0.attributes.position.array, sel = [];
+      for (let i = 0; i < g0.attributes.position.count; i += n) {
+        let cx = 0, cy = 0, cz = 0;
+        for (let j = 0; j < n; j++) { cx += P[3 * (i + j)]; cy += P[3 * (i + j) + 1]; cz += P[3 * (i + j) + 2]; }
+        if (pred(cx / n + CEN[0], CEN[1] - cz / n, cy / n)) sel.push(i);
+      }
+      const g2 = new THREE.BufferGeometry();
+      Object.keys(g0.attributes).forEach(k => {
+        const at = g0.attributes[k], s = at.itemSize, out = new Float32Array(sel.length * n * s);
+        sel.forEach((i, q) => out.set(at.array.subarray(i * s, (i + n) * s), q * n * s));
+        g2.setAttribute(k, new THREE.BufferAttribute(out, s));
+      });
+      g2.computeBoundingSphere(); x.geometry = g2;
+    });
+    return grupo;
+  }
+  // los colores de los materiales propios de un grupo (para llevarlos de un color a otro)
+  function tintes(grupo) {
+    const r = [];
+    grupo.traverse(x => {
+      const m = x.material; if (!m || r.some(t => t.m === m)) return;
+      if (m.uniforms && m.uniforms.uTinta) r.push({ m, c: m.uniforms.uTinta.value, base: m.uniforms.uTinta.value.clone(), g: m.uniforms.uGris ? m.uniforms.uGris.value : null, arista: false });
+      else if (m.color) r.push({ m, c: m.color, base: m.color.clone(), g: null, arista: true });
+    });
+    return r;
+  }
+  // el barrido al revés (de arriba hacia abajo): al borrar con él, lo de abajo se va primero
+  function barridoBaja(U, De) { U.uDib.value.z = 0; U.uDibV.value.copy(De.uDibV.value).negate(); U.uDibO.value.copy(De.uDibO.value).addScaledVector(De.uDibV.value, 1 / De.uDibV.value.lengthSq()); }
+
+  /* ---------- 3g. Etapa 2: el mercado (las naves que se conservan) ----------
+     Con el foco en las naves: 1) la cubierta se separa de los muros y se secciona a distintas alturas: cada pieza de la
+     cubierta del Revit sale de la cubierta a dos aguas de hoy y llega a su altura, primero las cercanas al aro;
+     2) los muros de hoy dejan paso a los del proyecto, con sus vanos, y a la celosía de la nave norte; 3) la cancelería
+     (también la de las caras que cortó el aro) y los pisos; al terminar se suelta el foco. */
+  const esCelosia = (u, v) => u > 557.5 && v > 472.5;   // la celosía: montantes y paneles de la esquina noreste de la nave norte
+  function zViejo(u, v) {   // la cubierta a dos aguas de hoy (como mallaNave), en cualquier punto de las naves
+    let nv = G.NAVES[0], dm = Infinity;
+    G.NAVES.forEach(n => { const d = v < n.v0 ? n.v0 - v : v > n.v1 ? v - n.v1 : 0; if (d < dm) { dm = d; nv = n; } });
+    const paso = (nv.u1 - nv.u0) / nv.n, j = Math.max(0, Math.min(nv.n - 1, Math.floor((u - nv.u0) / paso))), um = nv.u0 + (j + 0.5) * paso;
+    return nv.alero + (nv.cumbre - nv.alero) * Math.max(0, 1 - Math.abs(u - um) / (paso / 2));
+  }
+  function armaComercio() {
+    aplicaEstilo();   // (las copias de lo existente se llevan su estilo)
+    const gC = new THREE.Group(); gC.name = 'comercio'; gH.add(gC); FOCO.comercio = [gC];
+    const hoy = (sinTecho, sinMuros, U) => { const o = new THREE.Group(); o.name = 'comercio-hoy'; pon(o, mallaNavesCortadas(sinTecho, sinMuros), 'ctxpredio', null, 25); return conCanal(o, U); };
+    // 0 · el foco: las naves de hoy, ahora con materiales propios (no se apagan), en lugar de las de lo existente
+    const g0 = marcaEn(gC, 'comercio'), UMv = canalNuevo();
+    const murosHoy = hoy(true, false, UMv), techoHoy = hoy(false, true, canalNuevo());
+    g0.add(murosHoy, techoHoy);
+    MARCA.comercio = { g: g0, piezas: [], rotulos: [], dur: 500, durSale: 300,
+      aplica(k) { if (EXIS.cortadas) EXIS.cortadas.visible = k <= 0.001 && (marcaK.corteAro || 0) >= 0.22; },
+      latido() {}
+    };
+    // 1 · la cubierta: cada pieza (triángulos unidos por sus vértices) sale de la cubierta de hoy y llega a su altura
+    const g1 = marcaEn(gC, 'comercioTecho'), techo = copiaRevit(/^revit-comercio-roofs-/, canalNuevo());
+    techo.visible = true; g1.add(techo);
+    const A = G.ANILLO, SEPARA = 2.6, clave = (a, i) => Math.round(a[i] * 50) + ',' + Math.round(a[i + 1] * 50) + ',' + Math.round(a[i + 2] * 50);
+    const retDe = new Map(), morfs = [], mallas = [], lineas = [];
+    techo.traverse(x => { if (x.isMesh) mallas.push(x); else if (x.isLineSegments) lineas.push(x); });
+    const morf = (x, ret) => {
+      const p = x.geometry.attributes.position, fin = p.array.slice(), ini = new Float32Array(p.count);
+      for (let i = 0; i < p.count; i++) ini[i] = zViejo(fin[3 * i] + CEN[0], CEN[1] - fin[3 * i + 2]);
+      morfs.push({ p, fin, ini, ret, otro: x.geometry.attributes.aOtro || null });
+    };
+    mallas.forEach(x => {
+      x.geometry = x.geometry.index ? x.geometry.toNonIndexed() : x.geometry.clone();
+      const a = x.geometry.attributes.position.array, n = a.length / 3, padre = new Int32Array(n).map((_, i) => i), primero = new Map();
+      const raiz = i => { while (padre[i] !== i) { padre[i] = padre[padre[i]]; i = padre[i]; } return i; };
+      const une = (i, j) => { i = raiz(i); j = raiz(j); if (i !== j) padre[i] = j; };
+      for (let i = 0; i < n; i++) { const k = clave(a, 3 * i); if (primero.has(k)) une(i, primero.get(k)); else primero.set(k, i); if (i % 3) une(i, i - i % 3); }
+      const suma = new Map();
+      for (let i = 0; i < n; i++) { const r = raiz(i), s = suma.get(r) || [0, 0, 0]; s[0] += a[3 * i]; s[1] += a[3 * i + 2]; s[2]++; suma.set(r, s); }
+      // el retraso de cada pieza: las cercanas al aro primero, con un poco de azar
+      const retP = new Map();
+      suma.forEach((s, r) => { const d = Math.hypot(s[0] / s[2] + CEN[0] - A.u, CEN[1] - s[1] / s[2] - A.v); retP.set(r, 0.38 * Math.max(0, Math.min(1, (d - 46) / 56)) + 0.08 * (((r * 9301 + 49297) % 233280) / 233280)); });
+      const ret = new Float32Array(n);
+      for (let i = 0; i < n; i++) { ret[i] = retP.get(raiz(i)); retDe.set(clave(a, 3 * i), ret[i]); }
+      morf(x, ret);
+    });
+    lineas.forEach(x => {
+      x.geometry = x.geometry.clone();
+      const a = x.geometry.attributes.position.array, n = a.length / 3, ret = new Float32Array(n);
+      for (let i = 0; i < n; i++) { const r = retDe.get(clave(a, 3 * i)); ret[i] = r == null ? 0.2 : r; }
+      morf(x, ret);
+    });
+    const morfa = k => morfs.forEach(M => {
+      const a = M.p.array, n = M.p.count;
+      // cada pieza se despega (sube SEPARA m) y se asienta a su altura
+      for (let i = 0; i < n; i++) { const kk = suave(tramo(k, M.ret[i], M.ret[i] + 0.5)); a[3 * i + 1] = M.ini[i] + (M.fin[3 * i + 1] - M.ini[i]) * kk + SEPARA * Math.sin(Math.PI * kk); }
+      M.p.needsUpdate = true;
+      if (M.otro) { const o = M.otro.array; for (let i = 0; i + 1 < n; i += 2) { o[3 * i + 1] = a[3 * i + 4]; o[3 * i + 4] = a[3 * i + 1]; } M.otro.needsUpdate = true; }
+    });
+    // el color: sale con el de lo existente y llega al del mercado
+    const tT = tintes(techo), tH = tintes(murosHoy), hM = tH.find(t => !t.arista), hL = tH.find(t => t.arista);
+    tT.forEach(t => { t.de = (t.arista ? hL : hM) ? (t.arista ? hL : hM).base.clone() : t.base.clone(); });
+    const pinta = k => tT.forEach(t => t.c.copy(t.de).lerp(t.base, k));
+    MARCA.comercioTecho = { g: g1, piezas: [], rotulos: [], dur: 6500, durSale: 1500,
+      aplica(k) { techoHoy.visible = k <= 0.001; morfa(k); pinta(suave(tramo(k, 0.25, 0.95))); },
+      latido() {}
+    };
+    // 2 · los vanos: los muros de hoy se borran (de abajo hacia arriba) mientras se dibujan los del proyecto y la celosía
+    const g2 = marcaEn(gC, 'comercioVanos'), UV = canalNuevo(), vanos = new THREE.Group();
+    const muros = copiaRevit(/^revit-comercio-walls-/, UV), celosia = filtraTri(copiaRevit(/^revit-comercio-curtain(Panels|Mullions)-/, UV), esCelosia);
+    muros.visible = celosia.visible = true; vanos.add(muros, celosia); g2.add(vanos);
+    barridoSube(UV, vanos); barridoBaja(UMv, UV);
+    MARCA.comercioVanos = { g: g2, piezas: [], rotulos: [], dur: 6000, durSale: 1400,
+      aplica(k) { const a = tramo(k, 0.04, 0.84); vanos.visible = a > 0; armaCanal(UV, a); armaCanal(UMv, 1 - tramo(k, 0.12, 0.92)); murosHoy.visible = k < 0.999; },
+      latido() {}
+    };
+    // 3 · los pisos y la cancelería (con la de las caras que cortó el aro)
+    const g3 = marcaEn(gC, 'comercioCanceleria'), UP = canalNuevo(), UC = canalNuevo();
+    const pisos = copiaRevit(/^revit-comercio-floors-/, UP), cancel = filtraTri(copiaRevit(/^revit-comercio-(curtainPanels|curtainMullions|doors)-/, UC), (u, v) => !esCelosia(u, v));
+    pisos.visible = cancel.visible = true; g3.add(pisos, cancel);
+    barridoSube(UP, pisos); barridoSube(UC, cancel);
+    MARCA.comercioCanceleria = { g: g3, piezas: [], rotulos: [], dur: 6000, durSale: 1400,
+      aplica(k) { const ap = tramo(k, 0, 0.45), ac = tramo(k, 0.22, 0.86); pisos.visible = ap > 0; armaCanal(UP, ap); cancel.visible = ac > 0; armaCanal(UC, ac); },
+      latido() {}
+    };
+  }
+
+  /* ---------- 3h. Etapa 2: la industria ----------
+     1) la retícula completa de módulos (MARCAS.industria: 5.5 × 4 m, dos niveles); 2) los módulos que no están en el
+     proyecto (patios y bordes) se marcan en rojo y se borran, y los que quedan dejan paso al edificio del Revit, con
+     sus vanos y su vidrio; 3) los chacuacos (los conos de luz) y el recorrido del sol del 21 de diciembre: la luz
+     entra por cada cono. Al terminar se suelta el foco. */
+  function armaIndustria() {
+    const D = MARCAS.industria; if (!D) return;
+    const gI = new THREE.Group(); gI.name = 'industria'; gH.add(gI); FOCO.industria = [gI];
+    const a = D.giro * RAD, ca = Math.cos(a), sa = Math.sin(a);
+    const P = (x, y) => [D.origen[0] + x * ca - y * sa, D.origen[1] + x * sa + y * ca];
+    const nI = D.filas[0].length, nJ = D.filas.length, z = D.niveles, e = 0.04;
+    const queda = new Malla(), quita = new Malla(), abierta = new Set((D.pbAbierta || []).map(q => q[0] + ',' + q[1]));
+    for (let j = 0; j < nJ; j++) for (let i = 0; i < nI; i++) {
+      const si = D.filas[nJ - 1 - j][i] === '#';
+      const x0 = D.x0 + i * D.dx + e, x1 = D.x0 + (i + 1) * D.dx - e, y0 = D.y0 + j * D.dy + e, y1 = D.y0 + (j + 1) * D.dy - e;
+      const pol = api.ccw([P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1)]);
+      for (let l = 0; l + 1 < z.length; l++) prisma(si && !(l === 0 && abierta.has(i + ',' + j)) ? queda : quita, pol, z[l] + e, z[l + 1] - e);
+    }
+    const modulos = (m, U) => { const o = new THREE.Group(); o.name = 'industria-modulos'; pon(o, m, 'industria', null, 25); return conCanal(o, U); };
+    const UQ = canalNuevo(), UR = canalNuevo();
+    const gQueda = modulos(queda, UQ), gQuita = modulos(quita, UR);
+    // 1 · la retícula completa
+    const g1 = marcaEn(gI, 'industriaModulos'); g1.add(gQueda, gQuita);
+    barridoSube(UQ, g1); UR.uDibO.value.copy(UQ.uDibO.value); UR.uDibV.value.copy(UQ.uDibV.value);
+    const sube = { O: UQ.uDibO.value.clone(), V: UQ.uDibV.value.clone() }, baja = canalNuevo(); barridoBaja(baja, UQ);
+    const tq = tintes(gQuita), rojoC = new THREE.Color(ROJO);
+    let pulso = 1;
+    // los dos tiempos tocan los mismos canales: se calculan juntos
+    function modulosEn() {
+      const k1 = marcaK.industriaModulos || 0, k2 = marcaK.industriaPatios || 0, d = tramo(k1, 0, 1);
+      const dir = k2 > 0;   // al borrar, de abajo hacia arriba
+      [UQ, UR].forEach(U => { if (dir) { U.uDibO.value.copy(baja.uDibO.value); U.uDibV.value.copy(baja.uDibV.value); } else { U.uDibO.value.copy(sube.O); U.uDibV.value.copy(sube.V); } });
+      armaCanal(UR, Math.min(d, 1 - tramo(k2, 0.14, 0.42)));
+      armaCanal(UQ, Math.min(d, 1 - tramo(k2, 0.4, 0.9)));
+      gQuita.visible = k2 < 0.42; gQueda.visible = k2 < 0.9;
+      const r = suave(tramo(k2, 0, 0.12)) * (k2 < 0.14 ? pulso : 1);
+      tq.forEach(t => { t.c.copy(t.base).lerp(rojoC, r); if (t.g != null) t.m.uniforms.uGris.value = t.g + (0.42 - t.g) * r; });
+    }
+    MARCA.industriaModulos = { g: g1, piezas: [], rotulos: [], dur: 5000, durSale: 1400, aplica: modulosEn, latido() {} };
+    // 2 · se quitan los módulos y queda el edificio, con sus vanos y su vidrio
+    const g2 = marcaEn(gI, 'industriaPatios'), UE = canalNuevo();
+    const edif = copiaRevit(/^revit-industria-(walls|floors|windows|doors|curtainPanels)-/, UE); edif.visible = true; g2.add(edif);
+    barridoSube(UE, edif);
+    MARCA.industriaPatios = { g: g2, piezas: [], rotulos: [], dur: 7000, durSale: 1600,
+      aplica(k) { modulosEn(); const a = tramo(k, 0.42, 1); edif.visible = a > 0; armaCanal(UE, a); },
+      latido(ms, k) { pulso = k > 0.08 && k < 0.14 ? 0.82 + 0.18 * Math.sin(ms / 130) : 1; if (k > 0.08 && k < 0.14) modulosEn(); }
+    };
+    // 3 · los conos de luz y el sol del 21 de diciembre
+    const g3 = marcaEn(gI, 'industriaConos'), UK = canalNuevo();
+    const conos = copiaRevit(/^revit-industria-(chacuacos|chimeneas)-/, UK); conos.visible = true; g3.add(conos);
+    barridoSube(UK, conos);
+    const Rv = window.ATLAMPA_REVIT || {}, oR = Rv.origen || [0, 0, 0];
+    const gF = (Rv.grupos || []).find(r => r.programa === 'industria' && r.categoria === 'floors'), losaN1 = [];
+    if (gF) {
+      const f = new Float32Array(Rv.buffer, gF.offset, gF.floats);
+      for (let i = 0; i < f.length; i += 9) if ([2, 5, 8].every(j => Math.abs(f[i + j] + oR[2] - 3.06) < 0.05)) losaN1.push([0, 3, 6].map(j => [f[i + j] + oR[0], f[i + j + 1] + oR[1]]));
+    }
+    const enTri = (p, t) => { const s = (a, b, c) => (a[0] - c[0]) * (b[1] - c[1]) - (b[0] - c[0]) * (a[1] - c[1]); const d1 = s(p, t[0], t[1]), d2 = s(p, t[1], t[2]), d3 = s(p, t[2], t[0]); return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)); };
+    // cada cono: su boca (arriba) y el piso al que llega la luz (el del nivel 1 si hay losa debajo; si no, la planta baja)
+    const conosLuz = (Rv.piezasCubiertaIndustria || []).filter(p => !/CHIMENEA/i.test(p.familia)).map(p => {
+      const b = p.bbox, u = (b[0][0] + b[1][0]) / 2 + oR[0], v = (b[0][1] + b[1][1]) / 2 + oR[1];
+      return { u, v, zT: b[1][2] + oR[2], piso: losaN1.some(t => enTri([u, v], t)) ? 3.1 : 0.14, r: Math.min(b[1][0] - b[0][0], b[1][1] - b[0][1]) * 0.24 };
+    });
+    const ORO = 0xffd34d, cg = Math.cos(G.GIRO), sg = Math.sin(G.GIRO), C0 = P(D.x0 + nI * D.dx / 2, D.y0 + nJ * D.dy / 2), RS = 40;
+    const enCielo = (alt, az, extra) => { const c = Math.cos(alt * RAD), E = c * Math.sin(az * RAD), N = c * Math.cos(az * RAD); return [C0[0] + RS * (E * cg - N * sg), C0[1] + RS * (E * sg + N * cg), RS * Math.sin(alt * RAD) + 2 + (extra || 0)]; };
+    const dirSol = (alt, az) => { const c = Math.cos(alt * RAD), E = c * Math.sin(az * RAD), N = c * Math.cos(az * RAD); return [E * cg - N * sg, E * sg + N * cg, Math.sin(alt * RAD)]; };
+    const DIA = G.diaDelAno(new Date(new Date().getFullYear(), 11, 21)), horas = [];
+    for (let h = 5; h <= 20; h += 1 / 12) { const q = G.solEn(DIA, h); if (q.alt > 1) horas.push([h, q]); }
+    const h0 = horas[0][0], h1 = horas[horas.length - 1][0];
+    // el arco del día y el horizonte (tenue), alrededor de la industria
+    const arco = new THREE.BufferGeometry().setFromPoints(horas.map(([, q]) => V3(...enCielo(q.alt, q.az))));
+    const mArco = new THREE.LineBasicMaterial({ color: 0xffcf6b, transparent: true, opacity: 0 }), lArco = new THREE.Line(arco, mArco);
+    const hz = []; for (let i = 0; i <= 120; i++) hz.push(V3(C0[0] + RS * Math.cos(i / 60 * Math.PI), C0[1] + RS * Math.sin(i / 60 * Math.PI), 0.3));
+    const mHz = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }), lHz = new THREE.Line(new THREE.BufferGeometry().setFromPoints(hz), mHz);
+    // el sol
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    { const x = cv.getContext('2d'); x.fillStyle = 'rgba(255,211,77,.18)'; x.beginPath(); x.arc(32, 32, 30, 0, 7); x.fill(); x.fillStyle = '#ffe9a8'; x.beginPath(); x.arc(32, 32, 13, 0, 7); x.fill(); }
+    const mSol = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: 0, depthWrite: false, sizeAttenuation: false });
+    const sol = new THREE.Sprite(mSol); sol.scale.set(0.05, 0.05, 1);
+    // la luz: los rayos que llegan a la boca de cada cono y la columna de luz que baja hasta el piso (a través del
+    // edificio: es un diagrama), con su mancha en el piso
+    const nC = conosLuz.length, posR = new Float32Array(nC * 6), gR = new THREE.BufferGeometry(); gR.setAttribute('position', new THREE.BufferAttribute(posR, 3));
+    const mRayo = new THREE.LineBasicMaterial({ color: ORO, transparent: true, opacity: 0, depthWrite: false }), rayos = new THREE.LineSegments(gR, mRayo);
+    const mCol = new THREE.MeshBasicMaterial({ color: ORO, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
+    const mMan = mCol.clone();
+    const luces = new THREE.Group();
+    conosLuz.forEach(c => {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r * 1.25, 1, 20, 1, true).translate(0, 0.5, 0), mCol);
+      col.position.set(...W(c.u, c.v, c.piso)); col.scale.y = Math.max(0.5, c.zT - c.piso - 0.2); col.renderOrder = 12; luces.add(col);
+      const man = new THREE.Mesh(new THREE.CircleGeometry(c.r * 1.7, 28).rotateX(-Math.PI / 2), mMan);
+      man.position.set(...W(c.u, c.v, c.piso + 0.06)); man.renderOrder = 12; luces.add(man);
+    });
+    [lArco, lHz, sol, rayos].forEach(o => { o.renderOrder = 11; });
+    g3.add(lArco, lHz, sol, rayos, luces);
+    let solK = 0;
+    function ponSol(ms) {
+      const h = h0 + (h1 - h0) * ((ms % 16000) / 16000), q = G.solEn(DIA, h), alt = Math.max(1, q.alt);
+      sol.position.copy(V3(...enCielo(alt, q.az)));
+      const d = dirSol(alt, q.az), L = 9;
+      conosLuz.forEach((c, i) => {
+        const t = W(c.u, c.v, c.zT), f = W(c.u + d[0] * L, c.v + d[1] * L, c.zT + d[2] * L);
+        posR.set(f, i * 6); posR.set(t, i * 6 + 3);
+      });
+      gR.attributes.position.needsUpdate = true; gR.computeBoundingSphere();
+      const s = Math.sin(alt * RAD);
+      mRayo.opacity = 0.75 * solK; mCol.opacity = (0.06 + 0.22 * s) * solK; mMan.opacity = (0.1 + 0.35 * s) * solK; mSol.opacity = solK;
+    }
+    const qMed = G.solEn(DIA, 12), pMed = enCielo(qMed.alt, qMed.az, 6);
+    MARCA.industriaConos = { g: g3, piezas: [], rotulos: [{ u: pMed[0], v: pMed[1], z: pMed[2], texto: '21 de diciembre', sub: 'recorrido del sol en invierno', tipo: 'calle', retraso: 3800 }],
+      dur: 7600, durSale: 1500,
+      aplica(k) {
+        const a = tramo(k, 0, 0.5); conos.visible = a > 0; armaCanal(UK, a);
+        const t = tramo(k, 0.42, 0.78); arco.setDrawRange(0, Math.ceil(horas.length * t)); mArco.opacity = 0.9 * Math.min(1, t * 4); mHz.opacity = 0.16 * t;
+        solK = tramo(k, 0.7, 1); ponSol(performance.now());
+      },
+      latido(ms) { if (solK > 0) ponSol(quieto.matches ? 0 : ms); }
     };
   }
 
@@ -1332,6 +1627,7 @@ export async function crea(api) {
     if (gAut.visible && !quieto.matches) mueveCarros(ms);
     if (gPer.visible && !quieto.matches) caminan(ms);
     Object.keys(MARCA).forEach(id => { if (MARCA[id].g.visible) MARCA[id].latido(ms, marcaK[id] || 0); });
+    focoPaso();
     if (volando && avisos.mueve) avisos.mueve();
     pide();
     requestAnimationFrame(latido);
@@ -1347,7 +1643,7 @@ export async function crea(api) {
       const tandas = [armaSuelo, armaCalles, armaExistente, armaLimite];
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
       tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa, armaMercado,
-        armaDemolicion, armaCorteAro, armaAroO, armaAroReal, armaCulturaVolumen, armaCulturaCompleta,
+        armaDemolicion, armaCorteAro, armaAroO, armaAroReal, armaCulturaVolumen, armaCulturaCompleta, armaComercio, armaIndustria,
         () => { mueveCarros(performance.now()); caminan(performance.now()); });
       (function sigue() {
         tandas.shift()();
@@ -1508,6 +1804,7 @@ export async function crea(api) {
     ++irTok; tweens = []; volando = false;
     quitaTarjeta(); quitaRotulos(); ponFondo(null); fondo3D.visible = false; matFondo.opacity = 0; aroTw = null; aplicaAro({ op: 0, sube: 0 });
     activo = false;
+    focoK = 0; focoSuelta();
     gH.visible = false; capa.hidden = true; document.body.classList.remove('hist-activo');
     if (visAntes) { visAntes.forEach(([o, v]) => { o.visible = v; }); visAntes = null; }
     Object.keys(MARCA).forEach(id => aplicaMarca(id, 0));
@@ -1519,5 +1816,6 @@ export async function crea(api) {
 
   // se arma en ratos libres, para que la primera slide no espere
   if (window.requestIdleCallback) requestIdleCallback(() => arma(), { timeout: 4000 }); else setTimeout(arma, 800);
-  return { entra, sale, ir, siguiente, anterior, estado, total: GUION.length };
+  return { entra, sale, ir, siguiente, anterior, estado, total: GUION.length,
+    depura: () => ({ marcaK: Object.assign({}, marcaK), focoK, focoUso, foco: focoLista ? focoLista.length : 0 }) };
 }

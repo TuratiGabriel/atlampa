@@ -586,9 +586,9 @@ function crea(svg, op) {
   const canalPropio = papel => DIB_PROPIO[papel] || (DIB_PROPIO[papel] = canalDib());
   // una copia de las piezas del proyecto (por nombre) que se dibuja con el canal U, para que el Modo historia la
   // arme sola (como la separación por pisos: materiales clonados, las líneas con su propio canal)
-  function copiaConCanal(nombres, U) {
-    const g = new THREE.Group(); g.name = 'copia-' + nombres.join('-');
-    raizG.children.filter(o => nombres.includes(o.name)).forEach(o => {
+  function copiaConCanal(nombres, U) {   // nombres: de piezas del visor, u objetos ya armados (con pon)
+    const g = new THREE.Group(); g.name = 'copia-' + nombres.map(n => typeof n === 'string' ? n : n.name).join('-');
+    raizG.children.filter(o => nombres.includes(o.name)).concat(nombres.filter(n => typeof n !== 'string')).forEach(o => {
       const c = o.clone(true); c.visible = true;
       c.traverse(x => {
         if (!x.material) return;
