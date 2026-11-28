@@ -22,7 +22,9 @@ Qué sale:
 - piso: la plaza y los andadores (el predio menos los parques, el agua y las naves que no corta el aro), con huecos,
   y sus juntas (cada 1.8 m, en los ejes del predio); guarniciones: el anillo de 0.20 m de cada parque.
 - plantas: por especie, dónde va cada planta [u, v, escala], repartidas en tresbolillo con su separación.
-- rutas: recorridos de las personas por la plaza y los andadores (sin cruzar muros ni parques).
+- rutas: recorridos de las personas por la plaza y los andadores (sin cruzar muros ni parques); rutasAlto: por los
+  pasillos de la vivienda [u0, v0, u1, v1, z] (de atlampa-historia-vivienda.js).
+- fondos: anillos hacia dentro de cada espejo de agua (como la laguna del visor).
 """
 import json
 import math
@@ -46,9 +48,9 @@ ANILLO, CORTE = (505.75, 409.05), 47   # G.ANILLO (centro) y G.CORTE: el aro cor
 # ---------- la paleta (rueda_floracion_atlampa.html y los colores del boceto) ----------
 # forma: cómo se dibuja (arbol, domo, roseta, pasto, cana, junco, espiga); alto y sep en m (sep: entre plantas)
 ESPECIES = {
-    'E-046': dict(nombre='Tepozán', m='.......MMM..', flor='#EFA92F', tags=['poli'], forma='arbol', alto=9.0, follaje='#93a86c'),
-    'E-052': dict(nombre='Tejocote', m='.MMM........', flor='#EFEAD8', tags=['poli'], forma='arbol', alto=7.0, follaje='#6f9a52'),
-    'E-047': dict(nombre='Capulín', m='............', flor='#2F6B4F', tags=['estructura'], forma='arbol', alto=8.0, follaje='#4f8a55'),
+    'E-046': dict(nombre='Tepozán', m='.......MMM..', flor='#EFA92F', tags=['poli'], forma='arbol', alto=9.0, follaje='#c4dc8e'),
+    'E-052': dict(nombre='Tejocote', m='.MMM........', flor='#EFEAD8', tags=['poli'], forma='arbol', alto=7.0, follaje='#a8e063'),
+    'E-047': dict(nombre='Capulín', m='............', flor='#2F6B4F', tags=['estructura'], forma='arbol', alto=8.0, follaje='#7fd88c'),
     'E-019': dict(nombre='Trompetilla', m='rr..MMMMXXXr', flor='#DB2437', tags=['colibri'], forma='domo', alto=1.0, sep=0.9, boceto='#ec6024', follaje='#5f8a48'),
     'E-015': dict(nombre='Tlacote', m='.......SSSS.', flor='#4A4FD8', tags=['colibri', 'poli'], forma='domo', alto=1.6, sep=1.3, boceto='#483aa8', follaje='#557f45'),
     'E-016': dict(nombre='Mirto', m='rrrrSrrrSSSr', flor='#C8265A', tags=['colibri', 'poli'], forma='domo', alto=1.1, sep=1.0, boceto='#cc265c', follaje='#5a8546'),
@@ -195,6 +197,43 @@ while len(rutas) < 70 and intentos < 40000:
     if P_LIB.contains(LineString([a, b])):
         rutas.append([round(a[0], 2), round(a[1], 2), round(b[0], 2), round(b[1], 2)])
 
+# y por los pasillos de la vivienda (las losas 'pasillo' de atlampa-historia-vivienda.js), a lo largo de cada tramo
+t = open(os.path.join(RAIZ, 'atlampa-historia-vivienda.js'), encoding='utf-8').read()
+VIV = json.loads(t[t.index('{', t.index('ATLAMPA_HISTORIA_VIVIENDA')):t.rindex('}') + 1])
+rutas_alto = []
+for L in VIV['losas']:
+    for pol in L['pasillo']:
+        p = poligono(pol[0], pol[1:])
+        zona = p.buffer(-0.45)
+        if zona.is_empty or p.area < 8:
+            continue
+        pz = prep(zona)
+        caja = p.minimum_rotated_rectangle.exterior.coords
+        lados = [(caja[i], caja[i + 1]) for i in range(4)]
+        (ax, ay), (bx, by) = max(lados, key=lambda s: math.dist(s[0], s[1]))
+        eje = math.atan2(by - ay, bx - ax)
+        hechas, n = 0, max(1, round(p.area / 30))
+        for _ in range(60 * n):
+            if hechas >= n:
+                break
+            a0, b0, a1, b1 = zona.bounds
+            a = (a0 + rnd.random() * (a1 - a0), b0 + rnd.random() * (b1 - b0))
+            if not pz.contains(Point(a)):
+                continue
+            ang, Lr = eje + (rnd.random() - 0.5) * 0.08 + (math.pi if rnd.random() < 0.5 else 0), 4 + rnd.random() * 14
+            b = (a[0] + Lr * math.cos(ang), a[1] + Lr * math.sin(ang))
+            if pz.contains(LineString([a, b])):
+                rutas_alto.append([round(a[0], 2), round(a[1], 2), round(b[0], 2), round(b[1], 2), round(L['z'][1], 2)])
+                hechas += 1
+
+# el fondo de los espejos de agua: anillos hacia dentro, como la laguna del visor
+fondos = []
+for p in agua:
+    for d in (0.6, 1.4, 2.4):
+        for q in poligonos(p.buffer(-d).simplify(0.05)):
+            if q.area > 1:
+                fondos.append(plano(q)[0])
+
 out = {
     'nota': 'Generado por herramientas/prepara-paisaje-historia.py: no editar a mano. ' + BOC['nota'],
     'meses': MESES,
@@ -210,6 +249,8 @@ out = {
     'guarniciones': anillos_g,
     'plantas': plantas,
     'rutas': rutas,
+    'rutasAlto': rutas_alto,
+    'fondos': fondos,
 }
 txt = ('/* El paisaje del Modo historia (etapa 2). Generado por herramientas/prepara-paisaje-historia.py: no editar a mano.\n'
        '   Fuente: modelo/paisaje-boceto01d.json (Boceto 01d, Atlampa Landscape) y los muros de planta baja del Revit. */\n'
@@ -218,5 +259,5 @@ open(SALIDA, 'w', encoding='utf-8', newline='\n').write(txt)
 cuenta = {k: len(v) // 3 for k, v in plantas.items()}
 print('piso: %d polígonos, %.0f m²; juntas %d; guarniciones %d' % (len(piso_pols), sum(p.area for p in piso_pols), len(juntas) // 4, len(anillos_g)))
 print('plantas', cuenta, 'total', sum(cuenta.values()))
-print('rutas %d (%d intentos); libre %.0f m²' % (len(rutas), intentos, libre.area))
+print('rutas %d (%d intentos); libre %.0f m²; en los pasillos %d; fondos del agua %d' % (len(rutas), intentos, libre.area, len(rutas_alto), len(fondos)))
 print('%s: %.0f KB' % (os.path.basename(SALIDA), os.path.getsize(SALIDA) / 1024))

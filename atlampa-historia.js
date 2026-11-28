@@ -442,7 +442,7 @@ export async function crea(api) {
       const a = q.p[j - 1], b = q.p[j], f = (d - q.acc[j - 1]) / ((q.acc[j] - q.acc[j - 1]) || 1);
       const du = (b[0] - a[0]) * va, dv = (b[1] - a[1]) * va, n = Math.hypot(du, dv) || 1;
       const u = a[0] + (b[0] - a[0]) * f - dv / n * q.lado * va, v = a[1] + (b[1] - a[1]) * f + du / n * q.lado * va;
-      const w = W(u + du / n, v + dv / n, 0), o = W(u, v, PM.z != null ? PM.z : 0.25);   // PM.z: a qué altura caminan
+      const w = W(u + du / n, v + dv / n, 0), o = W(u, v, q.z != null ? q.z : PM.z != null ? PM.z : 0.25);   // q.z o PM.z: a qué altura caminan
       PM.aPos.setXYZ(i, o[0], o[1], o[2]);
       PM.aVolt.setX(i, (w[0] - o[0]) * derecha.x + (w[2] - o[2]) * derecha.z >= 0 ? 1 : -1);
       PM.aPose.setX(i, Math.floor(Math.abs(s) / (0.35 * q.esc * k)) % 4);
@@ -1749,12 +1749,15 @@ export async function crea(api) {
   }
 
   /* ---------- 3j. Etapa 2: el paisaje ----------
-     El Boceto 01d de Atlampa Landscape (Diego, 2026-11-28), en cuatro slides: 1) el agua: los jardines inundables
-     (los anillos de zacatón, caña de indias, junco y espigas de agua, en tonos de agua) y los espejos de agua; 2) los
-     pisos: la plaza y los andadores con sus juntas, las guarniciones, el pasto navajita, los cuatro pétreos y la tierra
-     de las arbustivas; 3) la vegetación con los colores del boceto (las masas de Burle Marx): los árboles de croquis,
-     las arbustivas, los magueyes y las cucharillas, los pastos, las plantas del agua y sus flores; 4) el año: pasan los
-     doce meses (3 s cada uno) y cada franja toma el color de su follaje (más verde en lluvias, pajizo en secas),
+     El Boceto 01d de Atlampa Landscape (Diego, 2026-11-28), con el estilo del paisaje del visor (rellenos oscuros
+     apenas teñidos, contornos claros, árboles de croquis con su trazo verde, pastos de trazo y flores de punto). Dos
+     slides: en la primera entra todo el paisaje en una animación (marcas paisajeAgua, paisajePisos y
+     paisajeVegetacion, encadenadas con s.retrasos): 1) el agua: los jardines inundables (los anillos de zacatón, caña
+     de indias, junco y espigas de agua, en tonos de agua) y los espejos de agua con su fondo; 2) los pisos: la plaza y
+     los andadores con sus juntas, las guarniciones, el pasto navajita, los cuatro pétreos y la tierra de las
+     arbustivas, cada franja con su contorno; 3) la vegetación con los colores del boceto (las masas de Burle Marx): los
+     árboles, las arbustivas, los magueyes y las cucharillas, los pastos, las plantas del agua y sus flores. En la
+     segunda, el año: pasan los doce meses (2.4 s cada uno) y cada franja toma el color de su follaje (más verde en lluvias, pajizo en secas),
      florece en sus meses (los de la rueda de floración del paquete) y las aromáticas en flor llevan un halo de su
      color que respira; los inundables se llenan de agua en lluvias. El mes va escrito sobre una azotea del contexto
      (proyectado desde arriba, como «circuito») y se reescribe al cambiar. Al terminar el año se suelta el foco.
@@ -1774,17 +1777,17 @@ export async function crea(api) {
     return { obj: o, mat: m, geo: g };
   }
   function radial(U, c, r0, r1) { U.uDib.value.z = 1; U.uDibO.value.copy(c); U.uDibV.value.set(r0, r1, 0); }
-  // las copias llevan materiales propios: las caras toman el color con uTinta (liso) y las líneas el suyo; devuelve
-  // los colores (para cambiarlos después)
-  function pinta(obj, cara, linea, gris) {
+  // las copias llevan materiales propios: las caras toman el color con uTinta (con el estilo del visor: el relleno
+  // oscuro, apenas teñido, según gris) y las líneas el suyo, claro; devuelve los colores (para cambiarlos después)
+  function pinta(obj, cara, linea, gris, modo) {   // (modo: el del sombreado, si se fuerza; 1 liso, como el estacionamiento)
     const r = { caras: [], lineas: [] };
     obj.traverse(x => {
       const m = x.material; if (!m) return;
       if (m.uniforms && m.uniforms.uTinta) {
         if (cara == null) return;
-        m.uniforms.uTinta.value.set(cara); if (m.uniforms.uModo) m.uniforms.uModo.value = 1;
-        if (m.uniforms.uGris) m.uniforms.uGris.value = gris == null ? 0.9 : gris;
-        if (m.uniforms.uGrano) m.uniforms.uGrano.value = 0;
+        m.uniforms.uTinta.value.set(cara);
+        if (m.uniforms.uGris && gris != null) m.uniforms.uGris.value = gris;
+        if (modo != null && m.uniforms.uModo) { m.uniforms.uModo.value = modo; if (m.uniforms.uGrano) m.uniforms.uGrano.value = 0; }
         r.caras.push(m.uniforms.uTinta.value);
       } else if (m.color && (linea || cara) != null) { m.color.set(linea || cara); r.lineas.push(m.color); }
     });
@@ -1800,12 +1803,12 @@ export async function crea(api) {
       if (lin) lin.poli(r.map(q => W(q[0], q[1], z + 0.01)), true);
     });
   }
-  // polígonos de un color en el canal U (copias propias)
-  function capaPol(nombre, pols, z, U, cara, linea, alto, gris) {
+  // polígonos de un color en el canal U (copias propias, con el material del visor de ese papel)
+  function capaPol(nombre, pols, z, U, cara, linea, alto, gris, papel) {
     const m = new Malla(), l = linea ? new Lineas() : null;
     pols.forEach(p => tapaPol(m, p, z, l, alto));
     const g = new THREE.Group(); g.name = 'paisaje-' + nombre;
-    if (m.p.length) pon(g, m, 'plaza', null, false, l || undefined);
+    if (m.p.length) pon(g, m, papel || 'plaza', null, false, l || undefined);
     const c = conCanal(g, U);
     return Object.assign({ obj: c }, pinta(c, cara, linea, gris));
   }
@@ -1813,7 +1816,7 @@ export async function crea(api) {
   const FLOR_MES = { M: 1, X: 1, S: 1, r: 0.45, '.': 0 };
   // el valor del mes f (0 enero … 11.99 diciembre), con el cambio al final de cada mes
   const enMes = (a, f) => { const i = Math.floor(f) % 12, j = (i + 1) % 12, t = f - Math.floor(f); return a[i] + (a[j] - a[i]) * suave(tramo(t, 0.7, 1)); };
-  const DUR_ANIO = 38000, MES_MS = 3000, ANIO_0 = 900;   // el año: entra (0.9 s), doce meses de 3 s y sale
+  const DUR_ANIO = 30800, MES_MS = 2400, ANIO_0 = 900;   // el año: entra (0.9 s), doce meses de 2.4 s y sale
   const PISO_PLAZA = { abre: 0, pon() {} };
   function armaPaisaje() {
     const P = window.ATLAMPA_HISTORIA_PAISAJE; if (!P) return;
@@ -1825,15 +1828,20 @@ export async function crea(api) {
     // 1 · el agua: los anillos inundables (en tonos de agua) y los espejos
     const g1 = marcaEn(gP, 'paisajeAgua'), UA = canalNuevo(), UE = canalNuevo();
     radial(UA, CP, 0, 100); radial(UE, CP, 0, 100);
-    const AGUA = { 'E-009': '#7db4ea', 'E-005': '#3d86c8', 'E-013': '#a3cde6', 'E-065': '#bcdbe6' };
+    // (como el paisaje del visor: rellenos oscuros apenas teñidos y los contornos claros, del color de cada uno)
+    const AGUA = { 'E-009': '#a9b8ff', 'E-005': '#6fb6ff', 'E-013': '#9fd8ff', 'E-065': '#c4e6ff' };
     const inund = {};
     Object.keys(AGUA).forEach(id => {
-      inund[id] = capaPol('inundable-' + id, P.manchas.filter(m => m.id === id).flatMap(m => m.pol), ZI, UA, AGUA[id], '#d6ebff', 0.12);
+      inund[id] = capaPol('inundable-' + id, P.manchas.filter(m => m.id === id).flatMap(m => m.pol), ZI, UA, AGUA[id], AGUA[id], 0.12, 0.17, 'agua');
       g1.add(inund[id].obj);
     });
-    const espejos = capaPol('espejos', P.agua.flatMap(a => a.pol), ZA, UE, '#2a6fbe', '#c4e2ff', 0.1);
-    g1.add(espejos.obj);
-    MARCA.paisajeAgua = { g: g1, piezas: [], rotulos: [], dur: 5200, durSale: 1200,
+    const espejos = capaPol('espejos', P.agua.flatMap(a => a.pol), ZA, UE, '#8fd0ff', '#bfe6ff', 0.1, 0.1, 'agua');
+    // el fondo de los espejos: anillos hacia dentro, como la laguna del visor
+    const lf = new Lineas(); (P.fondos || []).forEach(r => lf.poli(pares(r).map(q => W(q[0], q[1], ZA + 0.012)), true));
+    const gf = new THREE.Group(); ponLineas(gf, lf, 'paisaje-fondos', 0xffffff, null, null);
+    const fondos = conCanal(gf, UE); pinta(fondos, null, '#5e9fc6');
+    g1.add(espejos.obj, fondos);
+    MARCA.paisajeAgua = { g: g1, piezas: [], rotulos: [], dur: 4000, durSale: 1200,
       aplica(k) { armaCanal(UA, tramo(k, 0, 0.8)); armaCanal(UE, tramo(k, 0.25, 1)); },
       latido() {}
     };
@@ -1841,23 +1849,27 @@ export async function crea(api) {
     // 2 · los pisos: la plaza y los andadores (con sus juntas), las guarniciones y el suelo de cada franja
     const g2 = marcaEn(gP, 'paisajePisos'), UPz = canalNuevo(), UPq = canalNuevo();
     radial(UPz, CP, 0, 112); radial(UPq, CP, 0, 100);
-    const plaza = capaPol('plaza', P.piso, ZP, UPz, '#b9b2a4', '#d9d3c6', false, 0.78);
+    const plaza = capaPol('plaza', P.piso, ZP, UPz, '#efe7d6', '#cfc8b8', false, 0.12, 'plaza');
     const lj = new Lineas(), J = P.juntas;
     for (let i = 0; i < J.length; i += 4) lj.seg(W(J[i], J[i + 1], ZP + 0.012), W(J[i + 2], J[i + 3], ZP + 0.012));
     const gj = new THREE.Group(); ponLineas(gj, lj, 'paisaje-juntas', 0xffffff, null, null);
-    const juntas = conCanal(gj, UPz); pinta(juntas, null, '#8e887c');
-    const guarn = capaPol('guarniciones', P.guarniciones, ZQ + 0.08, UPq, '#e2ddd2', '#f4f1ea', 0.3, 0.85);
+    const juntas = conCanal(gj, UPz); pinta(juntas, null, '#3d3a35');
+    const guarn = capaPol('guarniciones', P.guarniciones, ZQ + 0.08, UPq, '#f2eee6', '#f4f1ea', 0.3, 0.26, 'plaza');
     g2.add(plaza.obj, juntas, guarn.obj);
-    const SUELO = { tierra: '#5d4b3b', 'E-060': '#a3b464' }, porSuelo = {};
-    P.manchas.forEach(m => { if (AGUA[m.id]) return; const k = /^PT-/.test(m.id) || m.id === 'E-060' ? m.id : 'tierra'; (porSuelo[k] = porSuelo[k] || []).push(...m.pol); });
+    // el suelo de cada franja, con su contorno del color de lo que va ahí (las franjas del boceto, dibujadas en el piso):
+    // los pétreos y el pasto con su color; las arbustivas, tierra
+    const SUELO = { 'E-060': ['#c8e07a', 0.16, 'verde'], 'PT-1': ['#ff8a66', 0.2, 'tezontle'], 'PT-2': ['#a8a29c', 0.1, 'tezontle'],
+      'PT-3': ['#ffffff', 0.26, 'tezontle'], 'PT-4': ['#d6d9d4', 0.16, 'tezontle'] }, TIERRA = ['#e0aa78', 0.08, 'verde'], porSuelo = {};
+    P.manchas.forEach(m => { if (AGUA[m.id]) return; (porSuelo[m.id] = porSuelo[m.id] || []).push(...m.pol); });
     const suelos = {};
     Object.keys(porSuelo).forEach(k => {
-      suelos[k] = capaPol('suelo-' + k, porSuelo[k], ZQ, UPq, SUELO[k] || P.petreos[k].color, null, false, 0.92);
+      const [c, gr, pa] = SUELO[k] || TIERRA, lin = SUELO[k] ? c : (ESP[k] && ESP[k].boceto) || c;
+      suelos[k] = capaPol('suelo-' + k, porSuelo[k], ZQ, UPq, c, lin, false, gr, pa);
       g2.add(suelos[k].obj);
     });
     // (la plaza se abre con el suelo cuando se muestra el estacionamiento: PISO_PLAZA.abre, de 0 a 1)
     PISO_PLAZA.pon = () => armaCanal(UPz, Math.min(tramo(marcaK.paisajePisos || 0, 0, 0.7), 1 - PISO_PLAZA.abre));
-    MARCA.paisajePisos = { g: g2, piezas: [], rotulos: [], dur: 5600, durSale: 1200,
+    MARCA.paisajePisos = { g: g2, piezas: [], rotulos: [], dur: 4400, durSale: 1200,
       aplica(k) { PISO_PLAZA.pon(); armaCanal(UPq, tramo(k, 0.3, 1)); },
       latido() {}
     };
@@ -1913,7 +1925,7 @@ export async function crea(api) {
         ponLineas(g, l, 'paisaje-' + id, 0xffffff, null, null);
       }
       const c = conCanal(g, UV); g3.add(c);
-      const pc = pinta(c, e.boceto || e.follaje, e.boceto || e.follaje, 0.92);
+      const pc = pinta(c, e.boceto || e.follaje, e.boceto || e.follaje, 0.24);   // (las masas, más oscuras: como los arbustos del visor)
       V.caras = pc.caras; V.lineas = pc.lineas;
       if (e.forma === 'domo' || e.forma === 'roseta' || e.forma === 'cana') V.crece.push(c);
       if (fl.length && e.mv.some(x => x > 0)) { V.flores = puntos(fl, e.flor, e.forma === 'domo' ? 4.2 : 3.4); g3.add(V.flores.obj); }
@@ -1932,7 +1944,7 @@ export async function crea(api) {
         b.aPos.setXYZ(i, p[0], p[1], p[2]); b.aEsc.setXY(i, ARB.ancho * H, ARB.alto * H); b.aTile.setX(i, TILE[id]); b.aVolt.setX(i, i % 2 ? 1 : -1);
       });
       ['aPos', 'aEsc', 'aTile', 'aVolt'].forEach(k => { b[k].needsUpdate = true; });
-      mat.uniforms.uTinta.value.set(ESP[id].follaje || '#7f9a5a'); mat.uniforms.uPlano.value = 0.42;   // (sobre el fondo oscuro: la copa con su verde)
+      mat.uniforms.uTinta.value.set(ESP[id].follaje || '#a8e063');   // (como en el visor: el croquis con el trazo de su verde)
       b.malla.renderOrder = 7; g3.add(b.malla); arboles[id] = { mat, base: mat.uniforms.uTinta.value.clone() };
     });
 
@@ -2002,7 +2014,7 @@ export async function crea(api) {
 
     // los tiempos de la vegetación y del año tocan los mismos colores: se calculan juntos
     const C1 = new THREE.Color(), C2 = new THREE.Color(), C3 = new THREE.Color(), SECO = new THREE.Color('#a39a72');
-    const TIERRA_H = new THREE.Color('#6b6a55'), NAV = [new THREE.Color('#bcae7c'), new THREE.Color('#8fae52'), new THREE.Color(SUELO['E-060'])];
+    const TIERRA_H = new THREE.Color('#d2b088'), NAV = [new THREE.Color('#e6d39a'), new THREE.Color('#b8e46e'), new THREE.Color(SUELO['E-060'][0])];
     let respira = 1, mesVisto = -1, mesDesde = 12, kAntes = 0, deRegreso = false;
     function paisajeEn() {
       const k3 = marcaK.paisajeVegetacion || 0, k4 = marcaK.paisajeAnio || 0, t = k4 * DUR_ANIO;
@@ -2036,7 +2048,7 @@ export async function crea(api) {
       uMes.uA.value = mesDesde; uMes.uB.value = m; uMes.uRev.value = t < ANIO_0 ? 0 : Math.min(1.02, tramo(f - m, 0, 0.2) * 1.02);
       uMes.uOp.value = deRegreso || !enAnio ? 0 : 0.9 * tramo(t, ANIO_0 * 0.5, ANIO_0) * (1 - tramo(k4, 0.975, 1));
     }
-    MARCA.paisajeVegetacion = { g: g3, piezas: [], rotulos: [], dur: 7500, durSale: 1400, aplica: paisajeEn, latido() {} };
+    MARCA.paisajeVegetacion = { g: g3, piezas: [], rotulos: [], dur: 6400, durSale: 1400, aplica: paisajeEn, latido() {} };
     // (si se llega a una slide posterior sin pasar por la del año, el año corre rápido: durEn)
     MARCA.paisajeAnio = { g: g4, piezas: [], rotulos: [], dur: DUR_ANIO, durEn: s => s.id === 'paisajeAnio' ? DUR_ANIO : 2400, durSale: 1600, aplica: paisajeEn,
       latido(ms) { if (!halos.length) return; respira = quieto.matches ? 1 : 0.72 + 0.28 * Math.sin(ms / 850); paisajeEn(); }
@@ -2077,7 +2089,7 @@ export async function crea(api) {
     E.bloques.forEach(b => { const pl = pares(b.planta); pl.forEach((q, i) => { if (i % 6 === 0) ls.seg(W(q[0], q[1], 0), W(q[0], q[1], FONDO)); }); });
     G.PRED.forEach((q, i) => { const r = G.PRED[(i + 1) % 4]; ls.poli([W(q[0], q[1], 0), W(r[0], r[1], 0), W(r[0], r[1], FONDO - 0.4), W(q[0], q[1], FONDO - 0.4)], true); });
     const gS = new THREE.Group(); pon(gS, ms, 'est', null, false, ls);
-    const sot = conCanal(gS, US); pinta(sot, '#a7b2bc', '#e4ebf0', 0.62);
+    const sot = conCanal(gS, US); pinta(sot, '#a7b2bc', '#e4ebf0', 0.62, 1);
     sot.traverse(x => { const m = x.material; if (m && m.uniforms && m.uniforms.uOpacidad) { m.uniforms.uOpacidad.value = 0.34; m.transparent = true; m.depthWrite = false; } });
     const gC = new THREE.Group(); ponLineas(gC, lc, 'est-cajones', 0xffffff, null, null);
     const caj = conCanal(gC, US); pinta(caj, null, '#b9c4cc');
@@ -2116,7 +2128,7 @@ export async function crea(api) {
       }
     }));
     const gR = new THREE.Group(); pon(gR, mr, 'rampa', null, false, lr);
-    const ram = conCanal(gR, UR); pinta(ram, AMBAR, '#ffd88a', 0.8);
+    const ram = conCanal(gR, UR); pinta(ram, AMBAR, '#ffd88a', 0.8, 1);
     g.add(ram);
     // los elevadores: del último sótano a lo más alto, con cada nivel
     const tope = (window.ATLAMPA_REVIT && window.ATLAMPA_REVIT.viviendaMaxZ) || 46.9;
@@ -2130,7 +2142,7 @@ export async function crea(api) {
       pol.forEach(q => le.seg(W(q[0], q[1], FONDO), W(q[0], q[1], tope)));
     });
     const gL = new THREE.Group(); pon(gL, me, 'est', null, false, le);
-    const elev = conCanal(gL, UL); pinta(elev, CIAN, '#bff1ff', 0.75);
+    const elev = conCanal(gL, UL); pinta(elev, CIAN, '#bff1ff', 0.75, 1);
     elev.traverse(x => { const m = x.material; if (m && m.uniforms && m.uniforms.uOpacidad) { m.uniforms.uOpacidad.value = 0.5; m.transparent = true; m.depthWrite = false; } });
     g.add(elev);
     // los flujos: puntos que recorren caminos 3D
@@ -2192,32 +2204,33 @@ export async function crea(api) {
     };
   }
 
-  /* ---------- 3l. El cierre: el proyecto completo y las personas ----------
-     Diego, 2026-11-28: la última slide muestra todo el proyecto con «circuito» escrito sobre el contexto (su «o» es el
-     aro: aro.o) y personas caminando por todo el desarrollo: por la plaza y los andadores (prepara-paisaje-historia.py)
-     y por la banqueta del predio (en el aro ya caminan desde la slide «El aro»: aroReal). */
-  function armaCierre() {
+  /* ---------- 3l. El proyecto terminado: la gente ----------
+     Diego, 2026-11-28: antes del cierre, el proyecto terminado de cerca, con gente caminando por todo el proyecto; la
+     gente sigue en la última slide (todo el proyecto con «circuito» escrito sobre el contexto; su «o» es el aro: aro.o).
+     Caminan por la plaza y los andadores (prepara-paisaje-historia.py), por la banqueta del predio y por los pasillos
+     de la vivienda, cada quien a su altura (en el aro ya caminan desde la slide «El aro»: aroReal). */
+  function armaGente() {
     const P = window.ATLAMPA_HISTORIA_PAISAJE;
-    const g = marcaEn(gH, 'cierre'), az = G.aleatorio(41);
-    const persona = (p, vel) => {
+    const g = marcaEn(gH, 'gente'), az = G.aleatorio(41);
+    const persona = (p, vel, z) => {
       const acc = [0]; for (let j = 1; j < p.length; j++) acc.push(acc[j - 1] + Math.hypot(p[j][0] - p[j - 1][0], p[j][1] - p[j - 1][1]));
-      return { p, acc, L: acc[acc.length - 1], lado: (az() - 0.5) * 1.6, s0: az() * acc[acc.length - 1] * 2, vel: vel * (0.8 + 0.4 * az()) * (az() < 0.5 ? 1 : -1),
-        tile: FIG.camina[Math.floor(az() * FIG.camina.length)], esc: PESC * (0.9 + 0.2 * az()) };
+      return { p, acc, L: acc[acc.length - 1], lado: (az() - 0.5) * (z ? 0.5 : 1.6), s0: az() * acc[acc.length - 1] * 2, vel: vel * (0.8 + 0.4 * az()) * (az() < 0.5 ? 1 : -1),
+        tile: FIG.camina[Math.floor(az() * FIG.camina.length)], esc: PESC * (0.9 + 0.2 * az()), z };
     };
-    const suelo = [];
-    if (P) P.rutas.forEach(r => { const n = 2 + (az() < 0.5 ? 1 : 0); for (let k = 0; k < n; k++) suelo.push(persona([[r[0], r[1]], [r[2], r[3]]], 1.3)); });
+    const lista = [];
+    if (P) P.rutas.forEach(r => { const n = 2 + (az() < 0.5 ? 1 : 0); for (let k = 0; k < n; k++) lista.push(persona([[r[0], r[1]], [r[2], r[3]]], 1.3)); });
+    if (P && P.rutasAlto) P.rutasAlto.forEach(r => { const n = 1 + (az() < 0.5 ? 1 : 0); for (let k = 0; k < n; k++) lista.push(persona([[r[0], r[1]], [r[2], r[3]]], 1.1, r[4] + 0.02)); });
     const GU = G.GU, esq = [[GU.o, GU.s], [GU.e, GU.s], [GU.e, GU.n], [GU.o, GU.n]], mitad = G.PRED.map((q, i) => [(q[0] + esq[i][0]) / 2, (q[1] + esq[i][1]) / 2]);
-    for (let k = 0; k < 26; k++) suelo.push(persona(mitad.concat([mitad[0]]), 1.3));
+    for (let k = 0; k < 26; k++) lista.push(persona(mitad.concat([mitad[0]]), 1.3));
     const malla = (lista, z) => {
       const mat = api.matAtlas(FIG.tex, FIG.N, FIG.POSES, canalNuevo()); mat.transparent = true; mat.uniforms.uOpacidad.value = 0;
-      mat.uniforms.uTinta.value.set('#2a2826');   // (oscuras: se leen sobre el piso claro de la plaza)
       const PMx = api.mallaAtlas(Math.max(1, lista.length), mat);
       lista.forEach((q, i) => { PMx.aEsc.setXY(i, FIG.ancho * q.esc, FIG.alto * q.esc); PMx.aTile.setX(i, q.tile); });
       PMx.malla.geometry.instanceCount = lista.length; PMx.z = z; PMx.malla.renderOrder = 14;
       g.add(PMx.malla); return { PM: PMx, mat, lista };
     };
-    const capas = [malla(suelo, 0.25)];
-    MARCA.cierre = { g, piezas: [], rotulos: [], dur: 2600, durSale: 900,
+    const capas = [malla(lista, 0.25)];   // (cada persona con su z; las de la plaza, a 0.25)
+    MARCA.gente = { g, piezas: [], rotulos: [], dur: 2600, durSale: 900,
       aplica(k) { capas.forEach(c => { c.mat.uniforms.uOpacidad.value = k; }); },
       latido(ms) { if (!quieto.matches) capas.forEach(c => mueveGente(c.lista, c.PM, ms)); }
     };
@@ -2510,7 +2523,7 @@ export async function crea(api) {
       for (let i = 0; i < EDIF.length; i += 120) { const a = i; tandas.push(() => armaEdificios(a, a + 120)); }
       tandas.push(armaAsentamientos, armaBalaceras, armaCultura, armaVerdes, armaEspuela, armaCircuitoProyecto, armaCircuitoAtlampa, armaMercado,
         armaDemolicion, armaCorteAro, armaAroO, armaAroReal, armaCulturaVolumen, armaCulturaCompleta, armaComercio, armaIndustria, armaVivienda,
-        armaPaisaje, armaEstacionamiento, armaCierre,
+        armaPaisaje, armaEstacionamiento, armaGente,
         () => { mueveCarros(performance.now()); caminan(performance.now()); });
       (function sigue() {
         tandas.shift()();

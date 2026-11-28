@@ -546,36 +546,16 @@ export default [
     rotulos: []
   },
 
-  /* El paisaje (Diego, 2026-11-28; Boceto 01d de Atlampa Landscape): el agua, los pisos, la vegetación y el año. */
+  /* El paisaje (Diego, 2026-11-28; Boceto 01d de Atlampa Landscape): todo el paisaje en una animación y el año. */
   {
-    id: 'paisajeAgua', etapa: 2,
-    titulo: 'Paisaje · agua',
-    // los jardines inundables (anillos de zacatón, caña de indias, junco y espigas de agua) y los espejos de agua
+    id: 'paisaje', etapa: 2,
+    titulo: 'Paisaje',
+    // entra todo de una: el agua (jardines inundables y espejos), luego los pisos (la plaza, los andadores, el pasto y
+    // los pétreos) y luego la vegetación (árboles, arbustivas, pastos, magueyes, plantas del agua y flores)
     camara: { centro: [505, 405, 4], h: 64, az: 105, el: 46, dur: 2800 },
     capas: { colonia: true, coches: true, limite: true },
-    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos', 'viviendaVolumen', 'viviendaSol', 'viviendaModulos', 'viviendaEdificio', 'paisajeAgua'],
-    foco: { uso: 'paisaje', desde: 'paisajeAgua' },
-    aro: { op: 0.95, sube: 0 },
-    rotulos: []
-  },
-  {
-    id: 'paisajePisos', etapa: 2,
-    titulo: 'Paisaje · pisos',
-    // la plaza y los andadores, las guarniciones, el pasto navajita y los cuatro pétreos
-    camara: { centro: [505, 405, 4], h: 64, az: 105, el: 46, dur: 1600 },
-    capas: { colonia: true, coches: true, limite: true },
-    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos', 'viviendaVolumen', 'viviendaSol', 'viviendaModulos', 'viviendaEdificio', 'paisajeAgua', 'paisajePisos'],
-    foco: { uso: 'paisaje', desde: 'paisajeAgua' },
-    aro: { op: 0.95, sube: 0 },
-    rotulos: []
-  },
-  {
-    id: 'paisajeVegetacion', etapa: 2,
-    titulo: 'Paisaje · vegetación',
-    // los árboles, las arbustivas, los pastos, los magueyes y las plantas del agua, con los colores del boceto
-    camara: { centro: [505, 405, 4], h: 64, az: 105, el: 46, dur: 1600 },
-    capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos', 'viviendaVolumen', 'viviendaSol', 'viviendaModulos', 'viviendaEdificio', 'paisajeAgua', 'paisajePisos', 'paisajeVegetacion'],
+    retrasos: { paisajePisos: 2200, paisajeVegetacion: 4600 },
     foco: { uso: 'paisaje', desde: 'paisajeAgua' },
     aro: { op: 0.95, sube: 0 },
     rotulos: []
@@ -583,7 +563,7 @@ export default [
   {
     id: 'paisajeAnio', etapa: 2,
     titulo: 'Paisaje · el año',
-    // pasan los doce meses (3 s cada uno): el tono, las flores y el aroma de cada franja; el mes se escribe sobre el
+    // pasan los doce meses (2.4 s cada uno): el tono, las flores y el aroma de cada franja; el mes se escribe sobre el
     // contexto (MARCAS.paisaje.mes). Al terminar se suelta el foco
     camara: { centro: [505, 428, 4], h: 68, az: 105, el: 46, dur: 1800 },
     capas: { colonia: true, coches: true, limite: true },
@@ -606,14 +586,25 @@ export default [
     rotulos: []
   },
 
-  /* El cierre: todo el proyecto, con «circuito» escrito sobre el contexto (su «o» es el aro) y personas caminando por
-     todo el desarrollo. */
+  /* El proyecto terminado, de cerca, con gente caminando por todo el proyecto (la plaza, los andadores, la banqueta, el
+     aro y los pasillos de la vivienda). */
+  {
+    id: 'proyecto', etapa: 2,
+    titulo: 'El proyecto',
+    camara: { centro: [505, 405, 12], h: 52, az: 105, el: 28, dur: 3000 },
+    capas: { colonia: true, coches: true, limite: true },
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos', 'viviendaVolumen', 'viviendaSol', 'viviendaModulos', 'viviendaEdificio', 'paisajeAgua', 'paisajePisos', 'paisajeVegetacion', 'paisajeAnio', 'gente'],
+    aro: { op: 0.95, sube: 0 },
+    rotulos: []
+  },
+
+  /* El cierre: todo el proyecto, con «circuito» escrito sobre el contexto (su «o» es el aro) y la gente caminando. */
   {
     id: 'cierre', etapa: 2,
     titulo: 'Circuito',
     camara: { encuadre: 'fondo', az: 37, el: 32, aire: 1.28, lado: 0, dur: 3200 },
     capas: { colonia: true, coches: true, limite: true },
-    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos', 'viviendaVolumen', 'viviendaSol', 'viviendaModulos', 'viviendaEdificio', 'paisajeAgua', 'paisajePisos', 'paisajeVegetacion', 'paisajeAnio', 'cierre'],
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos', 'viviendaVolumen', 'viviendaSol', 'viviendaModulos', 'viviendaEdificio', 'paisajeAgua', 'paisajePisos', 'paisajeVegetacion', 'paisajeAnio', 'gente'],
     fondo: { texto: 'circuito', pos: 'aro', op: 0.9, existente: 'contexto' },
     aro: { op: 0.95, sube: 0, o: 1 },   // (la cinta coral vuelve sobre el aro: es la o de la palabra)
     rotulos: []
