@@ -1473,33 +1473,34 @@ export async function crea(api) {
     { const x = cv.getContext('2d'); x.fillStyle = 'rgba(255,211,77,.18)'; x.beginPath(); x.arc(32, 32, 30, 0, 7); x.fill(); x.fillStyle = '#ffe9a8'; x.beginPath(); x.arc(32, 32, 13, 0, 7); x.fill(); }
     const mSol = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: 0, depthWrite: false });
     const sol = new THREE.Sprite(mSol); sol.scale.set(6, 6, 1);   // (en metros: la vista es axonométrica)
-    // la luz: los rayos que llegan a la boca de cada cono y la columna de luz que baja hasta el piso (a través del
-    // edificio: es un diagrama), con su mancha en el piso
-    const nC = conosLuz.length, posR = new Float32Array(nC * 6), gR = new THREE.BufferGeometry(); gR.setAttribute('position', new THREE.BufferAttribute(posR, 3));
-    const mRayo = new THREE.LineBasicMaterial({ color: ORO, transparent: true, opacity: 0, depthWrite: false }), rayos = new THREE.LineSegments(gR, mRayo);
+    // la luz que entra por cada cono: un haz que baja desde su boca hasta el piso con la inclinación del sol (a través
+    // del edificio: es un diagrama), con su mancha en el piso; los dos se mueven con el sol. El corrimiento en el piso
+    // se limita a CORRE m, para que la luz no se salga del módulo cuando el sol está bajo
+    const CORRE = 3.2, arriba = new THREE.Vector3(0, 1, 0), dirH = new THREE.Vector3(), pT = new THREE.Vector3(), pF = new THREE.Vector3();
     const mCol = new THREE.MeshBasicMaterial({ color: ORO, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
     const mMan = mCol.clone();
-    const luces = new THREE.Group();
-    conosLuz.forEach(c => {
+    const luces = new THREE.Group(), haces = conosLuz.map(c => {
       const col = new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r * 1.25, 1, 20, 1, true).translate(0, 0.5, 0), mCol);
-      col.position.set(...W(c.u, c.v, c.piso)); col.scale.y = Math.max(0.5, c.zT - c.piso - 0.2); col.renderOrder = 12; luces.add(col);
       const man = new THREE.Mesh(new THREE.CircleGeometry(c.r * 1.7, 28).rotateX(-Math.PI / 2), mMan);
-      man.position.set(...W(c.u, c.v, c.piso + 0.06)); man.renderOrder = 12; luces.add(man);
+      col.renderOrder = man.renderOrder = 12; luces.add(col, man);
+      return { c, col, man };
     });
-    [lArco, lHz, sol, rayos].forEach(o => { o.renderOrder = 11; });
-    g3.add(lArco, lHz, sol, rayos, luces);
+    [lArco, lHz, sol].forEach(o => { o.renderOrder = 11; });
+    g3.add(lArco, lHz, sol, luces);
     let solK = 0;
     function ponSol(t) {   // t: 0, cuando sale … 1, cuando se pone
-      const h = h0 + (h1 - h0) * t, q = G.solEn(DIA, h), alt = Math.max(1, q.alt);
+      const h = h0 + (h1 - h0) * t, q = G.solEn(DIA, h), alt = Math.max(3, q.alt);
       sol.position.copy(V3(...enCielo(alt, q.az)));
-      const d = dirSol(alt, q.az), L = 9;
-      conosLuz.forEach((c, i) => {
-        const t = W(c.u, c.v, c.zT), f = W(c.u + d[0] * L, c.v + d[1] * L, c.zT + d[2] * L);
-        posR.set(f, i * 6); posR.set(t, i * 6 + 3);
+      const d = dirSol(alt, q.az), hz = Math.hypot(d[0], d[1]) || 1;
+      haces.forEach(({ c, col, man }) => {
+        const alto = c.zT - c.piso, corre = Math.min(CORRE, alto * hz / Math.max(0.05, d[2]));   // lo que se corre la luz en el piso
+        pT.set(...W(c.u, c.v, c.zT - 0.2)); pF.set(...W(c.u - d[0] / hz * corre, c.v - d[1] / hz * corre, c.piso));
+        dirH.subVectors(pT, pF); const L = dirH.length();
+        col.position.copy(pF); col.quaternion.setFromUnitVectors(arriba, dirH.normalize()); col.scale.set(1, Math.max(0.5, L), 1);
+        man.position.set(pF.x, pF.y + 0.06, pF.z);
       });
-      gR.attributes.position.needsUpdate = true; gR.computeBoundingSphere();
       const s = Math.sin(alt * RAD);
-      mRayo.opacity = 0.75 * solK; mCol.opacity = (0.06 + 0.22 * s) * solK; mMan.opacity = (0.1 + 0.35 * s) * solK; mSol.opacity = solK;
+      mCol.opacity = (0.06 + 0.24 * s) * solK; mMan.opacity = (0.1 + 0.38 * s) * solK; mSol.opacity = solK;
     }
     // los conos; el arco se traza; el sol lo recorre una vez, de que sale a que se pone; luego el diagrama se va (y la
     // slide suelta el foco: foco.suelta)
@@ -1509,7 +1510,7 @@ export async function crea(api) {
         const t = tramo(k, 0.14, 0.26), fuera = 1 - tramo(k, 0.84, 0.92);
         arco.setDrawRange(0, Math.ceil(horas.length * t)); mArco.opacity = 0.9 * Math.min(1, t * 4) * fuera; mHz.opacity = 0.16 * t * fuera;
         solK = tramo(k, 0.24, 0.3) * fuera; ponSol(tramo(k, 0.28, 0.84));
-        lArco.visible = lHz.visible = mArco.opacity > 0.002; sol.visible = rayos.visible = luces.visible = solK > 0.002;
+        lArco.visible = lHz.visible = mArco.opacity > 0.002; sol.visible = luces.visible = solK > 0.002;
       },
       latido() {}
     };
@@ -1808,6 +1809,8 @@ export async function crea(api) {
   /* ---------- 7. Cámara de cada slide ---------- */
   function objetivo(cs, conTarjeta) {
     const az = cs.az === 'norte' || cs.az == null ? AZ_NORTE : cs.az, el = cs.el == null ? 60 : cs.el;
+    // una vista fija (calibrada contra una captura): centro [u, v, z] y h (la mitad del alto visible, en m)
+    if (cs.centro) { const p = V3(...cs.centro); return { c: [p.x, p.y, p.z], h: cs.h, az, el }; }
     const k = cs.encuadre === 'colonia' || !cs.encuadre ? CAJA_LIM : cs.encuadre;
     const a = az * RAD, e = el * RAD;
     const d = new THREE.Vector3(Math.sin(a) * Math.cos(e), -Math.sin(e), -Math.cos(a) * Math.cos(e));

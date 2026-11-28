@@ -491,7 +491,8 @@ export default [
     id: 'industriaConos', etapa: 2,
     titulo: 'Industria · luz',
     // los conos de luz y el recorrido del sol del 21 de diciembre; al final se suelta el foco
-    camara: { encuadre: [436, 330, 504, 412], az: 130, el: 18, aire: 1.12, lado: 0.26, dur: 2600 },
+    // el ángulo de la captura de Diego (2026-11-27), calibrado comparando capturas: una vista fija
+    camara: { centro: [502, 358, 4], h: 39.5, az: 316.5, el: 21.5, dur: 2600 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos'],
     foco: { uso: 'industria', desde: 'industriaVolumen', hasta: 'industriaConos', suelta: [0.93, 1] },
