@@ -19,8 +19,8 @@ Qué sale:
   mes; M, X o S en flor, r registro parcial, . sin floración), el color de la flor, el del boceto y el del follaje
   (en lluvias y en secas) y cómo se dibuja cada planta.
 - manchas, agua: como en el boceto (cada polígono [ext, hoyo, …], simplificado a 3 cm); arboles: centro y radio de copa.
-- piso: la plaza y los andadores (el predio menos los parques, el agua y las naves que no corta el aro), con huecos,
-  liso (sin juntas: así lo pidió Diego); guarniciones: el anillo de 0.20 m de cada parque.
+- guarniciones: el anillo de 0.20 m de cada parque. (La plaza y los andadores no llevan piso: se ve el fondo del
+  visor, así lo pidió Diego.)
 - plantas: por especie, dónde va cada planta [u, v, escala], repartidas en tresbolillo con su separación.
 - rutas: recorridos de las personas por la plaza y los andadores (sin cruzar muros ni parques); rutasAlto: por los
   pasillos de la vivienda [u0, v0, u1, v1, z] (de atlampa-historia-vivienda.js).
@@ -42,8 +42,6 @@ SALIDA = os.path.join(RAIZ, 'atlampa-historia-paisaje.js')
 
 BOC = json.load(open(os.path.join(RAIZ, 'modelo', 'paisaje-boceto01d.json'), encoding='utf-8'))
 PRED = box(447.963, 322.265, 558.963, 488.265)
-NAVES = [(504.601, 323.872, 558.546, 396.366), (522.782, 417.865, 558.81, 488.333)]   # G.NAVES
-ANILLO, CORTE = (505.75, 409.05), 47   # G.ANILLO (centro) y G.CORTE: el aro corta las naves
 
 # ---------- la paleta (rueda_floracion_atlampa.html y los colores del boceto) ----------
 # forma: cómo se dibuja (arbol, domo, roseta, pasto, cana, junco, espiga); alto y sep en m (sep: entre plantas)
@@ -100,14 +98,11 @@ def plano(p, nd=2):
     return [anillo(p.exterior)] + [anillo(i) for i in p.interiors]
 
 
-# ---------- el piso: la plaza y los andadores ----------
+# ---------- los parques (todo lo que no es plaza ni andador) ----------
 manchas = [poligono(m['ext'][0], m['int']) for m in BOC['manchas']]
 agua = [poligono(a['ext'][0], a['int']) for a in BOC['agua']]
 contornos = [poligono(c['p']) for c in BOC['contornos']]
 parques = unary_union(manchas + agua + contornos).buffer(0.02)
-naves = unary_union([box(*n) for n in NAVES]).difference(Point(ANILLO).buffer(CORTE, 128))
-piso = PRED.difference(parques).difference(naves)
-piso_pols = [p for p in poligonos(piso) if p.area > 4]
 
 # las guarniciones: cada contorno menos su guarnición (0.20 m hacia dentro)
 guarn = [poligono(g['p']) for g in BOC['guarniciones']]
@@ -229,7 +224,6 @@ out = {
                 for m, p in zip(BOC['manchas'], manchas)],
     'agua': [{'pol': [plano(q) for q in poligonos(p.simplify(0.03))], 'area': a['area']} for a, p in zip(BOC['agua'], agua)],
     'arboles': BOC['arboles'],
-    'piso': [plano(p) for p in piso_pols],
     'guarniciones': anillos_g,
     'plantas': plantas,
     'rutas': rutas,
@@ -241,7 +235,7 @@ txt = ('/* El paisaje del Modo historia (etapa 2). Generado por herramientas/pre
        'window.ATLAMPA_HISTORIA_PAISAJE = ' + json.dumps(out, ensure_ascii=False, separators=(',', ':')) + ';\n')
 open(SALIDA, 'w', encoding='utf-8', newline='\n').write(txt)
 cuenta = {k: len(v) // 3 for k, v in plantas.items()}
-print('piso: %d polígonos, %.0f m²; guarniciones %d' % (len(piso_pols), sum(p.area for p in piso_pols), len(anillos_g)))
+print('guarniciones %d' % len(anillos_g))
 print('plantas', cuenta, 'total', sum(cuenta.values()))
 print('rutas %d (%d intentos); libre %.0f m²; en los pasillos %d; fondos del agua %d' % (len(rutas), intentos, libre.area, len(rutas_alto), len(fondos)))
 print('%s: %.0f KB' % (os.path.basename(SALIDA), os.path.getsize(SALIDA) / 1024))

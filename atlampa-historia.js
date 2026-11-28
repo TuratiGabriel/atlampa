@@ -1753,8 +1753,8 @@ export async function crea(api) {
      apenas teñidos, contornos claros, árboles de croquis con su trazo verde, pastos de trazo y flores de punto). Dos
      slides: en la primera entra todo el paisaje en una animación (marcas paisajeAgua, paisajePisos y
      paisajeVegetacion, encadenadas con s.retrasos): 1) el agua: los jardines inundables (los anillos de zacatón, caña
-     de indias, junco y espigas de agua, en tonos de agua) y los espejos de agua con su fondo; 2) los pisos: la plaza y
-     los andadores (un fondo gris oscuro, sin juntas), las guarniciones, el pasto navajita, los cuatro pétreos y la tierra de las
+     de indias, junco y espigas de agua, en tonos de agua) y los espejos de agua con su fondo; 2) los pisos (la plaza
+     y los andadores sin piso: se ve el fondo del visor): las guarniciones, el pasto navajita, los cuatro pétreos y la tierra de las
      arbustivas, cada franja con su contorno; 3) la vegetación: los árboles, las arbustivas (masas oscuras en su verde,
      con muchos puntitos brillantes de flor, del color del boceto: las masas de Burle Marx), los magueyes y las
      cucharillas, los pastos, las plantas del agua. En la segunda, el año: pasan los doce meses (1.5 s cada uno) y cada
@@ -1818,11 +1818,10 @@ export async function crea(api) {
   // el valor del mes f (0 enero … 11.99 diciembre), con el cambio al final de cada mes
   const enMes = (a, f) => { const i = Math.floor(f) % 12, j = (i + 1) % 12, t = f - Math.floor(f); return a[i] + (a[j] - a[i]) * suave(tramo(t, 0.7, 1)); };
   const DUR_ANIO = 20000, MES_MS = 1500, ANIO_0 = 900;   // el año: entra (0.9 s), doce meses de 1.5 s y sale
-  const PISO_PLAZA = { abre: 0, pon() {} };
   function armaPaisaje() {
     const P = window.ATLAMPA_HISTORIA_PAISAJE; if (!P) return;
     const gP = new THREE.Group(); gP.name = 'paisaje'; gH.add(gP); FOCO.paisaje = [gP];
-    const ESP = P.especies, ZP = 0.21, ZQ = 0.34, ZI = 0.16, ZA = 0.1;   // la plaza, los parques, los inundables, el agua
+    const ESP = P.especies, ZQ = 0.34, ZI = 0.16, ZA = 0.1;   // los parques, los inundables, el agua
     const azarV = G.aleatorio(28), CP = V3(503.5, 405.3, 0);   // (el centro del predio: de ahí se dibuja todo hacia afuera)
     Object.values(ESP).forEach(e => { e.mv = e.m.split('').map(c => FLOR_MES[c] || 0); });
 
@@ -1847,12 +1846,12 @@ export async function crea(api) {
       latido() {}
     };
 
-    // 2 · los pisos: la plaza y los andadores (un fondo gris oscuro, liso: sin juntas), las guarniciones y el suelo de cada franja
-    const g2 = marcaEn(gP, 'paisajePisos'), UPz = canalNuevo(), UPq = canalNuevo();
-    radial(UPz, CP, 0, 112); radial(UPq, CP, 0, 100);
-    const plaza = capaPol('plaza', P.piso, ZP, UPz, '#ebebea', '#77736b', false, 0.12, 'plaza');   // (ligeramente gris, pero oscuro)
+    // 2 · los pisos: las guarniciones y el suelo de cada franja (la plaza y los andadores no llevan piso: ahí se ve el
+    // fondo del visor)
+    const g2 = marcaEn(gP, 'paisajePisos'), UPq = canalNuevo();
+    radial(UPq, CP, 0, 100);
     const guarn = capaPol('guarniciones', P.guarniciones, ZQ + 0.08, UPq, '#f2eee6', '#cfcac0', 0.3, 0.14, 'plaza');
-    g2.add(plaza.obj, guarn.obj);
+    g2.add(guarn.obj);
     // el suelo de cada franja, con su contorno del color de lo que va ahí (las franjas del boceto, dibujadas en el piso):
     // los pétreos y el pasto con su color; las arbustivas, tierra
     const SUELO = { 'E-060': ['#c8e07a', 0.16, 'verde'], 'PT-1': ['#ff8a66', 0.2, 'tezontle'], 'PT-2': ['#a8a29c', 0.1, 'tezontle'],
@@ -1864,10 +1863,8 @@ export async function crea(api) {
       suelos[k] = capaPol('suelo-' + k, porSuelo[k], ZQ, UPq, c, lin, false, gr, pa);
       g2.add(suelos[k].obj);
     });
-    // (la plaza se abre con el suelo cuando se muestra el estacionamiento: PISO_PLAZA.abre, de 0 a 1)
-    PISO_PLAZA.pon = () => armaCanal(UPz, Math.min(tramo(marcaK.paisajePisos || 0, 0, 0.7), 1 - PISO_PLAZA.abre));
     MARCA.paisajePisos = { g: g2, piezas: [], rotulos: [], dur: 4400, durSale: 1200,
-      aplica(k) { PISO_PLAZA.pon(); armaCanal(UPq, tramo(k, 0.3, 1)); },
+      aplica(k) { armaCanal(UPq, tramo(k, 0.3, 1)); },
       latido() {}
     };
 
@@ -2229,7 +2226,6 @@ export async function crea(api) {
         const abre = k > 0.001;
         sueloVisor.forEach(o => { o.visible = !abre; }); gHu.visible = abre; tapaS.visible = abre && k < 0.2;
         armaCanal(UH, 1 - tramo(k, 0.02, 0.18));
-        PISO_PLAZA.abre = tramo(k, 0.02, 0.18); PISO_PLAZA.pon();   // la plaza se abre con el suelo
         const s = tramo(k, 0.12, 0.44); sot.visible = caj.visible = s > 0; armaCanal(US, s);
         const r = tramo(k, 0.32, 0.6); ram.visible = r > 0; armaCanal(UR, r);
         const l = tramo(k, 0.48, 0.72); elev.visible = l > 0; armaCanal(UL, l);
