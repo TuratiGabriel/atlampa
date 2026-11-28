@@ -497,7 +497,9 @@ export default [
     id: 'vivienda', etapa: 2,
     titulo: 'Vivienda',
     // lo demás se apaga y se generan las dos volumetrías orgánicas: sus curvas de nivel y luego sus caras
-    camara: { centro: [508, 402, 25], h: 50, az: 20, el: 22, dur: 2800 },   // (una vista fija: el encuadre sólo mide hasta 18 m de alto)
+    // el ángulo de la captura de Diego (2026-11-27), calibrado comparando capturas; una vista fija (el encuadre sólo
+    // mide hasta 18 m de alto). Es el mismo en las cuatro slides de la vivienda
+    camara: { centro: [505, 405, 13], h: 59, az: 306, el: 27, dur: 2800 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos', 'viviendaVolumen'],
     foco: { uso: 'vivienda', desde: 'viviendaVolumen' },
@@ -508,8 +510,8 @@ export default [
     id: 'viviendaSol', etapa: 2,
     titulo: 'Vivienda · sol',
     // el recorrido del sol del 21 de diciembre; la superficie se vuelve el diagrama de horas de sol, que se llena
-    // mientras el sol avanza (más lejos, para que quepa el arco)
-    camara: { centro: [508, 402, 28], h: 60, az: 20, el: 22, dur: 1800 },
+    // mientras el sol avanza
+    camara: { centro: [505, 405, 13], h: 59, az: 306, el: 27, dur: 1800 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos', 'viviendaVolumen', 'viviendaSol'],
     foco: { uso: 'vivienda', desde: 'viviendaVolumen' },
@@ -520,7 +522,7 @@ export default [
     id: 'viviendaModulos', etapa: 2,
     titulo: 'Vivienda · módulos',
     // la volumetría se llena de módulos (con los pisos extra) y se quitan los que no convenían
-    camara: { centro: [508, 402, 25], h: 50, az: 20, el: 22, dur: 1800 },
+    camara: { centro: [505, 405, 13], h: 59, az: 306, el: 27, dur: 1800 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos', 'viviendaVolumen', 'viviendaSol', 'viviendaModulos'],
     foco: { uso: 'vivienda', desde: 'viviendaVolumen' },
@@ -532,7 +534,7 @@ export default [
     titulo: 'Vivienda · edificio',
     // los módulos dejan paso al edificio del Revit; luego las ventanas, los pasillos y los núcleos. Al final se suelta
     // el foco
-    camara: { centro: [508, 404, 27], h: 56, az: 20, el: 30, dur: 1600 },   // (más alto: que se vean los pasillos)
+    camara: { centro: [505, 405, 13], h: 59, az: 306, el: 27, dur: 1600 },
     capas: { colonia: true, coches: true, limite: true },
     marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos', 'viviendaVolumen', 'viviendaSol', 'viviendaModulos', 'viviendaEdificio'],
     foco: { uso: 'vivienda', desde: 'viviendaVolumen', hasta: 'viviendaEdificio', suelta: [0.93, 1] },

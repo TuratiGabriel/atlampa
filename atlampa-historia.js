@@ -1536,9 +1536,11 @@ export async function crea(api) {
     uniform vec3 uS; uniform vec3 uN; uniform float uB[6]; uniform vec2 uCen; uniform vec3 uLuz; uniform float uOp; uniform float uRej;
     varying vec3 vP; varying vec3 vN;
     float raya(float c) { float w = fwidth(c); float d = abs(fract(c + 0.5) - 0.5); return 1.0 - smoothstep(0.035 - w * 0.5, 0.035 + w, d); }
+    // (exagerada: los colores más saturados y una curva que separa lo intermedio de lo que más sol recibe)
     vec3 rampa(float h) {
-      vec3 c0 = vec3(0.80, 0.90, 1.0), c1 = vec3(1.0, 0.87, 0.34), c2 = vec3(1.0, 0.5, 0.2), c3 = vec3(0.78, 0.07, 0.06);
-      return h < 0.45 ? mix(c0, c1, h / 0.45) : h < 0.75 ? mix(c1, c2, (h - 0.45) / 0.3) : mix(c2, c3, (h - 0.75) / 0.25);
+      h = pow(clamp(h, 0.0, 1.0), 1.4);
+      vec3 c0 = vec3(0.6, 0.8, 1.0), c1 = vec3(1.0, 0.9, 0.18), c2 = vec3(1.0, 0.45, 0.05), c3 = vec3(0.88, 0.06, 0.04), c4 = vec3(0.52, 0.0, 0.04);
+      return h < 0.38 ? mix(c0, c1, h / 0.38) : h < 0.62 ? mix(c1, c2, (h - 0.38) / 0.24) : h < 0.84 ? mix(c2, c3, (h - 0.62) / 0.22) : mix(c3, c4, (h - 0.84) / 0.16);
     }
     void main() {
       vec3 n = normalize(cross(dFdx(vP), dFdy(vP))); if (dot(n, vN) < 0.0) n = -n;
