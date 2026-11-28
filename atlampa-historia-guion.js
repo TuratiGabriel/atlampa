@@ -48,25 +48,26 @@ export const MARCAS = {
     portones: { v0: 396.6, v1: 417.5, alto: 3.2 }
   },
   // Etapa 2 · la industria se arma desde su retícula: módulos de 5.5 × 4 m (los de los chacuacos del Revit), en dos
-  // niveles. Se parte del rectángulo completo y se quitan los módulos que no están en el proyecto (patios y bordes).
+  // niveles. Se parte del contorno, como una volumetría sola, y dentro se quitan los módulos que se quitaron.
   // Ejes girados: x a lo largo de giro (grados) desde origen. filas: de la fila de arriba (la más al norte, j = 9) a la
-  // de abajo (j = 0); '#' = módulo del proyecto, '.' = se quita. Sacado de la cubierta del Revit (2026-11-27).
-  // pbAbierta: [[i, j], …] módulos que se quitan sólo en planta baja (por confirmar con Diego).
+  // de abajo (j = 0), columnas i = 0… de poniente a oriente. '#' = módulo del proyecto · 'p' = se quita en los dos
+  // niveles (patio) · 'b' = se quita sólo en planta baja (planta baja libre) · '.' = fuera del contorno.
+  // Sacado del Revit (2026-11-27): patios = sin cubierta; planta baja libre = con losa del nivel 1 encima y casi sin
+  // muros en planta baja (aproximado).
   industria: {
     origen: [449.396, 360.185], giro: -9.9992, x0: -3.15, y0: -12.8, dx: 5.5, dy: 4, niveles: [0, 3.06, 6.2],
     filas: [
-      '..####..',
-      '######..',
-      '###.###.',
-      '###...#.',
-      '#######.',
-      '..#.###.',
-      '..#.###.',
-      '.##.#.##',
-      '.#######',
-      '.#####..'
-    ],
-    pbAbierta: []
+      '..##bb..',
+      '##bbb#..',
+      '###p###.',
+      '###pppb.',
+      '####bb#.',
+      '..#p#bb.',
+      '..#p###.',
+      '.##p#pb#',
+      '.###b#b#',
+      '.###bb..'
+    ]
   },
   // Booklet p. 68: franjas sobre el derecho de vía de la antigua espuela
   // (Crisantema, "Las Vías"), georreferidas con el límite de la colonia.
@@ -466,10 +467,10 @@ export default [
   {
     id: 'industria', etapa: 2,
     titulo: 'Industria',
-    // lo demás se apaga y aparece la retícula completa de módulos
+    // lo demás se apaga y aparece el contorno de la industria, como una volumetría sola
     camara: { encuadre: [440, 345, 500, 410], az: 37, el: 34, aire: 1.15, lado: 0.26, dur: 2800 },
     capas: { colonia: true, coches: true, limite: true },
-    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaModulos'],
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen'],
     foco: 'industria',
     aro: { op: 0.95, sube: 0 },
     rotulos: []
@@ -477,10 +478,11 @@ export default [
   {
     id: 'industriaPatios', etapa: 2,
     titulo: 'Industria · patios',
-    // se quitan los módulos de los patios y los bordes; queda el edificio, con sus vanos y su vidrio
-    camara: { encuadre: [440, 345, 500, 410], az: 37, el: 40, aire: 1.15, lado: 0.26, dur: 1400 },
+    // dentro del contorno se quitan los módulos de los patios y los de la planta baja libre; queda el edificio, con
+    // sus vanos y su vidrio (más bajo, para que se vea la planta baja)
+    camara: { encuadre: [440, 345, 500, 410], az: 37, el: 26, aire: 1.15, lado: 0.26, dur: 1400 },
     capas: { colonia: true, coches: true, limite: true },
-    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaModulos', 'industriaPatios'],
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios'],
     foco: 'industria',
     aro: { op: 0.95, sube: 0 },
     rotulos: []
@@ -491,7 +493,7 @@ export default [
     // los conos de luz y el recorrido del sol del 21 de diciembre; al final se suelta el foco
     camara: { encuadre: [436, 330, 504, 412], az: 130, el: 18, aire: 1.12, lado: 0.26, dur: 2600 },
     capas: { colonia: true, coches: true, limite: true },
-    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaModulos', 'industriaPatios', 'industriaConos'],
+    marcas: ['demolicion', 'corteAro', 'aroReal', 'culturaVolumen', 'culturaCompleta', 'comercio', 'comercioTecho', 'comercioVanos', 'comercioCanceleria', 'industriaVolumen', 'industriaPatios', 'industriaConos'],
     foco: { uso: 'industria', hasta: 'industriaConos' },
     aro: { op: 0.95, sube: 0 },
     rotulos: []

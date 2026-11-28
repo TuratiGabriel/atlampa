@@ -1247,51 +1247,67 @@ export async function crea(api) {
   }
 
   /* ---------- 3h. Etapa 2: la industria ----------
-     1) la retícula completa de módulos (MARCAS.industria: 5.5 × 4 m, dos niveles); 2) los módulos que no están en el
-     proyecto (patios y bordes) se marcan en rojo y se borran, y los que quedan dejan paso al edificio del Revit, con
-     sus vanos y su vidrio; 3) los chacuacos (los conos de luz) y el recorrido del sol del 21 de diciembre: la luz
-     entra por cada cono. Al terminar se suelta el foco. */
+     1) el contorno de la industria, como una volumetría sola (MARCAS.industria: la retícula de 5.5 × 4 m, en dos
+     niveles); 2) dentro de ella, los módulos que se quitaron (los de los patios y los de la planta baja libre) se
+     marcan en rojo y se borran, y lo que queda deja paso al edificio del Revit, con sus vanos y su vidrio; 3) los
+     chacuacos (los conos de luz) y el recorrido del sol del 21 de diciembre: la luz entra por cada cono. Al terminar
+     se suelta el foco. */
   function armaIndustria() {
     const D = MARCAS.industria; if (!D) return;
     const gI = new THREE.Group(); gI.name = 'industria'; gH.add(gI); FOCO.industria = [gI];
     const a = D.giro * RAD, ca = Math.cos(a), sa = Math.sin(a);
     const P = (x, y) => [D.origen[0] + x * ca - y * sa, D.origen[1] + x * sa + y * ca];
     const nI = D.filas[0].length, nJ = D.filas.length, z = D.niveles, e = 0.04;
-    const queda = new Malla(), quita = new Malla(), abierta = new Set((D.pbAbierta || []).map(q => q[0] + ',' + q[1]));
-    for (let j = 0; j < nJ; j++) for (let i = 0; i < nI; i++) {
-      const si = D.filas[nJ - 1 - j][i] === '#';
-      const x0 = D.x0 + i * D.dx + e, x1 = D.x0 + (i + 1) * D.dx - e, y0 = D.y0 + j * D.dy + e, y1 = D.y0 + (j + 1) * D.dy - e;
-      const pol = api.ccw([P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1)]);
-      for (let l = 0; l + 1 < z.length; l++) prisma(si && !(l === 0 && abierta.has(i + ',' + j)) ? queda : quita, pol, z[l] + e, z[l + 1] - e);
+    const tipo = (i, j) => i < 0 || j < 0 || i >= nI || j >= nJ ? '.' : D.filas[nJ - 1 - j][i];
+    const celdaPol = (i, j, m) => api.ccw([P(D.x0 + i * D.dx + m, D.y0 + j * D.dy + m), P(D.x0 + (i + 1) * D.dx - m, D.y0 + j * D.dy + m),
+      P(D.x0 + (i + 1) * D.dx - m, D.y0 + (j + 1) * D.dy - m), P(D.x0 + i * D.dx + m, D.y0 + (j + 1) * D.dy - m)]);
+    const celda = (u, v) => { const du = u - D.origen[0], dv = v - D.origen[1]; return [Math.floor((du * ca + dv * sa - D.x0) / D.dx), Math.floor((-du * sa + dv * ca - D.y0) / D.dy)]; };
+    // una volumetría sola: la envolvente de las celdas de cada nivel, sin las juntas entre módulos
+    function envolvente(en) {   // en(i, j, l): ¿la celda está en el nivel l?
+      const m = new Malla(), L = z.length - 1;
+      for (let l = 0; l < L; l++) for (let j = 0; j < nJ; j++) for (let i = 0; i < nI; i++) {
+        if (!en(i, j, l)) continue;
+        const q = celdaPol(i, j, 0), c = P(D.x0 + (i + 0.5) * D.dx, D.y0 + (j + 0.5) * D.dy);
+        api.muros(m, q, z[l], z[l + 1], null, (p, r) => {   // sólo los lados que dan afuera
+          const mu = (p[0] + r[0]) / 2, mv = (p[1] + r[1]) / 2, [ni, nj] = celda(mu + (mu - c[0]) * 0.2, mv + (mv - c[1]) * 0.2);
+          return !en(ni, nj, l);
+        });
+        if (l === L - 1 || !en(i, j, l + 1)) tapa(m, q, z[l + 1]);
+        if (l > 0 && !en(i, j, l - 1)) tapa(m, q, z[l], null, true);
+      }
+      return m;
     }
-    const modulos = (m, U) => { const o = new THREE.Group(); o.name = 'industria-modulos'; pon(o, m, 'industria', null, 25); return conCanal(o, U); };
-    const UQ = canalNuevo(), UR = canalNuevo();
-    const gQueda = modulos(queda, UQ), gQuita = modulos(quita, UR);
-    // 1 · la retícula completa
-    const g1 = marcaEn(gI, 'industriaModulos'); g1.add(gQueda, gQuita);
-    barridoSube(UQ, g1); UR.uDibO.value.copy(UQ.uDibO.value); UR.uDibV.value.copy(UQ.uDibV.value);
-    const sube = { O: UQ.uDibO.value.clone(), V: UQ.uDibV.value.clone() }, baja = canalNuevo(); barridoBaja(baja, UQ);
+    const masa = envolvente((i, j) => tipo(i, j) !== '.');                                      // todo el contorno
+    const queda = envolvente((i, j, l) => tipo(i, j) === '#' || (tipo(i, j) === 'b' && l > 0));  // lo que se queda
+    const quita = new Malla();                                                                  // los módulos que se quitan
+    for (let j = 0; j < nJ; j++) for (let i = 0; i < nI; i++) for (let l = 0; l + 1 < z.length; l++)
+      if (tipo(i, j) === 'p' || (tipo(i, j) === 'b' && l === 0)) prisma(quita, celdaPol(i, j, e), z[l] + e, z[l + 1] - e);
+    const volumen = (m, U) => { const o = new THREE.Group(); o.name = 'industria-volumen'; pon(o, m, 'industria', null, 25); return conCanal(o, U); };
+    const UA = canalNuevo(), UQ = canalNuevo(), UR = canalNuevo();
+    const gMasa = volumen(masa, UA), gQueda = volumen(queda, UQ), gQuita = volumen(quita, UR);
+    // 1 · el contorno, una volumetría sola
+    const g1 = marcaEn(gI, 'industriaVolumen'); g1.add(gMasa, gQueda, gQuita);
+    barridoSube(UA, gMasa); barridoBaja(UQ, UA); barridoBaja(UR, UA);   // (lo que se quita y lo que queda sólo se borran: lo de abajo primero)
     const tq = tintes(gQuita), rojoC = new THREE.Color(ROJO);
     let pulso = 1;
-    // los dos tiempos tocan los mismos canales: se calculan juntos
-    function modulosEn() {
-      const k1 = marcaK.industriaModulos || 0, k2 = marcaK.industriaPatios || 0, d = tramo(k1, 0, 1);
-      const dir = k2 > 0;   // al borrar, de abajo hacia arriba
-      [UQ, UR].forEach(U => { if (dir) { U.uDibO.value.copy(baja.uDibO.value); U.uDibV.value.copy(baja.uDibV.value); } else { U.uDibO.value.copy(sube.O); U.uDibV.value.copy(sube.V); } });
-      armaCanal(UR, Math.min(d, 1 - tramo(k2, 0.14, 0.42)));
-      armaCanal(UQ, Math.min(d, 1 - tramo(k2, 0.4, 0.9)));
-      gQuita.visible = k2 < 0.42; gQueda.visible = k2 < 0.9;
+    // los dos tiempos tocan los mismos grupos: se calculan juntos
+    function volumenEn() {
+      const k1 = marcaK.industriaVolumen || 0, k2 = marcaK.industriaPatios || 0, partido = k2 > 0.001;
+      armaCanal(UA, tramo(k1, 0, 1));
+      gMasa.visible = !partido; gQuita.visible = partido && k2 < 0.42; gQueda.visible = partido && k2 < 0.9;
+      armaCanal(UR, 1 - tramo(k2, 0.14, 0.42));
+      armaCanal(UQ, 1 - tramo(k2, 0.4, 0.9));
       const r = suave(tramo(k2, 0, 0.12)) * (k2 < 0.14 ? pulso : 1);
       tq.forEach(t => { t.c.copy(t.base).lerp(rojoC, r); if (t.g != null) t.m.uniforms.uGris.value = t.g + (0.42 - t.g) * r; });
     }
-    MARCA.industriaModulos = { g: g1, piezas: [], rotulos: [], dur: 5000, durSale: 1400, aplica: modulosEn, latido() {} };
-    // 2 · se quitan los módulos y queda el edificio, con sus vanos y su vidrio
+    MARCA.industriaVolumen = { g: g1, piezas: [], rotulos: [], dur: 4200, durSale: 1400, aplica: volumenEn, latido() {} };
+    // 2 · se quitan los módulos (patios y planta baja libre) y queda el edificio, con sus vanos y su vidrio
     const g2 = marcaEn(gI, 'industriaPatios'), UE = canalNuevo();
     const edif = copiaRevit(/^revit-industria-(walls|floors|windows|doors|curtainPanels)-/, UE); edif.visible = true; g2.add(edif);
     barridoSube(UE, edif);
     MARCA.industriaPatios = { g: g2, piezas: [], rotulos: [], dur: 7000, durSale: 1600,
-      aplica(k) { modulosEn(); const a = tramo(k, 0.42, 1); edif.visible = a > 0; armaCanal(UE, a); },
-      latido(ms, k) { pulso = k > 0.08 && k < 0.14 ? 0.82 + 0.18 * Math.sin(ms / 130) : 1; if (k > 0.08 && k < 0.14) modulosEn(); }
+      aplica(k) { volumenEn(); const a = tramo(k, 0.42, 1); edif.visible = a > 0; armaCanal(UE, a); },
+      latido(ms, k) { pulso = k > 0.08 && k < 0.14 ? 0.82 + 0.18 * Math.sin(ms / 130) : 1; if (k > 0.08 && k < 0.14) volumenEn(); }
     };
     // 3 · los conos de luz y el sol del 21 de diciembre
     const g3 = marcaEn(gI, 'industriaConos'), UK = canalNuevo();
