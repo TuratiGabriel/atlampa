@@ -1978,11 +1978,12 @@ export async function crea(api) {
       const o = new THREE.Points(geo, mat); o.renderOrder = 10; o.frustumCulled = false; g4.add(o);
       aromas.push({ id, mat });
     });
-    // el mes: los doce nombres en un atlas (y una fila vacía); se escribe de izquierda a derecha sobre el anterior. Va
-    // grande e impreso desde arriba sobre el contexto (el piso y los edificios de alrededor, no el predio), como
-    // «circuito»: se dobla con los techos y los muros. Se orienta con la cámara de la slide del año y su centro cae en el
-    // piso donde esa cámara ve MES.pantalla (0…1, desde la izquierda y desde arriba); MES.alto: la altura de la fila en la
-    // pantalla (fracción de su alto)
+    // el mes: los doce nombres en un atlas (y una fila vacía). Va grande e impreso desde arriba sobre el contexto (el
+    // piso y los edificios de alrededor, no el predio), como «circuito»: se dobla con los techos y los muros. Se alinea
+    // con las manzanas (el eje del predio que más se parece a la derecha de la pantalla, como en el sketch de Diego) y
+    // su centro cae en el piso donde la cámara del año ve MES.pantalla (0…1, desde la izquierda y desde arriba);
+    // MES.alto: la altura de la fila en la pantalla (fracción de su alto). Al cambiar de mes, el anterior se desmorona
+    // en migajas y el nuevo se arma con ellas, rápido, como la desintegración del visor
     const MES = Object.assign({ pantalla: [0.22, 0.6], alto: 0.18 }, MARCAS.paisaje && MARCAS.paisaje.mes);
     const fam = getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() || 'sans-serif';
     const cvM = document.createElement('canvas'), xm = cvM.getContext('2d'), RH = 200, PX = 168, PADM = 24, FILAS = 13;
@@ -1994,9 +1995,12 @@ export async function crea(api) {
     const sAnio = GUION.find(s => s.id === 'paisajeAnio'), cA = (sAnio && sAnio.camara && sAnio.camara.centro) ? sAnio.camara : { centro: [505, 405, 4], h: 64, az: 105, el: 46 };
     const aM = cA.az * RAD, eM = cA.el * RAD, dM = new THREE.Vector3(Math.sin(aM) * Math.cos(eM), -Math.sin(eM), -Math.cos(aM) * Math.cos(eM));
     const rM = new THREE.Vector3().crossVectors(dM, new THREE.Vector3(0, 1, 0)).normalize(), sM = new THREE.Vector3().crossVectors(rM, dM).normalize();   // (la pantalla)
-    const exM = new THREE.Vector3(Math.cos(aM), 0, Math.sin(aM)), nwM = new THREE.Vector3(Math.sin(aM), 0, -Math.cos(aM));   // (el texto, acostado en el piso)
-    // (en la pantalla conserva sus proporciones: a lo alto se estira lo que la cámara lo acorta)
-    const altoS = MES.alto * 2 * cA.h, altoM = altoS / Math.sin(eM), anchoM = altoS * cvM.width / RH, cM = V3(...cA.centro), oM = new THREE.Vector3();
+    // el texto, acostado en el piso a lo largo de las manzanas; lo de arriba de las letras, hacia el fondo
+    const exM = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]].map(e => new THREE.Vector3(...e)).reduce((p, q) => q.dot(rM) > p.dot(rM) ? q : p);
+    const nwM = new THREE.Vector3(exM.z, 0, -exM.x); if (nwM.dot(dM) < 0) nwM.negate();
+    // (en la pantalla conserva su tamaño: a lo alto se estira lo que la cámara lo acorta)
+    const altoS = MES.alto * 2 * cA.h, altoM = altoS / Math.max(0.2, nwM.dot(sM)), anchoM = altoS * cvM.width / RH / Math.max(0.2, exM.dot(rM));
+    const cM = V3(...cA.centro), oM = new THREE.Vector3();
     let aspM = 0;
     function centraMes() {   // (el centro en la pantalla depende de lo ancha que sea)
       const asp = trabajo.clientWidth / Math.max(1, trabajo.clientHeight); if (Math.abs(asp - aspM) < 1e-3) return; aspM = asp;
@@ -2007,21 +2011,27 @@ export async function crea(api) {
     const PR = G.PRED;
     let zMes = null;
     const uMes = { uMapa: { value: texM }, uO: { value: oM }, uEx: { value: exM }, uNw: { value: nwM }, uAncho: { value: anchoM }, uAlto: { value: altoM },
-      uOp: { value: 0 }, uA: { value: 12 }, uB: { value: 0 }, uRev: { value: 0 }, uFilas: { value: FILAS },
+      uOp: { value: 0 }, uA: { value: 12 }, uB: { value: 0 }, uT: { value: 0 }, uFilas: { value: FILAS }, uPx: { value: window.devicePixelRatio || 1 },
       uHueco: { value: new THREE.Vector4(PR[0][0], PR[0][1], PR[2][0], PR[2][1]) }, uCen: { value: new THREE.Vector2(CEN[0], CEN[1]) } };
     const matMes = new THREE.ShaderMaterial({
       uniforms: uMes,
       vertexShader: /* glsl */`varying vec3 vW; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
       fragmentShader: /* glsl */`uniform sampler2D uMapa; uniform vec3 uO; uniform vec3 uEx; uniform vec3 uNw; uniform float uAncho; uniform float uAlto;
-        uniform float uOp; uniform float uA; uniform float uB; uniform float uRev; uniform float uFilas; uniform vec4 uHueco; uniform vec2 uCen; varying vec3 vW;
+        uniform float uOp; uniform float uA; uniform float uB; uniform float uT; uniform float uFilas; uniform float uPx; uniform vec4 uHueco; uniform vec2 uCen; varying vec3 vW;
+        float azar(vec2 q) { return fract(sin(dot(q, vec2(12.9898, 78.233))) * 43758.5453); }
         void main() {
-          vec3 d = vW - uO; vec2 uv = vec2(dot(d, uEx) / uAncho + 0.5, dot(d, uNw) / uAlto + 0.5);
+          vec3 d = vW - uO; vec2 m = vec2(dot(d, uEx), dot(d, uNw)), uv = m / vec2(uAncho, uAlto) + 0.5;
           if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) discard;
           vec2 p = vec2(vW.x + uCen.x, uCen.y - vW.z); if (p.x > uHueco.x && p.x < uHueco.z && p.y > uHueco.y && p.y < uHueco.w) discard;   // (no sobre el predio)
-          float fila = uv.x < uRev ? uB : uA;
-          vec4 c = texture2D(uMapa, vec2(uv.x, 1.0 - (fila + 1.0 - uv.y) / uFilas)); if (c.a < 0.03) discard;
-          float borde = smoothstep(0.0, 0.012, abs(uv.x - uRev));   // la pluma: donde va escribiendo, un poco más tenue
-          gl_FragColor = vec4(c.rgb, c.a * uOp * mix(0.55, 1.0, borde));
+          // el cambio (uT 0…1): cada migaja (1.2 × 1.6 m en el piso) tiene su turno, de izquierda a derecha y con azar;
+          // la del mes anterior se va cuando le toca y la del nuevo llega un poco después. Al frente, el rayado del visor
+          float s = 0.55 * uv.x + 0.45 * azar(floor(m / vec2(1.2, 1.6))), tA = uT * 1.45 - 0.15, tB = uT * 1.45 - 0.3;
+          float a = s > tA ? texture2D(uMapa, vec2(uv.x, 1.0 - (uA + 1.0 - uv.y) / uFilas)).a : 0.0;
+          float b = s < tB ? texture2D(uMapa, vec2(uv.x, 1.0 - (uB + 1.0 - uv.y) / uFilas)).a : 0.0;
+          float raya = step(0.42, fract((gl_FragCoord.x - gl_FragCoord.y) / (4.5 * uPx))) * 0.6;
+          if (s < tA + 0.12) a *= raya; if (s > tB - 0.12) b *= raya;
+          float c = max(a, b); if (c < 0.03) discard;
+          gl_FragColor = vec4(1.0, 1.0, 1.0, c * uOp);
         }`,
       transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8
     });
@@ -2072,11 +2082,12 @@ export async function crea(api) {
       Object.keys(inund).forEach(id => { C1.set(AGUA[id]); C2.copy(TIERRA_H).lerp(C1, ll); C1.lerp(C2, a); inund[id].caras.forEach(c => c.copy(C1)); });
       if (suelos['E-060']) { C2.copy(NAV[0]).lerp(NAV[1], ll); C1.copy(NAV[2]).lerp(C2, a); suelos['E-060'].caras.forEach(c => c.copy(C1)); }
       aromas.forEach(h => { h.mat.uniforms.uOp.value = enAnio ? 0.55 * enMes(ESP[h.id].mv, f) * a * (1 - tramo(k4, 0.975, 1)) : 0; });
-      // el mes: se escribe sobre el anterior
+      // el mes: el anterior se desmorona y el nuevo se arma (en 0.6 s); al final, diciembre se desmorona solo
       if (enAnio) centraMes();
-      const m = Math.floor(f);
+      const m = Math.floor(f), tFin = ANIO_0 + 12 * MES_MS;
       if (m !== mesVisto) { mesDesde = mesVisto < 0 || m === 0 ? 12 : m - 1; mesVisto = m; }
-      uMes.uA.value = mesDesde; uMes.uB.value = m; uMes.uRev.value = t < ANIO_0 ? 0 : Math.min(1.02, tramo(f - m, 0, 0.2) * 1.02);
+      if (t > tFin) { uMes.uA.value = 11; uMes.uB.value = 12; uMes.uT.value = tramo(t, tFin, tFin + 600); }
+      else { uMes.uA.value = mesDesde; uMes.uB.value = m; uMes.uT.value = t < ANIO_0 ? 0 : tramo(t - ANIO_0 - m * MES_MS, 0, 600); }
       uMes.uOp.value = deRegreso || !enAnio ? 0 : 0.9 * tramo(t, ANIO_0 * 0.5, ANIO_0) * (1 - tramo(k4, 0.975, 1));
       if (zMes) zMes.visible = uMes.uOp.value > 0.001;   // (fuera del año no tapa nada)
     }

@@ -23,10 +23,10 @@
    ============================================================ */
 
 export const MARCAS = {
-  // El paisaje (slide «Paisaje · el año»): dónde se escribe el mes, en grande sobre el contexto (proyectado desde la
-  // cámara de esa slide): pantalla [x, y] es su centro (0…1, desde la izquierda y desde arriba) y alto, la altura de la
-  // fila (fracción del alto de la pantalla)
-  paisaje: { mes: { pantalla: [0.225, 0.6], alto: 0.21 } },
+  // El paisaje (slide «Paisaje · el año»): dónde se escribe el mes, en grande e impreso sobre el contexto, alineado
+  // con las manzanas (el sketch de Diego): pantalla [x, y] es dónde lo ve la cámara de esa slide (0…1, desde la
+  // izquierda y desde arriba) y alto, la altura de la fila (fracción del alto de la pantalla)
+  paisaje: { mes: { pantalla: [0.23, 0.57], alto: 0.21 } },
   // El predio hoy, con el levantamiento detallado de Luis desde Google Earth (handoff/LEVANTAMIENTO_PREEXISTENCIA.md;
   // es el mismo de atlampa-3d.js, historiaGrupo). Las dos naves orientales son G.NAVES y se conservan; estas piezas
   // son lo que se demuele en la etapa 2. Subdivisiones y alturas aproximadas. planta: [u0, v0, u1, v1].
